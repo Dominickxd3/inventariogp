@@ -10,6 +10,7 @@ import trabajadoresRoutes from './routes/trabajadores.routes.js';
 import asignacionesRoutes from './routes/asignaciones.routes.js';
 import incidenciasRoutes from './routes/incidencias.routes.js';
 import componentesRoutes from './routes/componentes.routes.js';
+import authRoutes from './routes/auth.routes.js';
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.use('/api/trabajadores', trabajadoresRoutes);
 app.use('/api/asignaciones', asignacionesRoutes);
 app.use('/api/incidencias', incidenciasRoutes);
 app.use('/api/componentes', componentesRoutes);
+app.use('/api/auth', authRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

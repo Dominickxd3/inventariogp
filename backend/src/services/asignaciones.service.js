@@ -18,6 +18,7 @@ export const AsignacionesService = {
 
     const idAsig = await AsignacionesRepository.asignar(data);
     await EquiposRepository.updateEstado(data.IdMaeEquipo, 'ASIGNADO');
+    await EquiposRepository.registrarCambioEstado(data.IdMaeEquipo, equipo.Estado, 'ASIGNADO', data.IdUsuario, 'Equipo asignado');
 
     if (data.componentes?.length) {
       for (const comp of data.componentes) {
@@ -27,11 +28,12 @@ export const AsignacionesService = {
     return idAsig;
   },
 
-  async cesar(id) {
+  async cesar(id, idUsuario) {
     const asig = await AsignacionesRepository.getById(id);
     if (!asig) throw new Error('Asignación no encontrada');
     await AsignacionesRepository.cesar(id);
     await EquiposRepository.updateEstado(asig.IdMaeEquipo, 'DISPONIBLE');
+    await EquiposRepository.registrarCambioEstado(asig.IdMaeEquipo, 'ASIGNADO', 'DISPONIBLE', idUsuario, 'Asignación finalizada');
   },
 
   async getHistorialByEquipo(idEquipo) {

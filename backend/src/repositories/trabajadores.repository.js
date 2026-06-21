@@ -14,14 +14,14 @@ export const TrabajadoresRepository = {
       FROM Personal_periodo
       WHERE 1=1
     `;
+    const params = {};
     if (filtros.search) {
-      sql += ` AND (DNI LIKE '%${filtros.search}%' OR CodEmpleado LIKE '%${filtros.search}%'
-        OR APaterno LIKE '%${filtros.search}%' OR AMaterno LIKE '%${filtros.search}%'
-        OR Nombres LIKE '%${filtros.search}%')`;
+      sql += ' AND (DNI LIKE @search OR CodEmpleado LIKE @search OR APaterno LIKE @search OR AMaterno LIKE @search OR Nombres LIKE @search)';
+      params.search = `%${filtros.search}%`;
     }
     if (filtros.activos !== 'false') sql += ' AND Cesado IS NULL';
     sql += ' ORDER BY APaterno, AMaterno, Nombres';
-    return query('SIGA_ASISTENCIA', sql);
+    return query('SIGA_ASISTENCIA', sql, params);
   },
 
   async getById(id) {

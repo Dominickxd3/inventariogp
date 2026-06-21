@@ -13,10 +13,11 @@ export const IncidenciasRepository = {
       LEFT JOIN SIGA_ASISTENCIA.dbo.Personal_periodo p ON i.IdReferente = p.PersonalId
       WHERE 1=1
     `;
-    if (filtros.estado) sql += ` AND i.Estado = '${filtros.estado}'`;
-    if (filtros.tipo) sql += ` AND i.TipoIncidencia = '${filtros.tipo}'`;
+    const params = {};
+    if (filtros.estado) { sql += ' AND i.Estado = @estado'; params.estado = filtros.estado; }
+    if (filtros.tipo) { sql += ' AND i.TipoIncidencia = @tipo'; params.tipo = filtros.tipo; }
     sql += ' ORDER BY i.FecRegistro DESC';
-    return query(DB, sql);
+    return query(DB, sql, params);
   },
 
   async getById(id) {

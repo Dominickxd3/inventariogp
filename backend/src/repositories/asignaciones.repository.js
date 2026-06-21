@@ -15,11 +15,12 @@ export const AsignacionesRepository = {
       LEFT JOIN SIGA_ASISTENCIA.dbo.Personal_periodo p ON a.IdReferente = p.PersonalId
       WHERE 1=1
     `;
-    if (filtros.estado) sql += ` AND a.Estado = '${filtros.estado}'`;
-    if (filtros.idEquipo) sql += ` AND a.IdMaeEquipo = ${filtros.idEquipo}`;
-    if (filtros.idTrabajador) sql += ` AND a.IdReferente = ${filtros.idTrabajador}`;
+    const params = {};
+    if (filtros.estado) { sql += ' AND a.Estado = @estado'; params.estado = filtros.estado; }
+    if (filtros.idEquipo) { sql += ' AND a.IdMaeEquipo = @idEquipo'; params.idEquipo = filtros.idEquipo; }
+    if (filtros.idTrabajador) { sql += ' AND a.IdReferente = @idTrabajador'; params.idTrabajador = filtros.idTrabajador; }
     sql += ' ORDER BY a.FecRegistro DESC';
-    return query(DB, sql);
+    return query(DB, sql, params);
   },
 
   async getById(id) {

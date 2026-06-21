@@ -10,10 +10,11 @@ export const ComponentesRepository = {
       LEFT JOIN Tab_EQ_TipodeComponentes tc ON c.IdTipodeComponente = tc.IdTipodeComponente
       WHERE 1=1
     `;
-    if (filtros.estado) sql += ` AND c.Estado = '${filtros.estado}'`;
-    if (filtros.idTipo) sql += ` AND c.IdTipodeComponente = ${filtros.idTipo}`;
+    const params = {};
+    if (filtros.estado) { sql += ' AND c.Estado = @estado'; params.estado = filtros.estado; }
+    if (filtros.idTipo) { sql += ' AND c.IdTipodeComponente = @idTipo'; params.idTipo = filtros.idTipo; }
     sql += ' ORDER BY c.DesComponente';
-    return query(DB, sql);
+    return query(DB, sql, params);
   },
 
   async getById(id) {
@@ -111,6 +112,43 @@ export const ComponentesRepository = {
   async desasignarDeEquipo(idMov) {
     const comp = await query(DB, 'SELECT IdComponente FROM Tab_EQ_MovEquiposComponentes WHERE IdMovEquipoComponente = @id', { id: idMov });
     await query(DB, "UPDATE Tab_EQ_MovEquiposComponentes SET Estado = 'BAJA', FecBajaComponente = GETDATE() WHERE IdMovEquipoComponente = @id", { id: idMov });
+    if (comp[0]) {
+      await query(DB, "UPDATE Tab_EQ_Componentes SET Estado = 'DISPONIBLE' WHERE IdComponente = @id", { id: comp[0].IdComponente });
+    }
+  },
+
+  async listAccesoriosPorTrabajador(idTrabajador) {
+    return query(DB, `
+      SELECT m.*, c.CodComponente, c.DesComponente, c.Marca, c.Modelo, c.Serie,
+             tc.DesTipodeComponente
+      FROM Tab_EQ_MovAccesoriosTrabajador m
+      JOIN Tab_EQ_Componentes c ON m.IdComponente = c.IdComponente
+      LEFT JOIN Tab_EQ_TipodeComponentes tc ON c.IdTipodeComponente = tc.IdTipodeComponente
+      WHERE m.IdReferente = @id AND m.Estado = 'VIGENTE'
+      ORDER BY m.FecAsignacion DESC
+    `, { id: idTrabajador });
+  },
+
+  async asignarAccesorioATrabajador(data) {
+    const result = await query(DB, `
+      INSERT INTO Tab_EQ_MovAccesoriosTrabajador
+        (IdComponente, IdReferente, FecAsignacion, Obs, Estado, IdUsuarioCrea)
+      OUTPUT INSERTED.IdMovAccesorio
+      VALUES (@idComponente, @idTrabajador, @fec, @obs, 'VIGENTE', @idUsuario)
+    `, {
+      idComponente: data.IdComponente,
+      idTrabajador: data.IdReferente,
+      fec: data.FecAsignacion || new Date().toISOString().split('T')[0],
+      obs: data.Obs || null,
+      idUsuario: data.IdUsuario || null,
+    });
+    await query(DB, "UPDATE Tab_EQ_Componentes SET Estado = 'ASIGNADO' WHERE IdComponente = @id", { id: data.IdComponente });
+    return result[0]?.IdMovAccesorio;
+  },
+
+  async cesarAccesorioATrabajador(idMov) {
+    const comp = await query(DB, 'SELECT IdComponente FROM Tab_EQ_MovAccesoriosTrabajador WHERE IdMovAccesorio = @id', { id: idMov });
+    await query(DB, "UPDATE Tab_EQ_MovAccesoriosTrabajador SET Estado = 'CESADO', FecCese = GETDATE() WHERE IdMovAccesorio = @id", { id: idMov });
     if (comp[0]) {
       await query(DB, "UPDATE Tab_EQ_Componentes SET Estado = 'DISPONIBLE' WHERE IdComponente = @id", { id: comp[0].IdComponente });
     }

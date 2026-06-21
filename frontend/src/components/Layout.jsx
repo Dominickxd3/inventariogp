@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Laptop, Users, ClipboardList,
-  AlertTriangle, Package, ScanLine, Menu, X, QrCode,
+  AlertTriangle, Package, ScanLine, Menu, X, QrCode, LogOut, User,
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -18,6 +19,8 @@ const navItems = [
 export default function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { usuario, logout } = useAuth();
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -69,7 +72,22 @@ export default function Layout({ children }) {
             <Menu className="w-6 h-6" />
           </button>
           <div className="flex items-center gap-3 ml-auto">
-            <span className="text-sm text-gray-500">Grupo Grupecsac</span>
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <User className="w-4 h-4" />
+              <span>{usuario?.nombre || 'Invitado'}</span>
+              <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+                {usuario?.rol || '—'}
+              </span>
+            </div>
+            {usuario && (
+              <button
+                onClick={() => { logout(); navigate('/login'); }}
+                className="p-2 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50"
+                title="Cerrar sesión"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </header>
         <main className="flex-1 p-4 lg:p-6 overflow-auto">

@@ -76,4 +76,23 @@ router.post('/tipos', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.post('/:id/estado', async (req, res, next) => {
+  try {
+    const equipo = await EquiposService.cambiarEstado(
+      parseInt(req.params.id),
+      req.body.estado,
+      req.usuario?.id,
+      req.body.obs
+    );
+    res.json(equipo);
+  } catch (e) { next(e); }
+});
+
+router.get('/:id/historial-estados', async (req, res, next) => {
+  try {
+    const historial = await EquiposService.getHistorialEstados(parseInt(req.params.id));
+    res.json(historial);
+  } catch (e) { next(e); }
+});
+
 export default router;

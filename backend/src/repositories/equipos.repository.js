@@ -10,11 +10,12 @@ export const EquiposRepository = {
       LEFT JOIN Tab_EQ_TipodeEquipos t ON e.IdTipodeEquipo = t.IdTipodeEquipo
       WHERE 1=1
     `;
-    if (filtros.estado) sql += ` AND e.Estado = '${filtros.estado}'`;
-    if (filtros.idTipo) sql += ` AND e.IdTipodeEquipo = ${filtros.idTipo}`;
-    if (filtros.search) sql += ` AND (e.CodEquipo LIKE '%${filtros.search}%' OR e.CodBarra LIKE '%${filtros.search}%')`;
+    const params = {};
+    if (filtros.estado) { sql += ' AND e.Estado = @estado'; params.estado = filtros.estado; }
+    if (filtros.idTipo) { sql += ' AND e.IdTipodeEquipo = @idTipo'; params.idTipo = filtros.idTipo; }
+    if (filtros.search) { sql += " AND (e.CodEquipo LIKE @search OR e.CodBarra LIKE @search)"; params.search = `%${filtros.search}%`; }
     sql += ' ORDER BY e.FecCreacion DESC';
-    return query(DB, sql);
+    return query(DB, sql, params);
   },
 
   async getById(id) {
@@ -88,5 +89,29 @@ export const EquiposRepository = {
       VALUES (@cod, @desc, 'ACTIVO')
     `, { cod: data.CodTipodeEquipo || 'GEN', desc: data.DesTipodeEquipo });
     return result[0]?.IdTipodeEquipo;
+  },
+
+  async registrarCambioEstado(idEquipo, estadoAnterior, estadoNuevo, idUsuario, obs) {
+    await query(DB, `
+      INSERT INTO Tab_EQ_MovEstadosEquipos
+        (IdMaeEquipo, EstadoAnterior, EstadoNuevo, IdUsuario, Obs)
+      VALUES (@idEquipo, @estadoAnterior, @estadoNuevo, @idUsuario, @obs)
+    `, {
+      idEquipo,
+      estadoAnterior,
+      estadoNuevo,
+      idUsuario: idUsuario || null,
+      obs: obs || null,
+    });
+  },
+
+  async getHistorialEstados(idEquipo) {
+    return query(DB, `
+      SELECT e.*, u.NombreUsuario
+      FROM Tab_EQ_MovEstadosEquipos e
+      LEFT JOIN Tab_SYS_Usuarios u ON e.IdUsuario = u.IdUsuario
+      WHERE e.IdMaeEquipo = @id
+      ORDER BY e.FecCambio DESC
+    `, { id: idEquipo });
   },
 };

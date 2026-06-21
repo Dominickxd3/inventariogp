@@ -14,7 +14,8 @@ export const EquiposService = {
     if (!equipo) return null;
     const asignacion = await AsignacionesRepository.getActivaByEquipo(id);
     const componentes = await ComponentesRepository.getByEquipo(id);
-    return { ...equipo, asignacion, componentes };
+    const historialEstados = await EquiposRepository.getHistorialEstados(id);
+    return { ...equipo, asignacion, componentes, historialEstados };
   },
 
   async getByCodigo(codBarra) {
@@ -30,11 +31,17 @@ export const EquiposService = {
       data.CodBarra = `QR-${data.CodEquipo}-${Date.now().toString(36).toUpperCase()}`;
     }
     const id = await EquiposRepository.create(data);
-    return this.getById(id);
+    const equipo = await this.getById(id);
+    await EquiposRepository.registrarCambioEstado(id, null, 'DISPONIBLE', data.IdUsuario, 'Equipo creado');
+    return equipo;
   },
 
   async update(id, data) {
+    const anterior = await EquiposRepository.getById(id);
     await EquiposRepository.update(id, data);
+    if (data.Estado && anterior && anterior.Estado !== data.Estado) {
+      await EquiposRepository.registrarCambioEstado(id, anterior.Estado, data.Estado, data.IdUsuario);
+    }
     return this.getById(id);
   },
 
@@ -42,6 +49,15 @@ export const EquiposService = {
     const activa = await AsignacionesRepository.getActivaByEquipo(id);
     if (activa) throw new Error('No se puede eliminar un equipo con asignación activa');
     await EquiposRepository.delete(id);
+  },
+
+  async cambiarEstado(id, nuevoEstado, idUsuario, obs) {
+    const equipo = await EquiposRepository.getById(id);
+    if (!equipo) throw new Error('Equipo no encontrado');
+    const estadoAnterior = equipo.Estado;
+    await EquiposRepository.updateEstado(id, nuevoEstado);
+    await EquiposRepository.registrarCambioEstado(id, estadoAnterior, nuevoEstado, idUsuario, obs);
+    return this.getById(id);
   },
 
   async generarQR(id) {
@@ -60,11 +76,16 @@ export const EquiposService = {
     return EquiposRepository.createTipo(data);
   },
 
+  async getHistorialEstados(id) {
+    return EquiposRepository.getHistorialEstados(id);
+  },
+
   async dashboard() {
     const todos = await EquiposRepository.listAll();
     const total = todos.length;
     const disponibles = todos.filter(e => e.Estado === 'DISPONIBLE').length;
     const asignados = todos.filter(e => e.Estado === 'ASIGNADO').length;
+    const mantenimiento = todos.filter(e => e.Estado === 'MANTENIMIENTO').length;
     const incidencia = todos.filter(e => e.Estado === 'INCIDENCIA').length;
     const baja = todos.filter(e => e.Estado === 'BAJA').length;
 
@@ -74,6 +95,6 @@ export const EquiposService = {
       porTipo[tipo] = (porTipo[tipo] || 0) + 1;
     });
 
-    return { total, disponibles, asignados, incidencia, baja, porTipo };
+    return { total, disponibles, asignados, mantenimiento, incidencia, baja, porTipo };
   },
 };

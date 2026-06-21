@@ -20,14 +20,16 @@ router.get('/:id', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
   try {
-    const id = await AsignacionesService.asignar(req.body);
+    if (!req.usuario?.id) return res.status(401).json({ error: 'Se requiere autenticación' });
+    const data = { ...req.body, IdUsuario: req.usuario.id };
+    const id = await AsignacionesService.asignar(data);
     res.status(201).json({ id, message: 'Equipo asignado correctamente' });
   } catch (e) { next(e); }
 });
 
 router.post('/:id/cesar', async (req, res, next) => {
   try {
-    await AsignacionesService.cesar(parseInt(req.params.id));
+    await AsignacionesService.cesar(parseInt(req.params.id), req.usuario?.id);
     res.json({ message: 'Asignación finalizada' });
   } catch (e) { next(e); }
 });

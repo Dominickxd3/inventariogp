@@ -1,10 +1,20 @@
 const BASE = '/api';
 
+function getAuthHeaders() {
+  const token = localStorage.getItem('token');
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+}
+
 async function request(url, options = {}) {
   const res = await fetch(`${BASE}${url}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(), ...options.headers },
     ...options,
   });
+  if (res.status === 401) {
+    localStorage.removeItem('token');
+    window.location.href = '/login';
+    throw new Error('Sesión expirada');
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || 'Error en la solicitud');
@@ -55,6 +65,13 @@ export const api = {
     get: (id) => request(`/incidencias/${id}`),
     create: (data) => request('/incidencias', { method: 'POST', body: JSON.stringify(data) }),
     cerrar: (id) => request(`/incidencias/${id}/cerrar`, { method: 'POST' }),
+  },
+
+  // Auth
+  auth: {
+    login: (usuario, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ usuario, password }) }),
+    me: () => request('/auth/me'),
+    crearUsuario: (data) => request('/auth/usuarios', { method: 'POST', body: JSON.stringify(data) }),
   },
 
   // Componentes

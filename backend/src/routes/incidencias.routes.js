@@ -27,7 +27,7 @@ router.post('/', async (req, res, next) => {
 
 router.post('/:id/cerrar', async (req, res, next) => {
   try {
-    await IncidenciasService.cerrar(parseInt(req.params.id));
+    await IncidenciasService.cerrar(parseInt(req.params.id), req.usuario?.id);
     res.json({ message: 'Incidencia cerrada' });
   } catch (e) { next(e); }
 });
