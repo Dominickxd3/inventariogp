@@ -4,8 +4,21 @@ import { api } from '../lib/api';
 import { EstadoBadge } from '../components/Badge';
 import DataTable from '../components/DataTable';
 import SearchInput from '../components/SearchInput';
-import Modal from '../components/Modal';
-import { Plus, QrCode, Eye, Trash2, Scan, Monitor, CheckCircle, Clock, AlertTriangle, Archive, X } from 'lucide-react';
+import { Button } from '#components/ui/button.jsx';
+import { Input } from '#components/ui/input.jsx';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '#components/ui/select.jsx';
+import {
+  Card, CardContent,
+} from '#components/ui/card.jsx';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+  DialogFooter,
+} from '#components/ui/dialog.jsx';
+import { Badge } from '#components/ui/badge.jsx';
+import { Skeleton } from '#components/ui/skeleton.jsx';
+import { Plus, QrCode, Eye, Trash2, Monitor, CheckCircle, Clock, AlertTriangle, Archive, X } from 'lucide-react';
 import { formatDate } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 
@@ -18,23 +31,13 @@ const columns = [
 ];
 
 const cardConfig = [
-  { key: 'total', label: 'Total', color: 'bg-gray-50 text-gray-700 border-gray-200', icon: Monitor },
-  { key: 'disponibles', label: 'Disponibles', color: 'bg-green-50 text-green-700 border-green-200', icon: CheckCircle },
-  { key: 'asignados', label: 'Asignados', color: 'bg-blue-50 text-blue-700 border-blue-200', icon: Monitor },
-  { key: 'mantenimiento', label: 'Mantenimiento', color: 'bg-yellow-50 text-yellow-700 border-yellow-200', icon: Clock },
-  { key: 'incidencia', label: 'Incidencia', color: 'bg-red-50 text-red-700 border-red-200', icon: AlertTriangle },
-  { key: 'baja', label: 'Baja', color: 'bg-gray-50 text-gray-700 border-gray-200', icon: Archive },
+  { key: 'total', label: 'Total', icon: Monitor },
+  { key: 'disponibles', label: 'Disponibles', icon: CheckCircle },
+  { key: 'asignados', label: 'Asignados', icon: Monitor },
+  { key: 'mantenimiento', label: 'Mantenimiento', icon: Clock },
+  { key: 'incidencia', label: 'Incidencia', icon: AlertTriangle },
+  { key: 'baja', label: 'Baja', icon: Archive },
 ];
-
-function DashboardSkeleton() {
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-      {cardConfig.map((c) => (
-        <div key={c.key} className="h-24 rounded-xl border border-gray-200 bg-gray-100 animate-pulse" />
-      ))}
-    </div>
-  );
-}
 
 export default function Equipos() {
   const [search, setSearch] = useState('');
@@ -42,10 +45,11 @@ export default function Equipos() {
   const [idTipoFiltro, setIdTipoFiltro] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
-  const [showModal, setShowModal] = useState(false);
-  const [showQR, setShowQR] = useState(null);
+  const [showCreateOpen, setShowCreateOpen] = useState(false);
+  const [showDeleteOpen, setShowDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [scanCode, setScanCode] = useState('');
+  const [showQROpen, setShowQROpen] = useState(false);
+  const [qrData, setQrData] = useState(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -69,7 +73,7 @@ export default function Equipos() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipos'] });
       queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
-      setShowModal(false);
+      setShowCreateOpen(false);
     },
   });
 
@@ -78,13 +82,14 @@ export default function Equipos() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipos'] });
       queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
+      setShowDeleteOpen(false);
       setDeleteTarget(null);
     },
   });
 
   const qrMutation = useMutation({
     mutationFn: api.equipos.qr,
-    onSuccess: (data) => setShowQR(data),
+    onSuccess: (data) => { setQrData(data); setShowQROpen(true); },
   });
 
   const [form, setForm] = useState({ CodEquipo: '', IdTipodeEquipo: '', Obs: '' });
@@ -92,17 +97,6 @@ export default function Equipos() {
   const handleSubmit = (e) => {
     e.preventDefault();
     createMutation.mutate(form);
-  };
-
-  const handleScan = async (e) => {
-    e.preventDefault();
-    if (!scanCode.trim()) return;
-    try {
-      const equipo = await api.equipos.scan(scanCode.trim());
-      navigate(`/equipos/${equipo.IdMaeEquipo}`);
-    } catch {
-      alert('Equipo no encontrado');
-    }
   };
 
   const equipos = pageData?.rows;
@@ -115,57 +109,60 @@ export default function Equipos() {
     onPageSizeChange: (s) => { setPageSize(s); setPage(1); },
   } : undefined;
 
+  const confirmDelete = (row) => {
+    setDeleteTarget(row);
+    setShowDeleteOpen(true);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-800">Equipos</h1>
-        <button
-          onClick={() => { setForm({ CodEquipo: '', IdTipodeEquipo: '', Obs: '' }); setShowModal(true); }}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
-        >
+        <h1 className="text-2xl font-bold text-foreground">Equipos</h1>
+        <Button onClick={() => { setForm({ CodEquipo: '', IdTipodeEquipo: '', Obs: '' }); setShowCreateOpen(true); }}>
           <Plus className="w-4 h-4" /> Nuevo Equipo
-        </button>
+        </Button>
       </div>
 
-      {dashLoading ? <DashboardSkeleton /> : dashboard && (
+      {dashLoading ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          {cardConfig.map(({ key, label, color, icon: Icon }) => (
-            <div key={key} className={`rounded-xl border p-4 ${color}`}>
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-medium uppercase tracking-wide">{label}</p>
-                <Icon className="w-4 h-4 opacity-50" />
-              </div>
-              <p className="text-2xl font-bold mt-1">{dashboard[key] ?? 0}</p>
-            </div>
+          {cardConfig.map((c) => <Skeleton key={c.key} className="h-24 rounded-xl" />)}
+        </div>
+      ) : dashboard && (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          {cardConfig.map(({ key, label, icon: Icon }) => (
+            <Card key={key}>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
+                  <Icon className="w-4 h-4 opacity-50" />
+                </div>
+                <p className="text-2xl font-bold mt-1 text-foreground">{dashboard[key] ?? 0}</p>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
 
       <div className="flex flex-wrap gap-3">
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Buscar por código o código de barra..." />
-        <select value={estadoFiltro} onChange={(e) => { setEstadoFiltro(e.target.value); setPage(1); }}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
-          <option value="">Todos los estados</option>
-          {['DISPONIBLE', 'ASIGNADO', 'MANTENIMIENTO', 'INCIDENCIA', 'BAJA'].map((e) => (
-            <option key={e} value={e}>{e}</option>
-          ))}
-        </select>
-        <select value={idTipoFiltro} onChange={(e) => { setIdTipoFiltro(e.target.value); setPage(1); }}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
-          <option value="">Todos los tipos</option>
-          {tipos?.map((t) => (
-            <option key={t.IdTipodeEquipo} value={t.IdTipodeEquipo}>{t.DesTipodeEquipo}</option>
-          ))}
-        </select>
-        <form onSubmit={handleScan} className="flex gap-2">
-          <input
-            type="text" value={scanCode} onChange={(e) => setScanCode(e.target.value)}
-            placeholder="Escanear código..." className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-40"
-          />
-          <button type="submit" className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm">
-            <Scan className="w-4 h-4" />
-          </button>
-        </form>
+        <Select value={estadoFiltro} onValueChange={(v) => { setEstadoFiltro(v); setPage(1); }}>
+          <SelectTrigger className="w-40"><SelectValue placeholder="Todos los estados" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">Todos los estados</SelectItem>
+            {['DISPONIBLE', 'ASIGNADO', 'MANTENIMIENTO', 'INCIDENCIA', 'BAJA'].map((e) => (
+              <SelectItem key={e} value={e}>{e}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={idTipoFiltro} onValueChange={(v) => { setIdTipoFiltro(v); setPage(1); }}>
+          <SelectTrigger className="w-44"><SelectValue placeholder="Todos los tipos" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">Todos los tipos</SelectItem>
+            {tipos?.map((t) => (
+              <SelectItem key={t.IdTipodeEquipo} value={String(t.IdTipodeEquipo)}>{t.DesTipodeEquipo}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <DataTable
@@ -177,18 +174,15 @@ export default function Equipos() {
             sortable: false,
             render: (row) => (
               <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                <button onClick={() => navigate(`/equipos/${row.IdMaeEquipo}`)}
-                  className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600">
+                <Button variant="ghost" size="icon" onClick={() => navigate(`/equipos/${row.IdMaeEquipo}`)}>
                   <Eye className="w-4 h-4" />
-                </button>
-                <button onClick={() => qrMutation.mutate(row.IdMaeEquipo)}
-                  className="p-1.5 rounded-lg hover:bg-purple-50 text-purple-600">
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => qrMutation.mutate(row.IdMaeEquipo)}>
                   <QrCode className="w-4 h-4" />
-                </button>
-                <button onClick={() => setDeleteTarget(row)}
-                  className="p-1.5 rounded-lg hover:bg-red-50 text-red-600">
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => confirmDelete(row)}>
                   <Trash2 className="w-4 h-4" />
-                </button>
+                </Button>
               </div>
             ),
           },
@@ -198,67 +192,82 @@ export default function Equipos() {
         pagination={pagination}
       />
 
-      <Modal open={showModal} onClose={() => setShowModal(false)} title="Nuevo Equipo">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Código</label>
-            <input value={form.CodEquipo} onChange={(e) => setForm({ ...form, CodEquipo: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" required />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Equipo</label>
-            <select value={form.IdTipodeEquipo} onChange={(e) => setForm({ ...form, IdTipodeEquipo: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" required>
-              <option value="">Seleccionar...</option>
-              {tipos?.map((t) => (
-                <option key={t.IdTipodeEquipo} value={t.IdTipodeEquipo}>{t.DesTipodeEquipo}</option>
-              ))}
-            </select>
-          </div>
-          <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
-            El código QR se generará automáticamente al guardar el equipo
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
-            <textarea value={form.Obs} onChange={(e) => setForm({ ...form, Obs: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" rows={3} />
-          </div>
-          <button type="submit" disabled={createMutation.isPending}
-            className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50">
-            {createMutation.isPending ? 'Guardando...' : 'Guardar Equipo'}
-          </button>
-        </form>
-      </Modal>
+      <Dialog open={showCreateOpen} onOpenChange={setShowCreateOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nuevo Equipo</DialogTitle>
+            <DialogDescription>Completa los datos para registrar un nuevo equipo</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Código</label>
+              <Input value={form.CodEquipo} onChange={(e) => setForm({ ...form, CodEquipo: e.target.value })} required />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Tipo de Equipo</label>
+              <Select value={form.IdTipodeEquipo} onValueChange={(v) => setForm({ ...form, IdTipodeEquipo: v })}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                <SelectContent>
+                  {tipos?.map((t) => (
+                    <SelectItem key={t.IdTipodeEquipo} value={String(t.IdTipodeEquipo)}>{t.DesTipodeEquipo}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground">
+              El código QR se generará automáticamente al guardar el equipo
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Observaciones</label>
+              <textarea value={form.Obs} onChange={(e) => setForm({ ...form, Obs: e.target.value })}
+                className="w-full min-h-[80px] rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowCreateOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={createMutation.isPending}>
+                {createMutation.isPending ? 'Guardando...' : 'Guardar'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-      <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Confirmar eliminación" size="sm">
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            ¿Estás seguro de eliminar el equipo <strong>{deleteTarget?.CodEquipo}</strong>?
-            {deleteTarget?.Estado === 'ASIGNADO' && (
-              <span className="block mt-2 text-red-500">No se puede eliminar un equipo con asignación activa.</span>
-            )}
-          </p>
-          <div className="flex gap-2 justify-end">
-            <button onClick={() => setDeleteTarget(null)}
-              className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
-            <button onClick={() => deleteMutation.mutate(deleteTarget.IdMaeEquipo)} disabled={deleteMutation.isPending}
-              className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50">
+      <Dialog open={showDeleteOpen} onOpenChange={(v) => { setShowDeleteOpen(v); if (!v) setDeleteTarget(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Confirmar eliminación</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de eliminar el equipo <strong>{deleteTarget?.CodEquipo}</strong>?
+              {deleteTarget?.Estado === 'ASIGNADO' && (
+                <span className="block mt-2 text-destructive">No se puede eliminar un equipo con asignación activa.</span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowDeleteOpen(false); setDeleteTarget(null); }}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => deleteMutation.mutate(deleteTarget.IdMaeEquipo)} disabled={deleteMutation.isPending}>
               {deleteMutation.isPending ? 'Eliminando...' : 'Eliminar'}
-            </button>
-          </div>
-        </div>
-      </Modal>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      <Modal open={!!showQR} onClose={() => setShowQR(null)} title="Código QR" size="sm">
-        {showQR && (
-          <div className="text-center space-y-4">
-            <img src={showQR.qr} alt="QR" className="mx-auto" />
-            <p className="text-sm text-gray-500">Escanea para ver información del equipo</p>
-            <a href={showQR.url} target="_blank" rel="noopener noreferrer"
-              className="text-xs text-blue-600 underline break-all block">{showQR.url}</a>
-          </div>
-        )}
-      </Modal>
+      <Dialog open={showQROpen} onOpenChange={setShowQROpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Código QR</DialogTitle>
+          </DialogHeader>
+          {qrData && (
+            <div className="text-center space-y-4">
+              <img src={qrData.qr} alt="QR" className="mx-auto" />
+              <p className="text-sm text-muted-foreground">Escanea para ver información del equipo</p>
+              <a href={qrData.url} target="_blank" rel="noopener noreferrer"
+                className="text-xs text-primary underline break-all block">{qrData.url}</a>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -3,6 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import DataTable from '../components/DataTable';
 import SearchInput from '../components/SearchInput';
+import { Button } from '#components/ui/button.jsx';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '#components/ui/select.jsx';
 import { useNavigate } from 'react-router-dom';
 
 const columns = [
@@ -32,8 +36,8 @@ export default function Trabajadores() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-800">Trabajadores</h1>
-        <button
+        <h1 className="text-2xl font-bold text-foreground">Trabajadores</h1>
+        <Button
           onClick={async () => {
             try {
               await api.trabajadores.sync();
@@ -42,27 +46,22 @@ export default function Trabajadores() {
               alert('Error al sincronizar: ' + e.message);
             }
           }}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
           Sincronizar
-        </button>
+        </Button>
       </div>
 
       <div className="flex gap-3">
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Buscar por DNI o nombre..." />
-        <select
-          value={areaFiltro}
-          onChange={(e) => { setAreaFiltro(e.target.value); setPage(1); }}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-        >
-          <option value="">Todas las áreas</option>
-          {areas?.map((a) => (
-            <option key={a.Area} value={a.Area}>{a.Area}</option>
-          ))}
-        </select>
+        <Select value={areaFiltro} onValueChange={(v) => { setAreaFiltro(v); setPage(1); }}>
+          <SelectTrigger className="w-48"><SelectValue placeholder="Todas las áreas" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">Todas las áreas</SelectItem>
+            {areas?.map((a) => (
+              <SelectItem key={a.Area} value={a.Area}>{a.Area}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <DataTable
