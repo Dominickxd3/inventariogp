@@ -29,35 +29,21 @@ export default function TrabajadorDetalle() {
       </button>
 
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h1 className="text-2xl font-bold text-gray-800">
-          {trabajador.APaterno} {trabajador.AMaterno}, {trabajador.Nombres}
-        </h1>
-        <p className="text-gray-500 mt-1">{trabajador.NomCargo}</p>
+        <h1 className="text-2xl font-bold text-gray-800">{trabajador.Trabajador}</h1>
+        <p className="text-gray-500 mt-1">{trabajador.Ocupacion}</p>
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-6">
           <div>
             <p className="text-xs text-gray-400">DNI</p>
-            <p className="text-sm font-medium">{trabajador.DNI}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-400">Código Empleado</p>
-            <p className="text-sm font-medium">{trabajador.CodEmpleado}</p>
+            <p className="text-sm font-medium">{trabajador.DOI}</p>
           </div>
           <div>
             <p className="text-xs text-gray-400">Área</p>
-            <p className="text-sm font-medium">{trabajador.AreaName}</p>
+            <p className="text-sm font-medium">{trabajador.Area || '-'}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-400">Gerencia</p>
-            <p className="text-sm font-medium">{trabajador.NomGerencia}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-400">Correo</p>
-            <p className="text-sm font-medium">{trabajador.Correo || '-'}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-400">F. Ingreso</p>
-            <p className="text-sm font-medium">{formatDate(trabajador.FIngreso)}</p>
+            <p className="text-xs text-gray-400">Estado</p>
+            <p className="text-sm font-medium">{trabajador.Activo === '1' ? 'Activo' : 'Inactivo'}</p>
           </div>
         </div>
       </div>

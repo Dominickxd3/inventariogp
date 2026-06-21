@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { TrabajadoresRepository } from '../repositories/trabajadores.repository.js';
+import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -10,17 +11,17 @@ router.get('/', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.post('/sync', authMiddleware, roleMiddleware('ADMIN'), async (req, res, next) => {
+  try {
+    const result = await TrabajadoresRepository.sync();
+    res.json(result);
+  } catch (e) { next(e); }
+});
+
 router.get('/areas', async (req, res, next) => {
   try {
     const areas = await TrabajadoresRepository.getAreas();
     res.json(areas);
-  } catch (e) { next(e); }
-});
-
-router.get('/gerencias', async (req, res, next) => {
-  try {
-    const gerencias = await TrabajadoresRepository.getGerencias();
-    res.json(gerencias);
   } catch (e) { next(e); }
 });
 

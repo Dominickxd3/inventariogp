@@ -17,7 +17,7 @@ BEGIN
     PRINT 'Tabla Tab_SYS_Usuarios creada'
 
     INSERT INTO Tab_SYS_Usuarios (NombreUsuario, Correo, PasswordHash, Rol)
-    VALUES ('admin', 'admin@grupecsac.com', '$2b$10$NB4bKCYHTsRr/yfJs/6RNOV.WYDp0vGJ/wynTAXjhoticFX58ak..', 'ADMIN')
+    VALUES ('admin', 'admin@grupecsac.com', '$2b$10$iZKQ5EV0EQ2djVIW1kEF4OqeYW5BZb7HnJcuT7fvA4H5GrCK2T4ia', 'ADMIN')
     PRINT 'Usuario admin creado (password: admin123)'
 END
 GO

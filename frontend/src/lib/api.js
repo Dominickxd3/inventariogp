@@ -45,8 +45,8 @@ export const api = {
     search: (params) => request(`/trabajadores?${new URLSearchParams(params)}`),
     get: (id) => request(`/trabajadores/${id}`),
     getByDNI: (dni) => request(`/trabajadores/dni/${dni}`),
+    sync: () => request('/trabajadores/sync', { method: 'POST' }),
     areas: () => request('/trabajadores/areas'),
-    gerencias: () => request('/trabajadores/gerencias'),
   },
 
   // Asignaciones
@@ -71,7 +71,7 @@ export const api = {
   auth: {
     login: (usuario, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ usuario, password }) }),
     me: () => request('/auth/me'),
-    crearUsuario: (data) => request('/auth/usuarios', { method: 'POST', body: JSON.stringify(data) }),
+
   },
 
   // Componentes

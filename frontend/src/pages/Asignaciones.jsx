@@ -15,7 +15,6 @@ const columns = [
   },
   { key: 'CodEquipo', label: 'Equipo' },
   { key: 'DesTipodeEquipo', label: 'Tipo' },
-  { key: 'AreaName', label: 'Área' },
   { key: 'FecAsignacion', label: 'Desde', render: (r) => formatDate(r.FecAsignacion) },
   {
     key: 'Estado',
@@ -110,7 +109,7 @@ function AsignarForm({ onSuccess }) {
     if (!selectedTrab || !selectedEquipo) return;
     asignarMutation.mutate({
       IdMaeEquipo: selectedEquipo.IdMaeEquipo,
-      IdReferente: selectedTrab.PersonalId,
+      IdReferente: selectedTrab.IdTrabajador,
       Obs: obs,
     });
   };
@@ -132,14 +131,14 @@ function AsignarForm({ onSuccess }) {
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
           />
           <div className="max-h-60 overflow-y-auto space-y-1">
-            {trabajadores?.map((t) => (
+            {trabajadores?.rows?.map((t) => (
               <div
-                key={t.PersonalId}
+                key={t.IdTrabajador}
                 onClick={() => { setSelectedTrab(t); setStep(2); }}
-                className={`p-3 rounded-lg cursor-pointer text-sm ${selectedTrab?.PersonalId === t.PersonalId ? 'bg-blue-50 border border-blue-200' : 'hover:bg-gray-50 border border-transparent'}`}
+                className={`p-3 rounded-lg cursor-pointer text-sm ${selectedTrab?.IdTrabajador === t.IdTrabajador ? 'bg-blue-50 border border-blue-200' : 'hover:bg-gray-50 border border-transparent'}`}
               >
-                <p className="font-medium">{t.APaterno} {t.AMaterno}, {t.Nombres}</p>
-                <p className="text-gray-400 text-xs">{t.DNI} - {t.NomCargo}</p>
+                <p className="font-medium">{t.Trabajador}</p>
+                <p className="text-gray-400 text-xs">{t.DOI} - {t.Ocupacion}</p>
               </div>
             ))}
           </div>
@@ -180,7 +179,7 @@ function AsignarForm({ onSuccess }) {
         <div className="space-y-3">
           <h3 className="font-medium">Confirmar Asignación</h3>
           <div className="bg-gray-50 p-3 rounded-lg space-y-2 text-sm">
-            <p><strong>Trabajador:</strong> {selectedTrab?.APaterno} {selectedTrab?.AMaterno}, {selectedTrab?.Nombres}</p>
+            <p><strong>Trabajador:</strong> {selectedTrab?.Trabajador}</p>
             <p><strong>Equipo:</strong> {selectedEquipo?.CodEquipo} - {selectedEquipo?.DesTipodeEquipo}</p>
           </div>
           <div>

@@ -1,54 +1,67 @@
-import { query } from '../config/db.js';
+import { query, execute } from '../config/db.js';
+
+const DB = 'InventarioGP';
 
 export const TrabajadoresRepository = {
   async search(filtros = {}) {
-    let sql = `
-      SELECT
-        PersonalId, PeriodoId, CompanyId, CompanyName, BOId, BOName,
-        SubDivisionId, NomSubDivision, Areaid, AreaName,
-        DNI, CodEmpleado, APaterno, AMaterno, Nombres,
-        APaterno + ' ' + AMaterno + ', ' + Nombres as NombreCompleto,
-        FIngreso, Cesado, FCesado,
-        IdCargo, NomCargo, Correo, Genero, Direccion, Telefono1,
-        CentralId, NomCentral, GerenciaId, NomGerencia
-      FROM Personal_periodo
-      WHERE 1=1
-    `;
+    const page = Math.max(1, parseInt(filtros.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(filtros.pageSize) || 50));
+    const offset = (page - 1) * pageSize;
+
+    let where = 'WHERE 1=1';
     const params = {};
     if (filtros.search) {
-      sql += ' AND (DNI LIKE @search OR CodEmpleado LIKE @search OR APaterno LIKE @search OR AMaterno LIKE @search OR Nombres LIKE @search)';
+      where += ' AND (DOI LIKE @search OR Trabajador LIKE @search)';
       params.search = `%${filtros.search}%`;
     }
-    if (filtros.activos !== 'false') sql += ' AND Cesado IS NULL';
-    sql += ' ORDER BY APaterno, AMaterno, Nombres';
-    return query('SIGA_ASISTENCIA', sql, params);
+    if (filtros.area) {
+      where += ' AND Area = @area';
+      params.area = filtros.area;
+    }
+    if (filtros.activos !== 'false') { where += ' AND Activo = @activo'; params.activo = '1'; }
+
+    const countSql = `SELECT COUNT(*) as total FROM Tab_EQ_Trabajadores ${where}`;
+    const [{ total }] = await query(DB, countSql, params);
+
+    const dataSql = `
+      SELECT IdTrabajador, IdTrabajadorERP, DOI, Trabajador, Ocupacion, Area, Activo
+      FROM Tab_EQ_Trabajadores ${where}
+      ORDER BY Trabajador
+      OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY
+    `;
+    params.offset = offset;
+    params.pageSize = pageSize;
+    const rows = await query(DB, dataSql, params);
+
+    return { rows, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
+  },
+
+  async getAreas() {
+    return query(DB, `
+      SELECT DISTINCT Area FROM Tab_EQ_Trabajadores
+      WHERE Area IS NOT NULL AND Area != '' AND Activo = @activo
+      ORDER BY Area
+    `, { activo: '1' });
   },
 
   async getById(id) {
-    const rows = await query('SIGA_ASISTENCIA', `
-      SELECT * FROM Personal_periodo WHERE PersonalId = @id
+    const rows = await query(DB, `
+      SELECT IdTrabajador, IdTrabajadorERP, DOI, Trabajador, Ocupacion, Area, Activo
+      FROM Tab_EQ_Trabajadores WHERE IdTrabajador = @id
     `, { id });
     return rows[0] || null;
   },
 
   async getByDNI(dni) {
-    const rows = await query('SIGA_ASISTENCIA', `
-      SELECT * FROM Personal_periodo WHERE DNI = @dni
+    const rows = await query(DB, `
+      SELECT IdTrabajador, IdTrabajadorERP, DOI, Trabajador, Ocupacion, Area, Activo
+      FROM Tab_EQ_Trabajadores WHERE DOI = @dni
     `, { dni });
     return rows[0] || null;
   },
 
-  async getAreas() {
-    return query('SIGA_ASISTENCIA', `
-      SELECT DISTINCT Areaid, AreaName FROM Personal_periodo
-      WHERE AreaName IS NOT NULL ORDER BY AreaName
-    `);
-  },
-
-  async getGerencias() {
-    return query('SIGA_ASISTENCIA', `
-      SELECT DISTINCT GerenciaId, NomGerencia FROM Personal_periodo
-      WHERE NomGerencia IS NOT NULL ORDER BY NomGerencia
-    `);
+  async sync() {
+    await execute(DB, 'sp_sync_trabajadores_erp');
+    return { success: true, message: 'Trabajadores sincronizados' };
   },
 };

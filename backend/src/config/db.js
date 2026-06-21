@@ -35,7 +35,7 @@ export async function query(dbName, sqlQuery, params = {}) {
     request.input(key, value);
   });
   const result = await request.query(sqlQuery);
-  return Array.from(result.recordset);
+  return result.recordset ? Array.from(result.recordset) : [];
 }
 
 export async function execute(dbName, procedure, params = {}) {
@@ -45,7 +45,7 @@ export async function execute(dbName, procedure, params = {}) {
     request.input(key, value);
   });
   const result = await request.execute(procedure);
-  return result.recordset;
+  return result.recordset || [];
 }
 
 export async function closeAll() {

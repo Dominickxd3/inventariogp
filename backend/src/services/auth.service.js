@@ -1,21 +1,31 @@
-import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { UsuariosRepository } from '../repositories/usuarios.repository.js';
+import { AuditRepository } from '../repositories/audit.repository.js';
 import { config } from '../config/index.js';
 
 export const AuthService = {
-  async login(nombreUsuario, password) {
-    const usuario = await UsuariosRepository.getByNombreUsuario(nombreUsuario);
-    if (!usuario) throw new Error('Usuario o contraseña incorrectos');
-    if (usuario.Estado !== 'ACTIVO') throw new Error('Usuario inactivo');
+  async login(userLogon, password, req) {
+    const ip = req?.ip || req?.connection?.remoteAddress || null;
+    const userAgent = req?.headers?.['user-agent'] || null;
 
-    const valido = await bcrypt.compare(password, usuario.PasswordHash);
-    if (!valido) throw new Error('Usuario o contraseña incorrectos');
+    const validacion = await UsuariosRepository.validarLogin(userLogon, password);
 
-    await UsuariosRepository.updateUltimoAcceso(usuario.IdUsuario);
+    if (!validacion || validacion.Success !== 1) {
+      const mensaje = validacion?.Mensaje || 'Error de autenticación';
+      await AuditRepository.registrarIntento({ userLogon, exitoso: false, ip, userAgent, mensaje });
+      throw new Error(mensaje);
+    }
+
+    const usuario = await UsuariosRepository.getByLogon(userLogon);
+    if (!usuario || !usuario.SwAcceso) {
+      await AuditRepository.registrarIntento({ userLogon, exitoso: false, ip, userAgent, mensaje: 'Acceso denegado' });
+      throw new Error('Usuario sin acceso habilitado');
+    }
+
+    await AuditRepository.registrarIntento({ userLogon, exitoso: true, ip, userAgent, mensaje: 'Login exitoso' });
 
     const token = jwt.sign(
-      { id: usuario.IdUsuario, nombre: usuario.NombreUsuario, rol: usuario.Rol },
+      { id: usuario.IdUsuario, logon: usuario.User_Logon, nombre: usuario.User_Fullname, rol: usuario.Rol },
       config.jwt.secret,
       { expiresIn: '8h' }
     );
@@ -24,31 +34,11 @@ export const AuthService = {
       token,
       usuario: {
         id: usuario.IdUsuario,
-        nombre: usuario.NombreUsuario,
-        correo: usuario.Correo,
+        logon: usuario.User_Logon,
+        nombre: usuario.User_Fullname,
+        email: usuario.User_Email,
         rol: usuario.Rol,
       },
     };
-  },
-
-  async crearUsuario(data) {
-    const existente = await UsuariosRepository.getByNombreUsuario(data.NombreUsuario);
-    if (existente) throw new Error('El nombre de usuario ya existe');
-
-    const salt = await bcrypt.genSalt(10);
-    const hash = await bcrypt.hash(data.Password, salt);
-
-    return UsuariosRepository.create({
-      ...data,
-      PasswordHash: hash,
-    });
-  },
-
-  async verificarToken(token) {
-    try {
-      return jwt.verify(token, config.jwt.secret);
-    } catch {
-      return null;
-    }
   },
 };
