@@ -1,0 +1,19 @@
+{
+  "name": "inventario-gp-api",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "mssql": "^11.0.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "morgan": "^1.10.0",
+    "qrcode": "^1.5.4",
+    "uuid": "^10.0.0",
+    "zod": "^3.23.8"
+  }
+}
