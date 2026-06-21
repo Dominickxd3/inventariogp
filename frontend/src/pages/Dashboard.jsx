@@ -44,10 +44,10 @@ export default function Dashboard() {
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h2 className="font-semibold text-gray-800 mb-4">Equipos por Tipo</h2>
           <div className="space-y-3">
-            {data?.porTipo && Object.entries(data.porTipo).map(([tipo, count]) => (
-              <div key={tipo} className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">{tipo}</span>
-                <span className="text-sm font-semibold text-gray-800">{count}</span>
+            {data?.porTipo?.map((item) => (
+              <div key={item.DesTipodeEquipo} className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">{item.DesTipodeEquipo}</span>
+                <span className="text-sm font-semibold text-gray-800">{item.count}</span>
               </div>
             ))}
           </div>

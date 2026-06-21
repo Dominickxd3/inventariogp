@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
+import Swal from 'sweetalert2';
 import { EstadoBadge } from '../components/Badge';
 import { formatDate } from '../lib/utils';
 import { Button } from '#components/ui/button.jsx';
@@ -48,6 +49,10 @@ export default function EquipoDetalle() {
       queryClient.invalidateQueries({ queryKey: ['equipos'] });
       queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
       setEditMode(false);
+      Swal.fire({ icon: 'success', title: 'Equipo actualizado', text: 'Los cambios se guardaron correctamente', timer: 2000, showConfirmButton: false });
+    },
+    onError: (err) => {
+      Swal.fire({ icon: 'error', title: 'Error al actualizar', text: err.message });
     },
   });
 

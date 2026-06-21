@@ -31,6 +31,9 @@ export const EquiposService = {
   },
 
   async create(data) {
+    const existente = await EquiposRepository.getByCodEquipo(data.CodEquipo);
+    if (existente) throw new Error(`Ya existe un equipo con el código ${data.CodEquipo}`);
+
     if (!data.CodBarra) {
       data.CodBarra = `QR-${data.CodEquipo}-${Date.now().toString(36).toUpperCase()}`;
     }

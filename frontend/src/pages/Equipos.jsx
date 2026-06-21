@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
+import Swal from 'sweetalert2';
 import { EstadoBadge } from '../components/Badge';
 import DataTable from '../components/DataTable';
 import SearchInput from '../components/SearchInput';
@@ -71,9 +72,14 @@ export default function Equipos() {
   const createMutation = useMutation({
     mutationFn: api.equipos.create,
     onSuccess: () => {
+      setPage(1);
       queryClient.invalidateQueries({ queryKey: ['equipos'] });
       queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
       setShowCreateOpen(false);
+      Swal.fire({ icon: 'success', title: 'Equipo creado', text: 'El equipo se registró correctamente', timer: 2000, showConfirmButton: false });
+    },
+    onError: (err) => {
+      Swal.fire({ icon: 'error', title: 'Error al crear', text: err.message });
     },
   });
 
@@ -84,6 +90,10 @@ export default function Equipos() {
       queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
       setShowDeleteOpen(false);
       setDeleteTarget(null);
+      Swal.fire({ icon: 'success', title: 'Equipo eliminado', text: 'El equipo se eliminó correctamente', timer: 2000, showConfirmButton: false });
+    },
+    onError: (err) => {
+      Swal.fire({ icon: 'error', title: 'Error al eliminar', text: err.message });
     },
   });
 

@@ -63,6 +63,16 @@ export const EquiposRepository = {
     return rows[0] || null;
   },
 
+  async getByCodEquipo(codEquipo) {
+    const rows = await query(DB, `
+      SELECT e.*, t.DesTipodeEquipo
+      FROM Tab_EQ_MaeEquipos e
+      LEFT JOIN Tab_EQ_TipodeEquipos t ON e.IdTipodeEquipo = t.IdTipodeEquipo
+      WHERE e.CodEquipo = @codEquipo
+    `, { codEquipo });
+    return rows[0] || null;
+  },
+
   async getByCodigo(codBarra) {
     const rows = await query(DB, `
       SELECT e.*, t.DesTipodeEquipo

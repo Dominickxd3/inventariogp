@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
+import Swal from 'sweetalert2';
 import { EstadoBadge } from '../components/Badge';
 import DataTable from '../components/DataTable';
 import { Button } from '#components/ui/button.jsx';
@@ -38,7 +39,17 @@ export default function Asignaciones() {
 
   const cesarMutation = useMutation({
     mutationFn: api.asignaciones.cesar,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['asignaciones'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['asignaciones'] });
+      queryClient.invalidateQueries({ queryKey: ['equipos'] });
+      queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
+      setShowCesarDialog(false);
+      setCesarTarget(null);
+      Swal.fire({ icon: 'success', title: 'Asignación finalizada', text: 'El equipo fue desasignado correctamente', timer: 2000, showConfirmButton: false });
+    },
+    onError: (err) => {
+      Swal.fire({ icon: 'error', title: 'Error al cesar', text: err.message });
+    },
   });
 
   const [showCesarDialog, setShowCesarDialog] = useState(false);
@@ -128,7 +139,13 @@ function AsignarForm({ onSuccess }) {
 
   const asignarMutation = useMutation({
     mutationFn: api.asignaciones.createBulk,
-    onSuccess,
+    onSuccess: () => {
+      onSuccess();
+      Swal.fire({ icon: 'success', title: 'Equipos asignados', text: `${selectedEquipos.length} equipo(s) asignado(s) correctamente`, timer: 2000, showConfirmButton: false });
+    },
+    onError: (err) => {
+      Swal.fire({ icon: 'error', title: 'Error al asignar', text: err.message });
+    },
   });
 
   const toggleEquipo = (eq) => {

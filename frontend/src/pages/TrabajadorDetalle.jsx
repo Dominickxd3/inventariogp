@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
+import Swal from 'sweetalert2';
 import { EstadoBadge } from '../components/Badge';
 import { Button } from '#components/ui/button.jsx';
 import { Card, CardContent, CardHeader, CardTitle } from '#components/ui/card.jsx';
@@ -42,6 +43,10 @@ export default function TrabajadorDetalle() {
       queryClient.invalidateQueries({ queryKey: ['equipos'] });
       queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
       setShowCesarDialog(false);
+      Swal.fire({ icon: 'success', title: 'Equipos desasignados', text: 'Todos los equipos fueron desasignados correctamente', timer: 2000, showConfirmButton: false });
+    },
+    onError: (err) => {
+      Swal.fire({ icon: 'error', title: 'Error al desasignar', text: err.message });
     },
   });
 

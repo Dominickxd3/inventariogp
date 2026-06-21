@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
+import Swal from 'sweetalert2';
 import DataTable from '../components/DataTable';
 import SearchInput from '../components/SearchInput';
 import { Button } from '#components/ui/button.jsx';
@@ -21,7 +22,9 @@ export default function Trabajadores() {
   const [areaFiltro, setAreaFiltro] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
+  const [syncing, setSyncing] = useState(false);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
     queryKey: ['trabajadores', search, areaFiltro, page, pageSize],
@@ -37,17 +40,20 @@ export default function Trabajadores() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-foreground">Trabajadores</h1>
-        <Button
-          onClick={async () => {
-            try {
-              await api.trabajadores.sync();
-              alert('Trabajadores sincronizados correctamente');
-            } catch (e) {
-              alert('Error al sincronizar: ' + e.message);
-            }
-          }}
-        >
-          Sincronizar
+        <Button disabled={syncing} onClick={async () => {
+          setSyncing(true);
+          try {
+            await api.trabajadores.sync();
+            Swal.fire({ icon: 'success', title: 'Sincronizado', text: 'Trabajadores sincronizados correctamente', timer: 2000, showConfirmButton: false });
+            queryClient.invalidateQueries({ queryKey: ['trabajadores'] });
+            queryClient.invalidateQueries({ queryKey: ['trabajadores-areas'] });
+          } catch (e) {
+            Swal.fire({ icon: 'error', title: 'Error al sincronizar', text: e.message });
+          } finally {
+            setSyncing(false);
+          }
+        }}>
+          {syncing ? 'Sincronizando...' : 'Sincronizar'}
         </Button>
       </div>
 
