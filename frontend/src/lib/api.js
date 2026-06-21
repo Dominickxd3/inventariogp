@@ -54,9 +54,12 @@ export const api = {
     list: (params) => request(`/asignaciones?${new URLSearchParams(params)}`),
     get: (id) => request(`/asignaciones/${id}`),
     create: (data) => request('/asignaciones', { method: 'POST', body: JSON.stringify(data) }),
+    createBulk: (data) => request('/asignaciones/bulk', { method: 'POST', body: JSON.stringify(data) }),
     cesar: (id) => request(`/asignaciones/${id}/cesar`, { method: 'POST' }),
+    cesarTrabajador: (id) => request(`/asignaciones/cesar-trabajador/${id}`, { method: 'POST' }),
     historialEquipo: (id) => request(`/asignaciones/equipo/${id}`),
     historialTrabajador: (id) => request(`/asignaciones/trabajador/${id}`),
+    activasTrabajador: (id) => request(`/asignaciones/trabajador/${id}/activas`),
   },
 
   // Incidencias

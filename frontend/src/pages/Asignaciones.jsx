@@ -3,8 +3,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { EstadoBadge } from '../components/Badge';
 import DataTable from '../components/DataTable';
-import Modal from '../components/Modal';
-import { Plus, XCircle } from 'lucide-react';
+import { Button } from '#components/ui/button.jsx';
+import { Input } from '#components/ui/input.jsx';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '#components/ui/dialog.jsx';
+import { Plus, XCircle, Check, Monitor } from 'lucide-react';
 import { formatDate } from '../lib/utils';
 
 const columns = [
@@ -37,16 +41,21 @@ export default function Asignaciones() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['asignaciones'] }),
   });
 
+  const [showCesarDialog, setShowCesarDialog] = useState(false);
+  const [cesarTarget, setCesarTarget] = useState(null);
+
+  const confirmCesar = (row) => {
+    setCesarTarget(row);
+    setShowCesarDialog(true);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-800">Asignaciones</h1>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
-        >
+        <h1 className="text-2xl font-bold text-foreground">Asignaciones</h1>
+        <Button onClick={() => setShowModal(true)}>
           <Plus className="w-4 h-4" /> Nueva Asignación
-        </button>
+        </Button>
       </div>
 
       <DataTable
@@ -58,15 +67,9 @@ export default function Asignaciones() {
             sortable: false,
             render: (row) => (
               row.Estado === 'VIGENTE' && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (confirm('¿Cesar asignación?')) cesarMutation.mutate(row.IdMovEquipoAsignacion);
-                  }}
-                  className="flex items-center gap-1 px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded-lg"
-                >
+                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); confirmCesar(row); }}>
                   <XCircle className="w-3 h-3" /> Cesar
-                </button>
+                </Button>
               )
             ),
           },
@@ -74,9 +77,32 @@ export default function Asignaciones() {
         data={asignaciones}
       />
 
-      <Modal open={showModal} onClose={() => setShowModal(false)} title="Nueva Asignación" size="lg">
-        <AsignarForm onSuccess={() => { setShowModal(false); queryClient.invalidateQueries({ queryKey: ['asignaciones'] }); }} />
-      </Modal>
+      <Dialog open={showModal} onOpenChange={setShowModal}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Nueva Asignación</DialogTitle>
+            <DialogDescription>Selecciona trabajador y equipos para asignar</DialogDescription>
+          </DialogHeader>
+          <AsignarForm onSuccess={() => { setShowModal(false); queryClient.invalidateQueries({ queryKey: ['asignaciones'] }); }} />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCesarDialog} onOpenChange={(v) => { setShowCesarDialog(v); if (!v) setCesarTarget(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Cesar asignación</DialogTitle>
+            <DialogDescription>
+              ¿Finalizar asignación de <strong>{cesarTarget?.CodEquipo}</strong> a {cesarTarget?.TrabajadorNombre}?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowCesarDialog(false); setCesarTarget(null); }}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => cesarMutation.mutate(cesarTarget.IdMovEquipoAsignacion)} disabled={cesarMutation.isPending}>
+              {cesarMutation.isPending ? 'Cesando...' : 'Cesar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -86,7 +112,7 @@ function AsignarForm({ onSuccess }) {
   const [searchTrab, setSearchTrab] = useState('');
   const [searchEquipo, setSearchEquipo] = useState('');
   const [selectedTrab, setSelectedTrab] = useState(null);
-  const [selectedEquipo, setSelectedEquipo] = useState(null);
+  const [selectedEquipos, setSelectedEquipos] = useState([]);
   const [obs, setObs] = useState('');
 
   const { data: trabajadores } = useQuery({
@@ -101,44 +127,52 @@ function AsignarForm({ onSuccess }) {
   });
 
   const asignarMutation = useMutation({
-    mutationFn: api.asignaciones.create,
+    mutationFn: api.asignaciones.createBulk,
     onSuccess,
   });
 
+  const toggleEquipo = (eq) => {
+    setSelectedEquipos((prev) =>
+      prev.some((e) => e.IdMaeEquipo === eq.IdMaeEquipo)
+        ? prev.filter((e) => e.IdMaeEquipo !== eq.IdMaeEquipo)
+        : [...prev, eq]
+    );
+  };
+
   const handleAsignar = () => {
-    if (!selectedTrab || !selectedEquipo) return;
+    if (!selectedTrab || selectedEquipos.length === 0) return;
     asignarMutation.mutate({
-      IdMaeEquipo: selectedEquipo.IdMaeEquipo,
+      IdMaeEquipos: selectedEquipos.map((e) => e.IdMaeEquipo),
       IdReferente: selectedTrab.IdTrabajador,
       Obs: obs,
     });
   };
 
+  const totalEquipos = selectedEquipos.reduce((acc, e) => {
+    const tipo = e.DesTipodeEquipo || 'OTRO';
+    acc[tipo] = (acc[tipo] || 0) + 1;
+    return acc;
+  }, {});
+
   return (
     <div className="space-y-4">
       <div className="flex gap-2 mb-4">
         {[1, 2, 3].map((s) => (
-          <div key={s} className={`flex-1 h-2 rounded-full ${step >= s ? 'bg-blue-500' : 'bg-gray-200'}`} />
+          <div key={s} className={`flex-1 h-2 rounded-full ${step >= s ? 'bg-primary' : 'bg-muted'}`} />
         ))}
       </div>
 
       {step === 1 && (
         <div className="space-y-3">
           <h3 className="font-medium">Seleccionar Trabajador</h3>
-          <input
-            type="text" value={searchTrab} onChange={(e) => setSearchTrab(e.target.value)}
-            placeholder="Buscar por DNI o nombre..."
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-          />
+          <Input value={searchTrab} onChange={(e) => setSearchTrab(e.target.value)} placeholder="Buscar por DNI o nombre..." />
           <div className="max-h-60 overflow-y-auto space-y-1">
             {trabajadores?.rows?.map((t) => (
-              <div
-                key={t.IdTrabajador}
-                onClick={() => { setSelectedTrab(t); setStep(2); }}
-                className={`p-3 rounded-lg cursor-pointer text-sm ${selectedTrab?.IdTrabajador === t.IdTrabajador ? 'bg-blue-50 border border-blue-200' : 'hover:bg-gray-50 border border-transparent'}`}
+              <div key={t.IdTrabajador} onClick={() => { setSelectedTrab(t); setStep(2); }}
+                className={`p-3 rounded-lg cursor-pointer text-sm ${selectedTrab?.IdTrabajador === t.IdTrabajador ? 'bg-accent border border-border' : 'hover:bg-muted border border-transparent'}`}
               >
                 <p className="font-medium">{t.Trabajador}</p>
-                <p className="text-gray-400 text-xs">{t.DOI} - {t.Ocupacion}</p>
+                <p className="text-muted-foreground text-xs">{t.DOI} - {t.Ocupacion}</p>
               </div>
             ))}
           </div>
@@ -147,30 +181,36 @@ function AsignarForm({ onSuccess }) {
 
       {step === 2 && (
         <div className="space-y-3">
-          <h3 className="font-medium">Seleccionar Equipo</h3>
-          <input
-            type="text" value={searchEquipo} onChange={(e) => setSearchEquipo(e.target.value)}
-            placeholder="Buscar equipo..."
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-          />
+          <div className="flex items-center justify-between">
+            <h3 className="font-medium">Seleccionar Equipos</h3>
+            {selectedEquipos.length > 0 && (
+              <span className="text-xs text-muted-foreground">{selectedEquipos.length} seleccionados</span>
+            )}
+          </div>
+          <Input value={searchEquipo} onChange={(e) => setSearchEquipo(e.target.value)} placeholder="Buscar equipo..." />
           <div className="max-h-60 overflow-y-auto space-y-1">
-            {equipos?.map((e) => (
-              <div
-                key={e.IdMaeEquipo}
-                onClick={() => { setSelectedEquipo(e); }}
-                className={`p-3 rounded-lg cursor-pointer text-sm ${selectedEquipo?.IdMaeEquipo === e.IdMaeEquipo ? 'bg-blue-50 border border-blue-200' : 'hover:bg-gray-50 border border-transparent'}`}
-              >
-                <p className="font-medium">{e.CodEquipo} - {e.DesTipodeEquipo}</p>
-                <p className="text-gray-400 text-xs">{e.CodBarra || 'Sin código de barra'}</p>
-              </div>
-            ))}
+            {equipos?.rows?.map((e) => {
+              const selected = selectedEquipos.some((s) => s.IdMaeEquipo === e.IdMaeEquipo);
+              return (
+                <div key={e.IdMaeEquipo} onClick={() => toggleEquipo(e)}
+                  className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer text-sm ${selected ? 'bg-accent border border-border' : 'hover:bg-muted border border-transparent'}`}
+                >
+                  <div className={`w-5 h-5 rounded border flex items-center justify-center ${selected ? 'bg-primary border-primary text-primary-foreground' : 'border-input'}`}>
+                    {selected && <Check className="w-3 h-3" />}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium">{e.CodEquipo} - {e.DesTipodeEquipo}</p>
+                    <p className="text-muted-foreground text-xs">{e.CodBarra || 'Sin código de barra'}</p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
           <div className="flex gap-2">
-            <button onClick={() => setStep(1)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Atrás</button>
-            <button onClick={() => setStep(3)} disabled={!selectedEquipo}
-              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
-              Continuar
-            </button>
+            <Button variant="outline" onClick={() => setStep(1)}>Atrás</Button>
+            <Button onClick={() => setStep(3)} disabled={selectedEquipos.length === 0}>
+              Continuar ({selectedEquipos.length} equipos)
+            </Button>
           </div>
         </div>
       )}
@@ -178,20 +218,26 @@ function AsignarForm({ onSuccess }) {
       {step === 3 && (
         <div className="space-y-3">
           <h3 className="font-medium">Confirmar Asignación</h3>
-          <div className="bg-gray-50 p-3 rounded-lg space-y-2 text-sm">
+          <div className="bg-muted p-4 rounded-lg space-y-2 text-sm">
             <p><strong>Trabajador:</strong> {selectedTrab?.Trabajador}</p>
-            <p><strong>Equipo:</strong> {selectedEquipo?.CodEquipo} - {selectedEquipo?.DesTipodeEquipo}</p>
+            <p><strong>Total equipos:</strong> {selectedEquipos.length}</p>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {Object.entries(totalEquipos).map(([tipo, count]) => (
+                <span key={tipo} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground text-xs">
+                  <Monitor className="w-3 h-3" /> {tipo}: {count}
+                </span>
+              ))}
+            </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
-            <textarea value={obs} onChange={(e) => setObs(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" rows={2} />
+            <label className="block text-sm font-medium mb-1">Observaciones</label>
+            <textarea value={obs} onChange={(e) => setObs(e.target.value)} className="w-full min-h-[60px] rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm" rows={2} />
           </div>
           <div className="flex gap-2">
-            <button onClick={() => setStep(2)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Atrás</button>
-            <button onClick={handleAsignar} disabled={asignarMutation.isPending}
-              className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50">
-              {asignarMutation.isPending ? 'Asignando...' : 'Confirmar Asignación'}
-            </button>
+            <Button variant="outline" onClick={() => setStep(2)}>Atrás</Button>
+            <Button onClick={handleAsignar} disabled={asignarMutation.isPending}>
+              {asignarMutation.isPending ? 'Asignando...' : `Asignar (${selectedEquipos.length} equipos)`}
+            </Button>
           </div>
         </div>
       )}

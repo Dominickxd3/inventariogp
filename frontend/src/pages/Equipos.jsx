@@ -92,7 +92,7 @@ export default function Equipos() {
     onSuccess: (data) => { setQrData(data); setShowQROpen(true); },
   });
 
-  const [form, setForm] = useState({ CodEquipo: '', IdTipodeEquipo: '', Obs: '' });
+  const [form, setForm] = useState({ CodEquipo: '', IdTipodeEquipo: '', CodBarra: '', Obs: '' });
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -118,7 +118,7 @@ export default function Equipos() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-foreground">Equipos</h1>
-        <Button onClick={() => { setForm({ CodEquipo: '', IdTipodeEquipo: '', Obs: '' }); setShowCreateOpen(true); }}>
+        <Button onClick={() => { setForm({ CodEquipo: '', IdTipodeEquipo: '', CodBarra: '', Obs: '' }); setShowCreateOpen(true); }}>
           <Plus className="w-4 h-4" /> Nuevo Equipo
         </Button>
       </div>
@@ -202,6 +202,11 @@ export default function Equipos() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Código</label>
               <Input value={form.CodEquipo} onChange={(e) => setForm({ ...form, CodEquipo: e.target.value })} required />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Código de Barra / SN</label>
+              <Input value={form.CodBarra} onChange={(e) => setForm({ ...form, CodBarra: e.target.value })}
+                placeholder="Opcional - ingresa el SN del equipo" />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Tipo de Equipo</label>

@@ -43,4 +43,37 @@ export const AsignacionesService = {
   async getHistorialByTrabajador(idTrabajador) {
     return AsignacionesRepository.getHistorialByTrabajador(idTrabajador);
   },
+
+  async getActivasByTrabajador(idTrabajador) {
+    return AsignacionesRepository.getActivasByTrabajador(idTrabajador);
+  },
+
+  async asignarMulti(data, idUsuario) {
+    const { IdMaeEquipos, IdReferente, Obs } = data;
+    const results = [];
+    for (const idEquipo of IdMaeEquipos) {
+      try {
+        const id = await this.asignar({
+          IdMaeEquipo: idEquipo,
+          IdReferente,
+          Obs,
+          IdUsuario: idUsuario,
+        });
+        results.push({ idEquipo, success: true, idAsig: id });
+      } catch (e) {
+        results.push({ idEquipo, success: false, error: e.message });
+      }
+    }
+    return results;
+  },
+
+  async cesarActivasByTrabajador(idTrabajador, idUsuario) {
+    const activas = await AsignacionesRepository.getActivasByTrabajador(idTrabajador);
+    for (const asig of activas) {
+      await AsignacionesRepository.cesar(asig.IdMovEquipoAsignacion);
+      await EquiposRepository.updateEstado(asig.IdMaeEquipo, 'DISPONIBLE');
+      await EquiposRepository.registrarCambioEstado(asig.IdMaeEquipo, 'ASIGNADO', 'DISPONIBLE', idUsuario, 'Asignación finalizada (desasignación masiva)');
+    }
+    return { count: activas.length };
+  },
 };

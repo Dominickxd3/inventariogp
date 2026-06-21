@@ -66,6 +66,28 @@ export const AsignacionesRepository = {
     `, { id: idTrabajador });
   },
 
+  async getActivasByTrabajador(idTrabajador) {
+    return query(DB, `
+      SELECT a.*, e.CodEquipo, e.CodBarra, t.DesTipodeEquipo
+      FROM Tab_EQ_MovEquiposAsignaciones a
+      JOIN Tab_EQ_MaeEquipos e ON a.IdMaeEquipo = e.IdMaeEquipo
+      LEFT JOIN Tab_EQ_TipodeEquipos t ON e.IdTipodeEquipo = t.IdTipodeEquipo
+      WHERE a.IdReferente = @id AND a.Estado = 'VIGENTE'
+      ORDER BY t.DesTipodeEquipo, e.CodEquipo
+    `, { id: idTrabajador });
+  },
+
+  async cesarActivasByTrabajador(idTrabajador) {
+    const ids = await query(DB, `
+      SELECT IdMovEquipoAsignacion FROM Tab_EQ_MovEquiposAsignaciones
+      WHERE IdReferente = @id AND Estado = 'VIGENTE'
+    `, { id: idTrabajador });
+    for (const row of ids) {
+      await this.cesar(row.IdMovEquipoAsignacion);
+    }
+    return ids;
+  },
+
   async asignar(data) {
     const result = await query(DB, `
       INSERT INTO Tab_EQ_MovEquiposAsignaciones
