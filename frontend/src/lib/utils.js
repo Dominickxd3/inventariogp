@@ -8,6 +8,7 @@ export function estadoColor(estado) {
   const map = {
     DISPONIBLE: 'bg-green-100 text-green-800',
     ASIGNADO: 'bg-blue-100 text-blue-800',
+    MANTENIMIENTO: 'bg-yellow-100 text-yellow-800',
     INCIDENCIA: 'bg-red-100 text-red-800',
     BAJA: 'bg-gray-100 text-gray-800',
     VIGENTE: 'bg-blue-100 text-blue-800',

@@ -9,6 +9,10 @@ export const EquiposService = {
     return EquiposRepository.listAll(filtros);
   },
 
+  async listAllForExport(filtros) {
+    return EquiposRepository.listAll({ ...filtros, page: 1, pageSize: 99999 });
+  },
+
   async getById(id) {
     const equipo = await EquiposRepository.getById(id);
     if (!equipo) return null;
@@ -81,20 +85,6 @@ export const EquiposService = {
   },
 
   async dashboard() {
-    const todos = await EquiposRepository.listAll();
-    const total = todos.length;
-    const disponibles = todos.filter(e => e.Estado === 'DISPONIBLE').length;
-    const asignados = todos.filter(e => e.Estado === 'ASIGNADO').length;
-    const mantenimiento = todos.filter(e => e.Estado === 'MANTENIMIENTO').length;
-    const incidencia = todos.filter(e => e.Estado === 'INCIDENCIA').length;
-    const baja = todos.filter(e => e.Estado === 'BAJA').length;
-
-    const porTipo = {};
-    todos.forEach(e => {
-      const tipo = e.DesTipodeEquipo || 'SIN TIPO';
-      porTipo[tipo] = (porTipo[tipo] || 0) + 1;
-    });
-
-    return { total, disponibles, asignados, mantenimiento, incidencia, baja, porTipo };
+    return EquiposRepository.getDashboardStats();
   },
 };

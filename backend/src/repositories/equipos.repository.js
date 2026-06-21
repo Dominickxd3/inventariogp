@@ -4,18 +4,53 @@ const DB = 'InventarioGP';
 
 export const EquiposRepository = {
   async listAll(filtros = {}) {
-    let sql = `
+    const page = Math.max(1, parseInt(filtros.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(filtros.pageSize) || 50));
+    const offset = (page - 1) * pageSize;
+
+    let where = 'WHERE 1=1';
+    const params = {};
+    if (filtros.estado) { where += ' AND e.Estado = @estado'; params.estado = filtros.estado; }
+    if (filtros.idTipo) { where += ' AND e.IdTipodeEquipo = @idTipo'; params.idTipo = parseInt(filtros.idTipo); }
+    if (filtros.search) { where += " AND (e.CodEquipo LIKE @search OR e.CodBarra LIKE @search)"; params.search = `%${filtros.search}%`; }
+
+    const countSql = `SELECT COUNT(*) as total FROM Tab_EQ_MaeEquipos e ${where}`;
+    const [{ total }] = await query(DB, countSql, params);
+
+    const dataSql = `
       SELECT e.*, t.DesTipodeEquipo
       FROM Tab_EQ_MaeEquipos e
       LEFT JOIN Tab_EQ_TipodeEquipos t ON e.IdTipodeEquipo = t.IdTipodeEquipo
-      WHERE 1=1
+      ${where}
+      ORDER BY e.FecCreacion DESC
+      OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY
     `;
-    const params = {};
-    if (filtros.estado) { sql += ' AND e.Estado = @estado'; params.estado = filtros.estado; }
-    if (filtros.idTipo) { sql += ' AND e.IdTipodeEquipo = @idTipo'; params.idTipo = filtros.idTipo; }
-    if (filtros.search) { sql += " AND (e.CodEquipo LIKE @search OR e.CodBarra LIKE @search)"; params.search = `%${filtros.search}%`; }
-    sql += ' ORDER BY e.FecCreacion DESC';
-    return query(DB, sql, params);
+    params.offset = offset;
+    params.pageSize = pageSize;
+    const rows = await query(DB, dataSql, params);
+
+    return { rows, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
+  },
+
+  async getDashboardStats() {
+    const [stats] = await query(DB, `
+      SELECT
+        COUNT(*) as total,
+        SUM(CASE WHEN Estado = 'DISPONIBLE' THEN 1 ELSE 0 END) as disponibles,
+        SUM(CASE WHEN Estado = 'ASIGNADO' THEN 1 ELSE 0 END) as asignados,
+        SUM(CASE WHEN Estado = 'MANTENIMIENTO' THEN 1 ELSE 0 END) as mantenimiento,
+        SUM(CASE WHEN Estado = 'INCIDENCIA' THEN 1 ELSE 0 END) as incidencia,
+        SUM(CASE WHEN Estado = 'BAJA' THEN 1 ELSE 0 END) as baja
+      FROM Tab_EQ_MaeEquipos
+    `);
+    const porTipo = await query(DB, `
+      SELECT t.DesTipodeEquipo, COUNT(*) as count
+      FROM Tab_EQ_MaeEquipos e
+      LEFT JOIN Tab_EQ_TipodeEquipos t ON e.IdTipodeEquipo = t.IdTipodeEquipo
+      GROUP BY t.DesTipodeEquipo
+      ORDER BY count DESC
+    `);
+    return { ...stats, porTipo };
   },
 
   async getById(id) {
