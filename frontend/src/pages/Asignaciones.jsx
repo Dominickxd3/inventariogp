@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import Swal from 'sweetalert2';
@@ -16,7 +17,16 @@ const columns = [
   {
     key: 'TrabajadorNombre',
     label: 'Trabajador',
-    render: (r) => r.TrabajadorNombre || `ID: ${r.IdReferente}`,
+    render: (r) => (
+      <div>
+        <p className="font-medium">{r.TrabajadorNombre || 'Trabajador no encontrado'}</p>
+        {r.TrabajadorNombre && r.DOI ? (
+          <p className="text-xs text-muted-foreground">{r.DOI}{r.Area ? ` - ${r.Area}` : ''}</p>
+        ) : (
+          <p className="text-xs text-muted-foreground">ID: {r.IdReferente}</p>
+        )}
+      </div>
+    ),
   },
   { key: 'CodEquipo', label: 'Equipo' },
   { key: 'DesTipodeEquipo', label: 'Tipo' },
@@ -30,7 +40,13 @@ const columns = [
 
 export default function Asignaciones() {
   const [showModal, setShowModal] = useState(false);
+  const [searchParams] = useSearchParams();
+  const nuevoEquipoId = searchParams.get('nuevoEquipo');
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (nuevoEquipoId) setShowModal(true);
+  }, [nuevoEquipoId]);
 
   const { data: asignaciones, isLoading } = useQuery({
     queryKey: ['asignaciones'],
@@ -94,7 +110,7 @@ export default function Asignaciones() {
             <DialogTitle>Nueva Asignación</DialogTitle>
             <DialogDescription>Selecciona trabajador y equipos para asignar</DialogDescription>
           </DialogHeader>
-          <AsignarForm onSuccess={() => { setShowModal(false); queryClient.invalidateQueries({ queryKey: ['asignaciones'] }); }} />
+          <AsignarForm equipoInicial={nuevoEquipoId} onSuccess={() => { setShowModal(false); queryClient.invalidateQueries({ queryKey: ['asignaciones'] }); }} />
         </DialogContent>
       </Dialog>
 
@@ -118,12 +134,14 @@ export default function Asignaciones() {
   );
 }
 
-function AsignarForm({ onSuccess }) {
-  const [step, setStep] = useState(1);
+function AsignarForm({ onSuccess, equipoInicial }) {
+  const [step, setStep] = useState(equipoInicial ? 1 : 1);
   const [searchTrab, setSearchTrab] = useState('');
   const [searchEquipo, setSearchEquipo] = useState('');
   const [selectedTrab, setSelectedTrab] = useState(null);
   const [selectedEquipos, setSelectedEquipos] = useState([]);
+  const [selectedAcc, setSelectedAcc] = useState([]);
+  const [searchAcc, setSearchAcc] = useState('');
   const [obs, setObs] = useState('');
 
   const { data: trabajadores } = useQuery({
@@ -137,15 +155,42 @@ function AsignarForm({ onSuccess }) {
     queryFn: () => api.equipos.list({ estado: 'DISPONIBLE', search: searchEquipo }),
   });
 
+  const { data: equipoInicialData } = useQuery({
+    queryKey: ['equipo-inicial', equipoInicial],
+    queryFn: () => api.equipos.get(equipoInicial),
+    enabled: !!equipoInicial,
+  });
+
+  const { data: accDisponibles } = useQuery({
+    queryKey: ['componentes-disponibles-asig', searchAcc],
+    queryFn: () => api.componentes.list({ estado: 'DISPONIBLE' }),
+    enabled: step === 4,
+  });
+
+  useEffect(() => {
+    if (equipoInicialData) {
+      setSelectedEquipos([equipoInicialData]);
+    }
+  }, [equipoInicialData]);
+
+  const totalSteps = 4; // 1: Trabajador, 2: Equipos, 3: Accesorios, 4: Confirmar
+
   const asignarMutation = useMutation({
     mutationFn: api.asignaciones.createBulk,
     onSuccess: () => {
       onSuccess();
       Swal.fire({ icon: 'success', title: 'Equipos asignados', text: `${selectedEquipos.length} equipo(s) asignado(s) correctamente`, timer: 2000, showConfirmButton: false });
     },
-    onError: (err) => {
-      Swal.fire({ icon: 'error', title: 'Error al asignar', text: err.message });
+    onError: (err) => Swal.fire({ icon: 'error', title: 'Error al asignar', text: err.message }),
+  });
+
+  const asignarConAccMutation = useMutation({
+    mutationFn: api.asignaciones.createConAccesorios,
+    onSuccess: (resp) => {
+      onSuccess();
+      Swal.fire({ icon: 'success', title: 'Asignación completada', text: `Equipo y ${resp.accesorios} accesorio(s) asignados`, timer: 2000, showConfirmButton: false });
     },
+    onError: (err) => Swal.fire({ icon: 'error', title: 'Error', text: err.message }),
   });
 
   const toggleEquipo = (eq) => {
@@ -156,13 +201,32 @@ function AsignarForm({ onSuccess }) {
     );
   };
 
+  const toggleAcc = (c) => {
+    setSelectedAcc((prev) =>
+      prev.some((a) => a.IdComponente === c.IdComponente)
+        ? prev.filter((a) => a.IdComponente !== c.IdComponente)
+        : [...prev, c]
+    );
+  };
+
   const handleAsignar = () => {
     if (!selectedTrab || selectedEquipos.length === 0) return;
-    asignarMutation.mutate({
-      IdMaeEquipos: selectedEquipos.map((e) => e.IdMaeEquipo),
-      IdReferente: selectedTrab.IdTrabajador,
-      Obs: obs,
-    });
+
+    if (selectedEquipos.length === 1 && selectedAcc.length > 0) {
+      const eq = selectedEquipos[0];
+      asignarConAccMutation.mutate({
+        IdMaeEquipo: eq.IdMaeEquipo,
+        IdReferente: selectedTrab.IdTrabajador,
+        Obs: obs || null,
+        Accesorios: selectedAcc.map((a) => ({ IdComponente: a.IdComponente, Obs: null })),
+      });
+    } else {
+      asignarMutation.mutate({
+        IdMaeEquipos: selectedEquipos.map((e) => e.IdMaeEquipo),
+        IdReferente: selectedTrab.IdTrabajador,
+        Obs: obs,
+      });
+    }
   };
 
   const totalEquipos = selectedEquipos.reduce((acc, e) => {
@@ -174,8 +238,8 @@ function AsignarForm({ onSuccess }) {
   return (
     <div className="space-y-4">
       <div className="flex gap-2 mb-4">
-        {[1, 2, 3].map((s) => (
-          <div key={s} className={`flex-1 h-2 rounded-full ${step >= s ? 'bg-primary' : 'bg-muted'}`} />
+        {Array.from({ length: totalSteps }).map((_, s) => (
+          <div key={s} className={`flex-1 h-2 rounded-full ${step >= s + 1 ? 'bg-primary' : 'bg-muted'}`} />
         ))}
       </div>
 
@@ -186,8 +250,7 @@ function AsignarForm({ onSuccess }) {
           <div className="max-h-60 overflow-y-auto space-y-1">
             {trabajadores?.rows?.map((t) => (
               <div key={t.IdTrabajador} onClick={() => { setSelectedTrab(t); setStep(2); }}
-                className={`p-3 rounded-lg cursor-pointer text-sm ${selectedTrab?.IdTrabajador === t.IdTrabajador ? 'bg-accent border border-border' : 'hover:bg-muted border border-transparent'}`}
-              >
+                className={`p-3 rounded-lg cursor-pointer text-sm ${selectedTrab?.IdTrabajador === t.IdTrabajador ? 'bg-accent border border-border' : 'hover:bg-muted border border-transparent'}`}>
                 <p className="font-medium">{t.Trabajador}</p>
                 <p className="text-muted-foreground text-xs">{t.DOI} - {t.Ocupacion}</p>
               </div>
@@ -204,35 +267,77 @@ function AsignarForm({ onSuccess }) {
               <span className="text-xs text-muted-foreground">{selectedEquipos.length} seleccionados</span>
             )}
           </div>
-          <Input value={searchEquipo} onChange={(e) => setSearchEquipo(e.target.value)} placeholder="Buscar equipo..." />
-          <div className="max-h-60 overflow-y-auto space-y-1">
-            {equipos?.rows?.map((e) => {
-              const selected = selectedEquipos.some((s) => s.IdMaeEquipo === e.IdMaeEquipo);
-              return (
-                <div key={e.IdMaeEquipo} onClick={() => toggleEquipo(e)}
-                  className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer text-sm ${selected ? 'bg-accent border border-border' : 'hover:bg-muted border border-transparent'}`}
-                >
-                  <div className={`w-5 h-5 rounded border flex items-center justify-center ${selected ? 'bg-primary border-primary text-primary-foreground' : 'border-input'}`}>
-                    {selected && <Check className="w-3 h-3" />}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium">{e.CodEquipo} - {e.DesTipodeEquipo}</p>
-                    <p className="text-muted-foreground text-xs">{e.CodBarra || 'Sin código de barra'}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          {!equipoInicial ? (
+            <>
+              <Input value={searchEquipo} onChange={(e) => setSearchEquipo(e.target.value)} placeholder="Buscar equipo..." />
+              <div className="max-h-60 overflow-y-auto space-y-1">
+                {equipos?.rows?.map((e) => {
+                  const selected = selectedEquipos.some((s) => s.IdMaeEquipo === e.IdMaeEquipo);
+                  return (
+                    <div key={e.IdMaeEquipo} onClick={() => toggleEquipo(e)}
+                      className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer text-sm ${selected ? 'bg-accent border border-border' : 'hover:bg-muted border border-transparent'}`}>
+                      <div className={`w-5 h-5 rounded border flex items-center justify-center ${selected ? 'bg-primary border-primary text-primary-foreground' : 'border-input'}`}>
+                        {selected && <Check className="w-3 h-3" />}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium">{e.CodEquipo} - {e.DesTipodeEquipo}</p>
+                        <p className="text-muted-foreground text-xs">{e.CodBarra || 'Sin código de barra'}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            <div className="bg-muted p-4 rounded-lg">
+              <p className="font-medium">{selectedEquipos[0]?.CodEquipo} - {selectedEquipos[0]?.DesTipodeEquipo}</p>
+              <p className="text-xs text-muted-foreground">{selectedEquipos[0]?.CodBarra || 'Sin código de barra'}</p>
+            </div>
+          )}
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setStep(1)}>Atrás</Button>
-            <Button onClick={() => setStep(3)} disabled={selectedEquipos.length === 0}>
-              Continuar ({selectedEquipos.length} equipos)
+            <Button onClick={() => setStep(selectedEquipos.length === 1 ? 3 : 4)} disabled={selectedEquipos.length === 0}>
+              Continuar
             </Button>
           </div>
         </div>
       )}
 
-      {step === 3 && (
+      {step === 3 && selectedEquipos.length === 1 && (
+        <div className="space-y-3">
+          <h3 className="font-medium">Accesorios incluidos</h3>
+          <p className="text-xs text-muted-foreground">Selecciona accesorios para entregar junto al equipo (opcional)</p>
+          <Input value={searchAcc} onChange={(e) => setSearchAcc(e.target.value)} placeholder="Buscar accesorio..." />
+          <div className="max-h-48 overflow-y-auto space-y-1">
+            {accDisponibles?.map((c) => {
+              const selected = selectedAcc.some((a) => a.IdComponente === c.IdComponente);
+              return (
+                <div key={c.IdComponente} onClick={() => toggleAcc(c)}
+                  className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer text-sm ${selected ? 'bg-accent border border-border' : 'hover:bg-muted border border-transparent'}`}>
+                  <div className={`w-5 h-5 rounded border flex items-center justify-center ${selected ? 'bg-primary border-primary text-primary-foreground' : 'border-input'}`}>
+                    {selected && <Check className="w-3 h-3" />}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium">{c.CodComponente} - {c.DesComponente || 'Sin descripción'}</p>
+                    <p className="text-xs text-muted-foreground">{c.DesTipodeComponente}{c.Marca ? ` / ${c.Marca}` : ''}</p>
+                  </div>
+                </div>
+              );
+            })}
+            {(!accDisponibles || accDisponibles.length === 0) && (
+              <p className="text-xs text-muted-foreground text-center py-2">No hay accesorios disponibles</p>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setStep(2)}>Atrás</Button>
+            <Button onClick={() => setStep(4)}>
+              Continuar ({selectedAcc.length} accesorios)
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {step === 4 && (
         <div className="space-y-3">
           <h3 className="font-medium">Confirmar Asignación</h3>
           <div className="bg-muted p-4 rounded-lg space-y-2 text-sm">
@@ -245,15 +350,23 @@ function AsignarForm({ onSuccess }) {
                 </span>
               ))}
             </div>
+            {selectedAcc.length > 0 && (
+              <div className="mt-2 pt-2 border-t border-border">
+                <p className="text-xs text-muted-foreground mb-1">Accesorios incluidos:</p>
+                {selectedAcc.map((a) => (
+                  <p key={a.IdComponente} className="text-xs">{a.CodComponente} - {a.DesComponente}</p>
+                ))}
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Observaciones</label>
             <textarea value={obs} onChange={(e) => setObs(e.target.value)} className="w-full min-h-[60px] rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm" rows={2} />
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setStep(2)}>Atrás</Button>
-            <Button onClick={handleAsignar} disabled={asignarMutation.isPending}>
-              {asignarMutation.isPending ? 'Asignando...' : `Asignar (${selectedEquipos.length} equipos)`}
+            <Button variant="outline" onClick={() => setStep(selectedEquipos.length === 1 && selectedAcc.length > 0 ? 3 : 2)}>Atrás</Button>
+            <Button onClick={handleAsignar} disabled={asignarMutation.isPending || asignarConAccMutation.isPending}>
+              {asignarMutation.isPending || asignarConAccMutation.isPending ? 'Asignando...' : `Asignar${selectedAcc.length > 0 ? ` (${selectedEquipos.length} equipo + ${selectedAcc.length} acc.)` : ` (${selectedEquipos.length} equipo${selectedEquipos.length > 1 ? 's' : ''})`}`}
             </Button>
           </div>
         </div>

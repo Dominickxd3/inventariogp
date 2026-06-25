@@ -1,6 +1,7 @@
 import { AsignacionesRepository } from '../repositories/asignaciones.repository.js';
 import { EquiposRepository } from '../repositories/equipos.repository.js';
 import { ComponentesRepository } from '../repositories/componentes.repository.js';
+import { withTransaction, createRequest } from '../config/db.js';
 
 export const AsignacionesService = {
   async list(filtros) {
@@ -67,6 +68,59 @@ export const AsignacionesService = {
     return results;
   },
 
+  async asignarConAccesorios(data) {
+    const { IdMaeEquipo, IdReferente, Obs, Accesorios, IdUsuario } = data;
+
+    const equipo = await EquiposRepository.getById(IdMaeEquipo);
+    if (!equipo) throw new Error('Equipo no encontrado');
+    if (equipo.Estado !== 'DISPONIBLE') throw new Error('El equipo no está disponible');
+
+    const accsValidos = [];
+    if (Accesorios?.length) {
+      for (const acc of Accesorios) {
+        const c = await ComponentesRepository.getById(acc.IdComponente);
+        if (!c) throw new Error(`Componente ID ${acc.IdComponente} no encontrado`);
+        if (c.Estado !== 'DISPONIBLE') throw new Error(`Componente ${c.CodComponente} no está disponible`);
+        if (accsValidos.some(a => a.IdComponente === acc.IdComponente)) {
+          throw new Error(`Componente duplicado: ${c.CodComponente}`);
+        }
+        accsValidos.push(acc);
+      }
+    }
+
+    const DB = 'InventarioGP';
+    const fec = new Date().toISOString().split('T')[0];
+
+    return withTransaction(DB, async (trx) => {
+      const req = (sql, params) => createRequest(trx, params).query(sql);
+
+      const [asigResult] = await req(`
+        INSERT INTO Tab_EQ_MovEquiposAsignaciones (IdMaeEquipo, IdReferente, FecAsignacion, Obs, Estado)
+        OUTPUT INSERTED.IdMovEquipoAsignacion
+        VALUES (@idEquipo, @idTrabajador, @fec, @obs, 'VIGENTE')
+      `, { idEquipo: IdMaeEquipo, idTrabajador: IdReferente, fec, obs: Obs || null });
+      const idAsig = asigResult.IdMovEquipoAsignacion;
+
+      await req(`UPDATE Tab_EQ_MaeEquipos SET Estado = 'ASIGNADO' WHERE IdMaeEquipo = @id`, { id: IdMaeEquipo });
+
+      await req(`
+        INSERT INTO Tab_EQ_MovEstadosEquipos (IdMaeEquipo, EstadoAnterior, EstadoNuevo, IdUsuario, Obs)
+        VALUES (@idEquipo, @estadoAnt, 'ASIGNADO', @idUsuario, 'Equipo asignado con accesorios')
+      `, { idEquipo: IdMaeEquipo, estadoAnt: equipo.Estado, idUsuario: IdUsuario || null });
+
+      for (const acc of accsValidos) {
+        await req(`
+          INSERT INTO Tab_EQ_MovAccesoriosTrabajador (IdComponente, IdReferente, FecAsignacion, Obs, Estado, IdUsuarioCrea)
+          VALUES (@idComponente, @idTrabajador, @fec, @obs, 'VIGENTE', @idUsuario)
+        `, { idComponente: acc.IdComponente, idTrabajador: IdReferente, fec, obs: acc.Obs || null, idUsuario: IdUsuario || null });
+
+        await req(`UPDATE Tab_EQ_Componentes SET Estado = 'ASIGNADO' WHERE IdComponente = @id`, { id: acc.IdComponente });
+      }
+
+      return { idAsig, equipo: IdMaeEquipo, accesorios: accsValidos.length };
+    });
+  },
+
   async cesarActivasByTrabajador(idTrabajador, idUsuario) {
     const activas = await AsignacionesRepository.getActivasByTrabajador(idTrabajador);
     for (const asig of activas) {
@@ -74,6 +128,11 @@ export const AsignacionesService = {
       await EquiposRepository.updateEstado(asig.IdMaeEquipo, 'DISPONIBLE');
       await EquiposRepository.registrarCambioEstado(asig.IdMaeEquipo, 'ASIGNADO', 'DISPONIBLE', idUsuario, 'Asignación finalizada (desasignación masiva)');
     }
-    return { count: activas.length };
+    // También cesar accesorios activos del trabajador
+    const accs = await ComponentesRepository.listAccesoriosPorTrabajador(idTrabajador);
+    for (const acc of accs) {
+      await ComponentesRepository.cesarAccesorioATrabajador(acc.IdMovAccesorio);
+    }
+    return { count: activas.length, accesoriosCesados: accs.length };
   },
 };

@@ -122,6 +122,48 @@ export const EquiposRepository = {
     await query(DB, 'DELETE FROM Tab_EQ_MaeEquipos WHERE IdMaeEquipo = @id', { id });
   },
 
+  async getTipoById(id) {
+    const rows = await query(DB, 'SELECT * FROM Tab_EQ_TipodeEquipos WHERE IdTipodeEquipo = @id', { id });
+    return rows[0] || null;
+  },
+
+  async getLastCodEquipoByPrefix(prefix) {
+    const rows = await query(DB, `
+      SELECT TOP 1 CodEquipo
+      FROM Tab_EQ_MaeEquipos
+      WHERE CodEquipo LIKE @prefix + '-%'
+      ORDER BY CAST(SUBSTRING(CodEquipo, LEN(@prefix) + 2, 20) AS INT) DESC
+    `, { prefix });
+    return rows[0]?.CodEquipo || null;
+  },
+
+  async createQuick({ codEquipo, idTipo, codBarra, obs, estado, idUsuario }) {
+    const result = await query(DB, `
+      DECLARE @IdMaeEquipo int;
+      BEGIN TRY
+        BEGIN TRANSACTION;
+          INSERT INTO Tab_EQ_MaeEquipos (CodEquipo, IdTipodeEquipo, CodBarra, Obs, Estado)
+          VALUES (@codEquipo, @idTipo, @codBarra, @obs, @estado);
+          SET @IdMaeEquipo = SCOPE_IDENTITY();
+          INSERT INTO Tab_EQ_MovEstadosEquipos (IdMaeEquipo, EstadoAnterior, EstadoNuevo, IdUsuario, Obs)
+          VALUES (@IdMaeEquipo, NULL, @estado, @idUsuario, 'Equipo creado - registro rápido');
+        COMMIT TRANSACTION;
+        SELECT @IdMaeEquipo as IdMaeEquipo;
+      END TRY
+      BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW;
+      END CATCH
+    `, {
+      codEquipo, idTipo,
+      codBarra: codBarra || null,
+      obs: obs || null,
+      estado,
+      idUsuario: idUsuario || null,
+    });
+    return result[0]?.IdMaeEquipo;
+  },
+
   // Tipos de equipo
   async listTipos() {
     return query(DB, "SELECT * FROM Tab_EQ_TipodeEquipos WHERE Estado = 'ACTIVO' ORDER BY DesTipodeEquipo");
@@ -152,11 +194,60 @@ export const EquiposRepository = {
 
   async getHistorialEstados(idEquipo) {
     return query(DB, `
-      SELECT e.*, u.NombreUsuario
+      SELECT e.*, u.User_Fullname AS NombreUsuario
       FROM Tab_EQ_MovEstadosEquipos e
       LEFT JOIN Tab_SYS_Usuarios u ON e.IdUsuario = u.IdUsuario
       WHERE e.IdMaeEquipo = @id
       ORDER BY e.FecCambio DESC
     `, { id: idEquipo });
+  },
+
+  // Plantillas de características por tipo de equipo
+  async getPlantillaByTipo(idTipo) {
+    return query(DB, `
+      SELECT IdPlantilla, Clave, Etiqueta, TipoDato, Requerido, Orden
+      FROM Tab_EQ_PlantillaCaracteristicas
+      WHERE IdTipodeEquipo = @idTipo AND Activo = 1
+      ORDER BY Orden
+    `, { idTipo });
+  },
+
+  // Características técnicas (con IdPlantilla)
+  async getCaracteristicas(idEquipo) {
+    return query(DB, `
+      SELECT IdCaracteristica, IdPlantilla, Clave, Valor
+      FROM Tab_EQ_CaracteristicasEquipo
+      WHERE IdMaeEquipo = @id
+    `, { id: idEquipo });
+  },
+
+  async deleteCaracteristicasPorEquipo(idEquipo) {
+    await query(DB, 'DELETE FROM Tab_EQ_CaracteristicasEquipo WHERE IdMaeEquipo = @id', { id: idEquipo });
+  },
+
+  async insertCaracteristica(idEquipo, clave, valor, idUsuario) {
+    await query(DB, `
+      INSERT INTO Tab_EQ_CaracteristicasEquipo (IdMaeEquipo, Clave, Valor, IdUsuarioCrea)
+      VALUES (@idEquipo, @clave, @valor, @idUsuario)
+    `, { idEquipo, clave, valor: valor || null, idUsuario: idUsuario || null });
+  },
+
+  async upsertCaracteristicaPlantilla(idEquipo, idPlantilla, valor, idUsuario) {
+    const existing = await query(DB, `
+      SELECT IdCaracteristica FROM Tab_EQ_CaracteristicasEquipo
+      WHERE IdMaeEquipo = @idEquipo AND IdPlantilla = @idPlantilla
+    `, { idEquipo, idPlantilla });
+    if (existing.length > 0) {
+      await query(DB, `
+        UPDATE Tab_EQ_CaracteristicasEquipo
+        SET Valor = @valor, IdUsuarioModifica = @idUsuario, FecModificacion = GETDATE()
+        WHERE IdCaracteristica = @id
+      `, { id: existing[0].IdCaracteristica, valor: valor || null, idUsuario: idUsuario || null });
+    } else {
+      await query(DB, `
+        INSERT INTO Tab_EQ_CaracteristicasEquipo (IdMaeEquipo, IdPlantilla, Clave, Valor, IdUsuarioCrea)
+        VALUES (@idEquipo, @idPlantilla, (SELECT Clave FROM Tab_EQ_PlantillaCaracteristicas WHERE IdPlantilla = @idPlantilla), @valor, @idUsuario)
+      `, { idEquipo, idPlantilla, valor: valor || null, idUsuario: idUsuario || null });
+    }
   },
 };

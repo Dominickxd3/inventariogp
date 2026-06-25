@@ -48,6 +48,28 @@ export async function execute(dbName, procedure, params = {}) {
   return result.recordset || [];
 }
 
+export async function withTransaction(dbName, callback) {
+  const pool = await getPool(dbName);
+  const transaction = pool.transaction();
+  await transaction.begin();
+  try {
+    const result = await callback(transaction);
+    await transaction.commit();
+    return result;
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
+}
+
+export function createRequest(transaction, params = {}) {
+  const request = transaction.request();
+  Object.entries(params).forEach(([key, value]) => {
+    request.input(key, value);
+  });
+  return request;
+}
+
 export async function closeAll() {
   for (const pool of poolCache.values()) {
     try { await pool.close(); } catch {}

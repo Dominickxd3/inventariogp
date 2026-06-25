@@ -5,14 +5,12 @@ const DB = 'InventarioGP';
 export const AsignacionesRepository = {
   async listAll(filtros = {}) {
     let sql = `
-      SELECT a.*, e.CodEquipo, e.CodBarra, t.DesTipodeEquipo,
-             p.DNI, p.APaterno, p.AMaterno, p.Nombres,
-             p.APaterno + ' ' + p.AMaterno + ', ' + p.Nombres as TrabajadorNombre,
-             p.AreaName, p.NomCargo, p.NomGerencia
+      SELECT a.*, e.CodEquipo, e.CodBarra, te.DesTipodeEquipo,
+             tr.Trabajador as TrabajadorNombre, tr.DOI, tr.Area, tr.Ocupacion
       FROM Tab_EQ_MovEquiposAsignaciones a
       JOIN Tab_EQ_MaeEquipos e ON a.IdMaeEquipo = e.IdMaeEquipo
-      LEFT JOIN Tab_EQ_TipodeEquipos t ON e.IdTipodeEquipo = t.IdTipodeEquipo
-      LEFT JOIN SIGA_ASISTENCIA.dbo.Personal_periodo p ON a.IdReferente = p.PersonalId
+      LEFT JOIN Tab_EQ_TipodeEquipos te ON e.IdTipodeEquipo = te.IdTipodeEquipo
+      LEFT JOIN Tab_EQ_Trabajadores tr ON a.IdReferente = tr.IdTrabajador
       WHERE 1=1
     `;
     const params = {};
@@ -36,10 +34,9 @@ export const AsignacionesRepository = {
 
   async getActivaByEquipo(idEquipo) {
     const rows = await query(DB, `
-      SELECT a.*, p.DNI, p.APaterno, p.AMaterno, p.Nombres,
-             p.AreaName, p.NomCargo
+      SELECT a.*, tr.Trabajador as TrabajadorNombre, tr.DOI, tr.Area, tr.Ocupacion
       FROM Tab_EQ_MovEquiposAsignaciones a
-      LEFT JOIN SIGA_ASISTENCIA.dbo.Personal_periodo p ON a.IdReferente = p.PersonalId
+      LEFT JOIN Tab_EQ_Trabajadores tr ON a.IdReferente = tr.IdTrabajador
       WHERE a.IdMaeEquipo = @id AND a.Estado = 'VIGENTE'
     `, { id: idEquipo });
     return rows[0] || null;
@@ -47,9 +44,9 @@ export const AsignacionesRepository = {
 
   async getHistorialByEquipo(idEquipo) {
     return query(DB, `
-      SELECT a.*, p.DNI, p.APaterno + ' ' + p.AMaterno + ', ' + p.Nombres as Trabajador
+      SELECT a.*, tr.Trabajador as TrabajadorNombre, tr.DOI
       FROM Tab_EQ_MovEquiposAsignaciones a
-      LEFT JOIN SIGA_ASISTENCIA.dbo.Personal_periodo p ON a.IdReferente = p.PersonalId
+      LEFT JOIN Tab_EQ_Trabajadores tr ON a.IdReferente = tr.IdTrabajador
       WHERE a.IdMaeEquipo = @id
       ORDER BY a.FecRegistro DESC
     `, { id: idEquipo });
@@ -57,10 +54,12 @@ export const AsignacionesRepository = {
 
   async getHistorialByTrabajador(idTrabajador) {
     return query(DB, `
-      SELECT a.*, e.CodEquipo, e.CodBarra, t.DesTipodeEquipo
+      SELECT a.*, e.CodEquipo, e.CodBarra, t.DesTipodeEquipo,
+             tr.Trabajador as TrabajadorNombre
       FROM Tab_EQ_MovEquiposAsignaciones a
       JOIN Tab_EQ_MaeEquipos e ON a.IdMaeEquipo = e.IdMaeEquipo
       LEFT JOIN Tab_EQ_TipodeEquipos t ON e.IdTipodeEquipo = t.IdTipodeEquipo
+      LEFT JOIN Tab_EQ_Trabajadores tr ON a.IdReferente = tr.IdTrabajador
       WHERE a.IdReferente = @id
       ORDER BY a.FecRegistro DESC
     `, { id: idTrabajador });
@@ -68,10 +67,12 @@ export const AsignacionesRepository = {
 
   async getActivasByTrabajador(idTrabajador) {
     return query(DB, `
-      SELECT a.*, e.CodEquipo, e.CodBarra, t.DesTipodeEquipo
+      SELECT a.*, e.CodEquipo, e.CodBarra, t.DesTipodeEquipo,
+             tr.Trabajador as TrabajadorNombre
       FROM Tab_EQ_MovEquiposAsignaciones a
       JOIN Tab_EQ_MaeEquipos e ON a.IdMaeEquipo = e.IdMaeEquipo
       LEFT JOIN Tab_EQ_TipodeEquipos t ON e.IdTipodeEquipo = t.IdTipodeEquipo
+      LEFT JOIN Tab_EQ_Trabajadores tr ON a.IdReferente = tr.IdTrabajador
       WHERE a.IdReferente = @id AND a.Estado = 'VIGENTE'
       ORDER BY t.DesTipodeEquipo, e.CodEquipo
     `, { id: idTrabajador });

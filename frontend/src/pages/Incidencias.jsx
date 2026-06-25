@@ -3,10 +3,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { EstadoBadge, IncidenciaBadge } from '../components/Badge';
 import DataTable from '../components/DataTable';
-import Modal from '../components/Modal';
 import SearchInput from '../components/SearchInput';
+import { Button } from '#components/ui/button.jsx';
+import { Input } from '#components/ui/input.jsx';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '#components/ui/select.jsx';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '#components/ui/dialog.jsx';
 import { Plus, CheckCircle } from 'lucide-react';
 import { formatDate } from '../lib/utils';
+import Swal from 'sweetalert2';
 
 const columns = [
   { key: 'CodEquipo', label: 'Equipo' },
@@ -37,22 +45,31 @@ export default function Incidencias() {
 
   const cerrarMutation = useMutation({
     mutationFn: api.incidencias.cerrar,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['incidencias'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['incidencias'] });
+      queryClient.invalidateQueries({ queryKey: ['equipos'] });
+      queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
+    },
   });
+
+  const confirmCerrar = (row) => {
+    Swal.fire({
+      title: '¿Cerrar incidencia?',
+      text: `Se cerrará la incidencia de tipo ${row.TipoIncidencia} para el equipo ${row.CodEquipo}.`,
+      icon: 'question', showCancelButton: true, confirmButtonText: 'Cerrar', cancelButtonText: 'Cancelar',
+    }).then((r) => { if (r.isConfirmed) cerrarMutation.mutate(row.IdIncidencia); });
+  };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-800">Incidencias</h1>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
-        >
+        <h1 className="text-2xl font-bold text-foreground">Incidencias</h1>
+        <Button onClick={() => setShowModal(true)}>
           <Plus className="w-4 h-4" /> Nueva Incidencia
-        </button>
+        </Button>
       </div>
 
-      <SearchInput value={search} onChange={setSearch} placeholder="Buscar por equipo o trabajador..." />
+      <SearchInput value={search} onChange={setSearch} placeholder="Buscar por equipo, descripción o trabajador..." />
 
       <DataTable
         columns={[
@@ -63,15 +80,9 @@ export default function Incidencias() {
             sortable: false,
             render: (row) => (
               row.Estado === 'ABIERTO' && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (confirm('¿Cerrar incidencia?')) cerrarMutation.mutate(row.IdIncidencia);
-                  }}
-                  className="flex items-center gap-1 px-2 py-1 text-xs text-green-600 hover:bg-green-50 rounded-lg"
-                >
+                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); confirmCerrar(row); }}>
                   <CheckCircle className="w-3 h-3" /> Cerrar
-                </button>
+                </Button>
               )
             ),
           },
@@ -79,9 +90,15 @@ export default function Incidencias() {
         data={data}
       />
 
-      <Modal open={showModal} onClose={() => setShowModal(false)} title="Registrar Incidencia" size="lg">
-        <IncidenciaForm onSuccess={() => { setShowModal(false); queryClient.invalidateQueries({ queryKey: ['incidencias'] }); }} />
-      </Modal>
+      <Dialog open={showModal} onOpenChange={setShowModal}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Registrar Incidencia</DialogTitle>
+            <DialogDescription>Registra un daño, robo, pérdida o devolución de equipo</DialogDescription>
+          </DialogHeader>
+          <IncidenciaForm onSuccess={() => { setShowModal(false); queryClient.invalidateQueries({ queryKey: ['incidencias'] }); }} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -89,8 +106,7 @@ export default function Incidencias() {
 function IncidenciaForm({ onSuccess }) {
   const [searchEquipo, setSearchEquipo] = useState('');
   const [selectedEquipo, setSelectedEquipo] = useState(null);
-  const [selectedTrabajador, setSelectedTrabajador] = useState(null);
-  const [form, setForm] = useState({ TipoIncidencia: 'ROBO', Descripcion: '', FecIncidencia: new Date().toISOString().split('T')[0] });
+  const [form, setForm] = useState({ TipoIncidencia: 'DAÑO', Descripcion: '', FecIncidencia: new Date().toISOString().split('T')[0] });
 
   const { data: equipos } = useQuery({
     queryKey: ['equipos-search-incidencia', searchEquipo],
@@ -101,62 +117,76 @@ function IncidenciaForm({ onSuccess }) {
   const createMutation = useMutation({
     mutationFn: api.incidencias.create,
     onSuccess,
+    onError: (err) => Swal.fire({ icon: 'error', title: 'Error', text: err.message }),
   });
+
+  const equiposList = equipos?.rows || equipos || [];
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!selectedEquipo) return;
+    if (!selectedEquipo) {
+      Swal.fire({ icon: 'warning', title: 'Selecciona un equipo' });
+      return;
+    }
+    if (!form.Descripcion.trim()) {
+      Swal.fire({ icon: 'warning', title: 'La descripción es obligatoria' });
+      return;
+    }
     createMutation.mutate({
       IdMaeEquipo: selectedEquipo.IdMaeEquipo,
-      IdReferente: selectedTrabajador?.PersonalId || null,
       ...form,
     });
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Equipo</label>
-        <input type="text" value={searchEquipo} onChange={(e) => setSearchEquipo(e.target.value)}
-          placeholder="Buscar equipo..." className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-        {equipos && equipos.length > 0 && (
+      <div className="space-y-1.5">
+        <label className="text-sm font-medium">Equipo <span className="text-destructive">*</span></label>
+        <Input value={searchEquipo} onChange={(e) => setSearchEquipo(e.target.value)}
+          placeholder="Buscar equipo por código o nombre..." />
+        {equiposList.length > 0 && (
           <div className="mt-1 max-h-40 overflow-y-auto border rounded-lg">
-            {equipos.map((e) => (
+            {equiposList.map((e) => (
               <div key={e.IdMaeEquipo} onClick={() => { setSelectedEquipo(e); setSearchEquipo(`${e.CodEquipo} - ${e.DesTipodeEquipo}`); }}
-                className="px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer">{e.CodEquipo} - {e.DesTipodeEquipo}</div>
+                className={`px-3 py-2 text-sm cursor-pointer hover:bg-muted ${selectedEquipo?.IdMaeEquipo === e.IdMaeEquipo ? 'bg-accent font-medium' : ''}`}>
+                {e.CodEquipo} - {e.DesTipodeEquipo}
+              </div>
             ))}
           </div>
         )}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Incidencia</label>
-          <select value={form.TipoIncidencia} onChange={(e) => setForm({ ...form, TipoIncidencia: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-            <option value="ROBO">Robo</option>
-            <option value="PERDIDA">Pérdida</option>
-            <option value="DAÑO">Daño</option>
-            <option value="DEVOLUCION">Devolución</option>
-          </select>
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">Tipo de Incidencia</label>
+          <Select value={form.TipoIncidencia} onValueChange={(v) => setForm({ ...form, TipoIncidencia: v })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="DAÑO">Daño</SelectItem>
+              <SelectItem value="ROBO">Robo</SelectItem>
+              <SelectItem value="PERDIDA">Pérdida</SelectItem>
+              <SelectItem value="DEVOLUCION">Devolución</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
-          <input type="date" value={form.FecIncidencia} onChange={(e) => setForm({ ...form, FecIncidencia: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">Fecha</label>
+          <Input type="date" value={form.FecIncidencia} onChange={(e) => setForm({ ...form, FecIncidencia: e.target.value })} />
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+      <div className="space-y-1.5">
+        <label className="text-sm font-medium">Descripción <span className="text-destructive">*</span></label>
         <textarea value={form.Descripcion} onChange={(e) => setForm({ ...form, Descripcion: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" rows={4} required />
+          className="w-full min-h-[80px] rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm" required />
       </div>
 
-      <button type="submit" disabled={createMutation.isPending}
-        className="w-full py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium disabled:opacity-50">
-        {createMutation.isPending ? 'Registrando...' : 'Registrar Incidencia'}
-      </button>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={() => onSuccess?.()}>Cancelar</Button>
+        <Button type="submit" variant="destructive" disabled={createMutation.isPending}>
+          {createMutation.isPending ? 'Registrando...' : 'Registrar Incidencia'}
+        </Button>
+      </DialogFooter>
     </form>
   );
 }

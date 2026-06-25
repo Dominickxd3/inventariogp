@@ -30,6 +30,7 @@ export const api = {
     get: (id) => request(`/equipos/${id}`),
     scan: (codigo) => request(`/equipos/scan/${codigo}`),
     create: (data) => request('/equipos', { method: 'POST', body: JSON.stringify(data) }),
+    rapido: (data) => request('/equipos/rapido', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) => request(`/equipos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id) => request(`/equipos/${id}`, { method: 'DELETE' }),
     qr: (id) => request(`/equipos/${id}/qr`, { method: 'POST' }),
@@ -38,6 +39,22 @@ export const api = {
       create: (data) => request('/equipos/tipos', { method: 'POST', body: JSON.stringify(data) }),
     },
     dashboard: () => request('/equipos/dashboard'),
+    intervenciones: {
+      list: (id) => request(`/equipos/${id}/intervenciones`),
+      create: (id, data) => request(`/equipos/${id}/intervenciones`, { method: 'POST', body: JSON.stringify(data) }),
+    },
+    incidencias: {
+      list: (id) => request(`/equipos/${id}/incidencias`),
+    },
+    caracteristicas: {
+      get: (id) => request(`/equipos/${id}/caracteristicas`),
+      save: (id, data) => request(`/equipos/${id}/caracteristicas`, { method: 'PUT', body: JSON.stringify(data) }),
+    },
+    componentes: {
+      list: (id) => request(`/equipos/${id}/componentes`),
+      add: (id, data) => request(`/equipos/${id}/componentes`, { method: 'POST', body: JSON.stringify(data) }),
+      remove: (id, idMov, motivo) => request(`/equipos/${id}/componentes/${idMov}`, { method: 'DELETE', body: JSON.stringify({ Motivo: motivo || null }) }),
+    },
   },
 
   // Trabajadores
@@ -55,6 +72,7 @@ export const api = {
     get: (id) => request(`/asignaciones/${id}`),
     create: (data) => request('/asignaciones', { method: 'POST', body: JSON.stringify(data) }),
     createBulk: (data) => request('/asignaciones/bulk', { method: 'POST', body: JSON.stringify(data) }),
+    createConAccesorios: (data) => request('/asignaciones/con-accesorios', { method: 'POST', body: JSON.stringify(data) }),
     cesar: (id) => request(`/asignaciones/${id}/cesar`, { method: 'POST' }),
     cesarTrabajador: (id) => request(`/asignaciones/cesar-trabajador/${id}`, { method: 'POST' }),
     historialEquipo: (id) => request(`/asignaciones/equipo/${id}`),
@@ -65,6 +83,7 @@ export const api = {
   // Incidencias
   incidencias: {
     list: (params) => request(`/incidencias?${new URLSearchParams(params)}`),
+    listByEquipo: (id) => request(`/incidencias?idEquipo=${id}`),
     get: (id) => request(`/incidencias/${id}`),
     create: (data) => request('/incidencias', { method: 'POST', body: JSON.stringify(data) }),
     cerrar: (id) => request(`/incidencias/${id}/cerrar`, { method: 'POST' }),
@@ -82,6 +101,7 @@ export const api = {
     list: (params) => request(`/componentes?${new URLSearchParams(params)}`),
     get: (id) => request(`/componentes/${id}`),
     create: (data) => request('/componentes', { method: 'POST', body: JSON.stringify(data) }),
+    createQuick: (data) => request('/componentes/rapido', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) => request(`/componentes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     tipos: {
       list: () => request('/componentes/tipos'),

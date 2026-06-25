@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import Swal from 'sweetalert2';
@@ -17,9 +17,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
   DialogFooter,
 } from '#components/ui/dialog.jsx';
-import { Badge } from '#components/ui/badge.jsx';
 import { Skeleton } from '#components/ui/skeleton.jsx';
-import { Plus, QrCode, Eye, Trash2, Monitor, CheckCircle, Clock, AlertTriangle, Archive, X } from 'lucide-react';
+import { Plus, QrCode, Eye, Trash2, Monitor, CheckCircle, Clock, AlertTriangle, Archive } from 'lucide-react';
 import { formatDate } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 
@@ -69,20 +68,6 @@ export default function Equipos() {
     queryFn: api.equipos.tipos.list,
   });
 
-  const createMutation = useMutation({
-    mutationFn: api.equipos.create,
-    onSuccess: () => {
-      setPage(1);
-      queryClient.invalidateQueries({ queryKey: ['equipos'] });
-      queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
-      setShowCreateOpen(false);
-      Swal.fire({ icon: 'success', title: 'Equipo creado', text: 'El equipo se registró correctamente', timer: 2000, showConfirmButton: false });
-    },
-    onError: (err) => {
-      Swal.fire({ icon: 'error', title: 'Error al crear', text: err.message });
-    },
-  });
-
   const deleteMutation = useMutation({
     mutationFn: api.equipos.delete,
     onSuccess: () => {
@@ -102,11 +87,52 @@ export default function Equipos() {
     onSuccess: (data) => { setQrData(data); setShowQROpen(true); },
   });
 
-  const [form, setForm] = useState({ CodEquipo: '', IdTipodeEquipo: '', CodBarra: '', Obs: '' });
+  const [form, setForm] = useState({ IdTipodeEquipo: '', CodBarra: '', Obs: '' });
+  const [despuesDeGuardar, setDespuesDeGuardar] = useState('');
+  const codBarraRef = useRef(null);
+
+  const createRapidoMutation = useMutation({
+    mutationFn: api.equipos.rapido,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['equipos'] });
+      queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
+      Swal.fire({ icon: 'success', title: 'Equipo creado', text: 'Equipo registrado correctamente', timer: 1500, showConfirmButton: false });
+    },
+    onError: (err) => {
+      Swal.fire({ icon: 'error', title: 'Error al crear', text: err.message });
+    },
+  });
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    createMutation.mutate(form);
+    if (!form.IdTipodeEquipo) {
+      Swal.fire({ icon: 'warning', title: 'Campo requerido', text: 'Selecciona un tipo de equipo' });
+      return;
+    }
+
+    const payload = {
+      IdTipodeEquipo: Number(form.IdTipodeEquipo),
+      CodBarra: form.CodBarra?.trim() || null,
+      Obs: form.Obs?.trim() || null,
+    };
+
+    const onSuccess = (resp) => {
+      switch (despuesDeGuardar) {
+        case 'registrar_otro':
+          setForm(prev => ({ ...prev, CodBarra: '', Obs: '' }));
+          setTimeout(() => codBarraRef.current?.focus(), 150);
+          break;
+        case 'asignar_ahora':
+          setShowCreateOpen(false);
+          navigate(`/asignaciones?nuevoEquipo=${resp.equipo.IdMaeEquipo}`);
+          break;
+        default:
+          setShowCreateOpen(false);
+          break;
+      }
+    };
+
+    createRapidoMutation.mutate(payload, { onSuccess });
   };
 
   const equipos = pageData?.rows;
@@ -128,7 +154,11 @@ export default function Equipos() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-foreground">Equipos</h1>
-        <Button onClick={() => { setForm({ CodEquipo: '', IdTipodeEquipo: '', CodBarra: '', Obs: '' }); setShowCreateOpen(true); }}>
+        <Button onClick={() => {
+          setForm({ IdTipodeEquipo: '', CodBarra: '', Obs: '' });
+          setDespuesDeGuardar('');
+          setShowCreateOpen(true);
+        }}>
           <Plus className="w-4 h-4" /> Nuevo Equipo
         </Button>
       </div>
@@ -204,24 +234,23 @@ export default function Equipos() {
 
       <Dialog open={showCreateOpen} onOpenChange={setShowCreateOpen}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader>
+          <DialogHeader className="pb-1">
             <DialogTitle>Nuevo Equipo</DialogTitle>
-            <DialogDescription>Completa los datos para registrar un nuevo equipo</DialogDescription>
+            <DialogDescription>El código interno se genera automáticamente</DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Código</label>
-              <Input value={form.CodEquipo} onChange={(e) => setForm({ ...form, CodEquipo: e.target.value })} required />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Código de Barra / SN</label>
-              <Input value={form.CodBarra} onChange={(e) => setForm({ ...form, CodBarra: e.target.value })}
-                placeholder="Opcional - ingresa el SN del equipo" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Tipo de Equipo</label>
-              <Select value={form.IdTipodeEquipo} onValueChange={(v) => setForm({ ...form, IdTipodeEquipo: v })}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Tipo de Equipo <span className="text-destructive">*</span></label>
+              <Select value={form.IdTipodeEquipo} onValueChange={(v) => {
+                setForm({ ...form, IdTipodeEquipo: v });
+                setTimeout(() => codBarraRef.current?.focus(), 200);
+              }}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Seleccionar tipo de equipo...">
+                    {tipos?.find(t => String(t.IdTipodeEquipo) === form.IdTipodeEquipo)?.DesTipodeEquipo}
+                  </SelectValue>
+                </SelectTrigger>
                 <SelectContent>
                   {tipos?.map((t) => (
                     <SelectItem key={t.IdTipodeEquipo} value={String(t.IdTipodeEquipo)}>{t.DesTipodeEquipo}</SelectItem>
@@ -229,19 +258,44 @@ export default function Equipos() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground">
-              El código QR se generará automáticamente al guardar el equipo
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Código de barra o serie</label>
+              <Input ref={codBarraRef} value={form.CodBarra} onChange={(e) => setForm({ ...form, CodBarra: e.target.value })}
+                placeholder="Escanea o escribe el código del equipo" />
+              <p className="text-xs text-muted-foreground">Puedes dejarlo vacío si el equipo no tiene código visible.</p>
             </div>
-            <div className="space-y-2">
+
+            <div className="space-y-1.5">
               <label className="text-sm font-medium">Observaciones</label>
               <textarea value={form.Obs} onChange={(e) => setForm({ ...form, Obs: e.target.value })}
-                className="w-full min-h-[80px] rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm"
+                className="w-full min-h-[60px] rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm"
+                placeholder="Opcional"
               />
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowCreateOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? 'Guardando...' : 'Guardar'}
+
+            <div className="space-y-1.5 pt-1">
+              <label className="text-sm font-medium">Después de guardar, opcional:</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {[{ v: 'registrar_otro', l: 'Registrar otro equipo' }, { v: 'asignar_ahora', l: 'Asignar este equipo' }].map(({ v, l }) => (
+                  <button key={v} type="button" onClick={() => setDespuesDeGuardar(despuesDeGuardar === v ? '' : v)}
+                    className={`w-full text-left px-3 py-2.5 rounded-lg border text-sm font-medium transition-colors ${despuesDeGuardar === v ? 'border-primary border-2 bg-primary/5 text-primary' : 'border-input bg-background text-foreground hover:bg-muted hover:border-muted-foreground/30'}`}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <DialogFooter className="flex-col sm:flex-row gap-2 pt-1">
+              <Button type="button" variant="outline" onClick={() => setShowCreateOpen(false)}
+                className="w-full sm:w-auto">Cancelar</Button>
+              <Button type="submit" variant="default"
+                disabled={createRapidoMutation.isPending}
+                className="w-full sm:w-auto sm:min-w-[180px]">
+                {createRapidoMutation.isPending
+                  ? 'Guardando...'
+                  : ({ registrar_otro: 'Guardar y registrar otro', asignar_ahora: 'Guardar y asignar' })[despuesDeGuardar] || 'Guardar'
+                }
               </Button>
             </DialogFooter>
           </form>

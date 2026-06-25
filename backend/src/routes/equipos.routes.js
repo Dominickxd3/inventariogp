@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { EquiposService } from '../services/equipos.service.js';
+import { IncidenciasService } from '../services/incidencias.service.js';
+import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -47,6 +49,16 @@ router.post('/', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.post('/rapido', async (req, res, next) => {
+  try {
+    const equipo = await EquiposService.createQuick({
+      ...req.body,
+      IdUsuario: req.usuario?.id || 1,
+    });
+    res.status(201).json({ success: true, equipo });
+  } catch (e) { next(e); }
+});
+
 router.put('/:id', async (req, res, next) => {
   try {
     const equipo = await EquiposService.update(parseInt(req.params.id), req.body);
@@ -76,6 +88,59 @@ router.post('/tipos', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.get('/:id/caracteristicas', async (req, res, next) => {
+  try {
+    const caracteristicas = await EquiposService.getCaracteristicas(parseInt(req.params.id));
+    res.json(caracteristicas);
+  } catch (e) { next(e); }
+});
+
+router.put('/:id/caracteristicas', authMiddleware, roleMiddleware('ADMIN', 'TECNICO'), async (req, res, next) => {
+  try {
+    const caracteristicas = await EquiposService.saveCaracteristicas(
+      parseInt(req.params.id),
+      req.body.caracteristicas || [],
+      req.usuario?.id
+    );
+    res.json({ success: true, caracteristicas });
+  } catch (e) { next(e); }
+});
+
+router.get('/:id/componentes', async (req, res, next) => {
+  try {
+    const componentes = await EquiposService.getComponentesDelEquipo(parseInt(req.params.id));
+    res.json(componentes);
+  } catch (e) { next(e); }
+});
+
+router.post('/:id/componentes', authMiddleware, roleMiddleware('ADMIN', 'TECNICO'), async (req, res, next) => {
+  try {
+    const id = await EquiposService.agregarComponenteAEquipo(
+      parseInt(req.params.id),
+      req.body.IdComponente,
+      req.body.Obs,
+      req.usuario?.id || 1,
+      req.body.OrigenVinculo,
+      req.body.Motivo,
+      req.body.IdIntervencion
+    );
+    res.status(201).json({ success: true, id });
+  } catch (e) { next(e); }
+});
+
+router.delete('/:id/componentes/:idMovComponente', authMiddleware, roleMiddleware('ADMIN', 'TECNICO'), async (req, res, next) => {
+  try {
+    await EquiposService.quitarComponenteDeEquipo(
+      parseInt(req.params.id),
+      parseInt(req.params.idMovComponente),
+      req.usuario?.id || 1,
+      req.body.Motivo,
+      req.body.NuevoEstado || 'DISPONIBLE'
+    );
+    res.json({ success: true });
+  } catch (e) { next(e); }
+});
+
 router.post('/:id/estado', async (req, res, next) => {
   try {
     const equipo = await EquiposService.cambiarEstado(
@@ -92,6 +157,31 @@ router.get('/:id/historial-estados', async (req, res, next) => {
   try {
     const historial = await EquiposService.getHistorialEstados(parseInt(req.params.id));
     res.json(historial);
+  } catch (e) { next(e); }
+});
+
+router.get('/:id/incidencias', authMiddleware, async (req, res, next) => {
+  try {
+    const incidencias = await IncidenciasService.getByEquipo(parseInt(req.params.id));
+    res.json(incidencias);
+  } catch (e) { next(e); }
+});
+
+router.get('/:id/intervenciones', authMiddleware, async (req, res, next) => {
+  try {
+    const intervenciones = await EquiposService.getIntervenciones(parseInt(req.params.id));
+    res.json(intervenciones);
+  } catch (e) { next(e); }
+});
+
+router.post('/:id/intervenciones', authMiddleware, roleMiddleware('ADMIN', 'TECNICO'), async (req, res, next) => {
+  try {
+    const id = await EquiposService.crearIntervencion(
+      parseInt(req.params.id),
+      req.body,
+      req.usuario?.id
+    );
+    res.status(201).json({ success: true, id });
   } catch (e) { next(e); }
 });
 

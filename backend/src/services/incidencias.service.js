@@ -1,5 +1,6 @@
 import { IncidenciasRepository } from '../repositories/incidencias.repository.js';
 import { EquiposRepository } from '../repositories/equipos.repository.js';
+import { AsignacionesRepository } from '../repositories/asignaciones.repository.js';
 
 export const IncidenciasService = {
   async list(filtros) {
@@ -8,6 +9,10 @@ export const IncidenciasService = {
 
   async getById(id) {
     return IncidenciasRepository.getById(id);
+  },
+
+  async getByEquipo(idEquipo) {
+    return IncidenciasRepository.getByEquipo(idEquipo);
   },
 
   async create(data) {
@@ -23,8 +28,16 @@ export const IncidenciasService = {
   async cerrar(id, idUsuario) {
     const incidencia = await IncidenciasRepository.getById(id);
     if (!incidencia) throw new Error('Incidencia no encontrada');
+
     await IncidenciasRepository.updateEstado(id, 'CERRADO');
-    await EquiposRepository.updateEstado(incidencia.IdMaeEquipo, 'DISPONIBLE');
-    await EquiposRepository.registrarCambioEstado(incidencia.IdMaeEquipo, 'INCIDENCIA', 'DISPONIBLE', idUsuario, 'Incidencia cerrada');
+
+    const activa = await AsignacionesRepository.getActivaByEquipo(incidencia.IdMaeEquipo);
+    const nuevoEstado = activa ? 'ASIGNADO' : 'DISPONIBLE';
+
+    await EquiposRepository.updateEstado(incidencia.IdMaeEquipo, nuevoEstado);
+    await EquiposRepository.registrarCambioEstado(
+      incidencia.IdMaeEquipo, 'INCIDENCIA', nuevoEstado, idUsuario,
+      `Incidencia cerrada - equipo ${nuevoEstado === 'ASIGNADO' ? 'permanece asignado' : 'disponible'}`
+    );
   },
 };

@@ -1,7 +1,20 @@
 import { Router } from 'express';
 import { AsignacionesService } from '../services/asignaciones.service.js';
+import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 
 const router = Router();
+
+router.use(authMiddleware);
+
+router.post('/con-accesorios', async (req, res, next) => {
+  try {
+    const result = await AsignacionesService.asignarConAccesorios({
+      ...req.body,
+      IdUsuario: req.usuario.id,
+    });
+    res.status(201).json({ success: true, ...result });
+  } catch (e) { next(e); }
+});
 
 router.get('/', async (req, res, next) => {
   try {
@@ -20,7 +33,6 @@ router.get('/:id', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
   try {
-    if (!req.usuario?.id) return res.status(401).json({ error: 'Se requiere autenticación' });
     const data = { ...req.body, IdUsuario: req.usuario.id };
     const id = await AsignacionesService.asignar(data);
     res.status(201).json({ id, message: 'Equipo asignado correctamente' });
@@ -29,7 +41,7 @@ router.post('/', async (req, res, next) => {
 
 router.post('/:id/cesar', async (req, res, next) => {
   try {
-    await AsignacionesService.cesar(parseInt(req.params.id), req.usuario?.id);
+    await AsignacionesService.cesar(parseInt(req.params.id), req.usuario.id);
     res.json({ message: 'Asignación finalizada' });
   } catch (e) { next(e); }
 });
@@ -57,7 +69,6 @@ router.get('/trabajador/:idTrabajador/activas', async (req, res, next) => {
 
 router.post('/bulk', async (req, res, next) => {
   try {
-    if (!req.usuario?.id) return res.status(401).json({ error: 'Se requiere autenticación' });
     const results = await AsignacionesService.asignarMulti(req.body, req.usuario.id);
     res.status(201).json(results);
   } catch (e) { next(e); }
@@ -65,7 +76,7 @@ router.post('/bulk', async (req, res, next) => {
 
 router.post('/cesar-trabajador/:idTrabajador', async (req, res, next) => {
   try {
-    const result = await AsignacionesService.cesarActivasByTrabajador(parseInt(req.params.idTrabajador), req.usuario?.id);
+    const result = await AsignacionesService.cesarActivasByTrabajador(parseInt(req.params.idTrabajador), req.usuario.id);
     res.json(result);
   } catch (e) { next(e); }
 });

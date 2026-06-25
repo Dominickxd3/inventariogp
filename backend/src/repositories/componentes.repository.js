@@ -1,4 +1,4 @@
-import { query } from '../config/db.js';
+import { query, withTransaction, createRequest } from '../config/db.js';
 
 const DB = 'InventarioGP';
 
@@ -13,6 +13,7 @@ export const ComponentesRepository = {
     const params = {};
     if (filtros.estado) { sql += ' AND c.Estado = @estado'; params.estado = filtros.estado; }
     if (filtros.idTipo) { sql += ' AND c.IdTipodeComponente = @idTipo'; params.idTipo = filtros.idTipo; }
+    if (filtros.search) { sql += " AND (c.CodComponente LIKE @search OR c.DesComponente LIKE @search OR c.Marca LIKE @search OR c.Modelo LIKE @search OR c.Serie LIKE @search OR c.Capacidad LIKE @search)"; params.search = `%${filtros.search}%`; }
     sql += ' ORDER BY c.DesComponente';
     return query(DB, sql, params);
   },
@@ -74,6 +75,29 @@ export const ComponentesRepository = {
     return query(DB, "SELECT * FROM Tab_EQ_TipodeComponentes WHERE Estado = 'ACTIVO' ORDER BY DesTipodeComponente");
   },
 
+  async getTipoById(id) {
+    const rows = await query(DB, 'SELECT * FROM Tab_EQ_TipodeComponentes WHERE IdTipodeComponente = @id', { id });
+    return rows[0] || null;
+  },
+
+  async getBySerie(serie) {
+    const rows = await query(DB, `
+      SELECT TOP 1 *
+      FROM Tab_EQ_Componentes
+      WHERE LTRIM(RTRIM(Serie)) = LTRIM(RTRIM(@serie))
+    `, { serie });
+    return rows[0] || null;
+  },
+
+  async getLastCodComponenteByPrefix(prefix) {
+    const rows = await query(DB, `
+      SELECT TOP 1 CodComponente FROM Tab_EQ_Componentes
+      WHERE CodComponente LIKE @prefix + '-%'
+      ORDER BY LEN(CodComponente) DESC, CodComponente DESC
+    `, { prefix });
+    return rows[0]?.CodComponente || null;
+  },
+
   async createTipo(data) {
     const result = await query(DB, `
       INSERT INTO Tab_EQ_TipodeComponentes (CodTipodeComponente, DesTipodeComponente, Estado)
@@ -92,28 +116,65 @@ export const ComponentesRepository = {
       JOIN Tab_EQ_Componentes c ON mc.IdComponente = c.IdComponente
       LEFT JOIN Tab_EQ_TipodeComponentes tc ON c.IdTipodeComponente = tc.IdTipodeComponente
       WHERE mc.IdMaeEquipo = @id AND mc.Estado = 'VIGENTE'
+      ORDER BY mc.IdMovEquipoComponente DESC
     `, { id: idEquipo });
   },
 
-  async asignarAEquipo(idEquipo, idComponente, obs) {
-    const result = await query(DB, `
-      INSERT INTO Tab_EQ_MovEquiposComponentes (IdMaeEquipo, IdComponente, Obs, Estado)
-      OUTPUT INSERTED.IdMovEquipoComponente
-      VALUES (@idEquipo, @idComponente, @obs, 'VIGENTE')
-    `, {
-      idEquipo,
-      idComponente,
-      obs: obs || null,
-    });
-    await query(DB, "UPDATE Tab_EQ_Componentes SET Estado = 'ASIGNADO' WHERE IdComponente = @id", { id: idComponente });
-    return result[0]?.IdMovEquipoComponente;
+  async getRelacionVigenteByComponente(idComponente) {
+    const rows = await query(DB, `
+      SELECT TOP 1 *
+      FROM Tab_EQ_MovEquiposComponentes
+      WHERE IdComponente = @idComponente AND Estado = 'VIGENTE'
+      ORDER BY IdMovEquipoComponente DESC
+    `, { idComponente });
+    return rows[0] || null;
   },
 
-  async desasignarDeEquipo(idMov) {
+  async asignarAEquipo(idEquipo, idComponente, obs, origenVinculo, motivo, idIntervencion) {
+    return withTransaction(DB, async (trx) => {
+      const req = (params) => createRequest(trx, params);
+      const vigente = await req({ idComponente }).query(`
+        SELECT TOP 1 IdMovEquipoComponente, IdMaeEquipo
+        FROM Tab_EQ_MovEquiposComponentes
+        WHERE IdComponente = @idComponente AND Estado = 'VIGENTE'
+        ORDER BY IdMovEquipoComponente DESC
+      `);
+      if (vigente.length > 0) {
+        throw new Error('El componente ya está vinculado a otro equipo');
+      }
+
+      const result = await req({
+        idEquipo,
+        idComponente,
+        obs: obs || null,
+        origenVinculo: origenVinculo || null,
+        motivo: motivo || null,
+        idIntervencion: idIntervencion || null,
+      }).query(`
+        INSERT INTO Tab_EQ_MovEquiposComponentes
+          (IdMaeEquipo, IdComponente, FecAsigComponente, Obs, Estado, OrigenVinculo, Motivo, FecInstalacion, IdIntervencion)
+        OUTPUT INSERTED.IdMovEquipoComponente
+        VALUES (@idEquipo, @idComponente, GETDATE(), @obs, 'VIGENTE', @origenVinculo, @motivo, GETDATE(), @idIntervencion)
+      `);
+
+      await req({ id: idComponente }).query(`
+        UPDATE Tab_EQ_Componentes
+        SET Estado = 'ASIGNADO'
+        WHERE IdComponente = @id
+      `);
+
+      return result[0]?.IdMovEquipoComponente;
+    });
+  },
+
+  async desasignarDeEquipo(idMov, motivo, nuevoEstado) {
     const comp = await query(DB, 'SELECT IdComponente FROM Tab_EQ_MovEquiposComponentes WHERE IdMovEquipoComponente = @id', { id: idMov });
-    await query(DB, "UPDATE Tab_EQ_MovEquiposComponentes SET Estado = 'BAJA', FecBajaComponente = GETDATE() WHERE IdMovEquipoComponente = @id", { id: idMov });
+    await query(DB, "UPDATE Tab_EQ_MovEquiposComponentes SET Estado = 'BAJA', FecBajaComponente = GETDATE(), Motivo = @motivo WHERE IdMovEquipoComponente = @id", { id: idMov, motivo: motivo || null });
     if (comp[0]) {
-      await query(DB, "UPDATE Tab_EQ_Componentes SET Estado = 'DISPONIBLE' WHERE IdComponente = @id", { id: comp[0].IdComponente });
+      await query(DB, "UPDATE Tab_EQ_Componentes SET Estado = @estado WHERE IdComponente = @id", {
+        id: comp[0].IdComponente,
+        estado: nuevoEstado || 'DISPONIBLE',
+      });
     }
   },
 

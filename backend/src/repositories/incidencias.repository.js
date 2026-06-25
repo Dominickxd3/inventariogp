@@ -16,6 +16,7 @@ export const IncidenciasRepository = {
     const params = {};
     if (filtros.estado) { sql += ' AND i.Estado = @estado'; params.estado = filtros.estado; }
     if (filtros.tipo) { sql += ' AND i.TipoIncidencia = @tipo'; params.tipo = filtros.tipo; }
+    if (filtros.search) { sql += " AND (e.CodEquipo LIKE @search OR e.CodBarra LIKE @search OR i.Descripcion LIKE @search OR p.DNI LIKE @search OR p.APaterno + ' ' + p.AMaterno + ', ' + p.Nombres LIKE @search)"; params.search = `%${filtros.search}%`; }
     sql += ' ORDER BY i.FecRegistro DESC';
     return query(DB, sql, params);
   },
@@ -31,6 +32,19 @@ export const IncidenciasRepository = {
       WHERE i.IdIncidencia = @id
     `, { id });
     return rows[0] || null;
+  },
+
+  async getByEquipo(idEquipo) {
+    return query(DB, `
+      SELECT i.*, e.CodEquipo, t.DesTipodeEquipo,
+             p.DNI, p.APaterno + ' ' + p.AMaterno + ', ' + p.Nombres as Trabajador
+      FROM Tab_EQ_Incidencias i
+      JOIN Tab_EQ_MaeEquipos e ON i.IdMaeEquipo = e.IdMaeEquipo
+      LEFT JOIN Tab_EQ_TipodeEquipos t ON e.IdTipodeEquipo = t.IdTipodeEquipo
+      LEFT JOIN SIGA_ASISTENCIA.dbo.Personal_periodo p ON i.IdReferente = p.PersonalId
+      WHERE i.IdMaeEquipo = @idEquipo
+      ORDER BY i.FecRegistro DESC
+    `, { idEquipo });
   },
 
   async create(data) {
