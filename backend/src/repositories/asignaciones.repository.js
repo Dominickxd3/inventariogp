@@ -4,29 +4,49 @@ const DB = 'InventarioGP';
 
 export const AsignacionesRepository = {
   async listAll(filtros = {}) {
-    let sql = `
+    const page = Math.max(1, parseInt(filtros.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(filtros.pageSize) || 50));
+    const offset = (page - 1) * pageSize;
+
+    let where = 'WHERE 1=1';
+    const params = {};
+
+    if (filtros.estado) { where += ' AND a.Estado = @estado'; params.estado = filtros.estado; }
+    if (filtros.idEquipo) { where += ' AND a.IdMaeEquipo = @idEquipo'; params.idEquipo = filtros.idEquipo; }
+    if (filtros.idTrabajador) { where += ' AND a.IdReferente = @idTrabajador'; params.idTrabajador = filtros.idTrabajador; }
+    if (filtros.idTipodeEquipo) { where += ' AND e.IdTipodeEquipo = @idTipodeEquipo'; params.idTipodeEquipo = filtros.idTipodeEquipo; }
+    if (filtros.fechaDesde) { where += ' AND a.FecAsignacion >= @fechaDesde'; params.fechaDesde = filtros.fechaDesde; }
+    if (filtros.fechaHasta) { where += ' AND a.FecAsignacion <= @fechaHasta'; params.fechaHasta = filtros.fechaHasta; }
+
+    const countSql = `SELECT COUNT(*) as total FROM Tab_EQ_MovEquiposAsignaciones a ${where}`;
+    const [{ total }] = await query(DB, countSql, params);
+
+    const dataSql = `
       SELECT a.*, e.CodEquipo, e.CodBarra, te.DesTipodeEquipo,
              tr.Trabajador as TrabajadorNombre, tr.DOI, tr.Area, tr.Ocupacion
       FROM Tab_EQ_MovEquiposAsignaciones a
       JOIN Tab_EQ_MaeEquipos e ON a.IdMaeEquipo = e.IdMaeEquipo
       LEFT JOIN Tab_EQ_TipodeEquipos te ON e.IdTipodeEquipo = te.IdTipodeEquipo
       LEFT JOIN Tab_EQ_Trabajadores tr ON a.IdReferente = tr.IdTrabajador
-      WHERE 1=1
+      ${where}
+      ORDER BY a.FecRegistro DESC
+      OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY
     `;
-    const params = {};
-    if (filtros.estado) { sql += ' AND a.Estado = @estado'; params.estado = filtros.estado; }
-    if (filtros.idEquipo) { sql += ' AND a.IdMaeEquipo = @idEquipo'; params.idEquipo = filtros.idEquipo; }
-    if (filtros.idTrabajador) { sql += ' AND a.IdReferente = @idTrabajador'; params.idTrabajador = filtros.idTrabajador; }
-    sql += ' ORDER BY a.FecRegistro DESC';
-    return query(DB, sql, params);
+    params.offset = offset;
+    params.pageSize = pageSize;
+    const rows = await query(DB, dataSql, params);
+
+    return { rows, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
   },
 
   async getById(id) {
     const rows = await query(DB, `
-      SELECT a.*, e.CodEquipo, e.CodBarra, t.DesTipodeEquipo
+      SELECT a.*, e.CodEquipo, e.CodBarra, t.DesTipodeEquipo,
+             tr.Trabajador as TrabajadorNombre, tr.DOI, tr.Area
       FROM Tab_EQ_MovEquiposAsignaciones a
       JOIN Tab_EQ_MaeEquipos e ON a.IdMaeEquipo = e.IdMaeEquipo
       LEFT JOIN Tab_EQ_TipodeEquipos t ON e.IdTipodeEquipo = t.IdTipodeEquipo
+      LEFT JOIN Tab_EQ_Trabajadores tr ON a.IdReferente = tr.IdTrabajador
       WHERE a.IdMovEquipoAsignacion = @id
     `, { id });
     return rows[0] || null;
@@ -76,47 +96,5 @@ export const AsignacionesRepository = {
       WHERE a.IdReferente = @id AND a.Estado = 'VIGENTE'
       ORDER BY t.DesTipodeEquipo, e.CodEquipo
     `, { id: idTrabajador });
-  },
-
-  async cesarActivasByTrabajador(idTrabajador) {
-    const ids = await query(DB, `
-      SELECT IdMovEquipoAsignacion FROM Tab_EQ_MovEquiposAsignaciones
-      WHERE IdReferente = @id AND Estado = 'VIGENTE'
-    `, { id: idTrabajador });
-    for (const row of ids) {
-      await this.cesar(row.IdMovEquipoAsignacion);
-    }
-    return ids;
-  },
-
-  async asignar(data) {
-    const result = await query(DB, `
-      INSERT INTO Tab_EQ_MovEquiposAsignaciones
-        (IdMaeEquipo, IdReferente, FecAsignacion, Obs, Estado)
-      OUTPUT INSERTED.IdMovEquipoAsignacion
-      VALUES (@idEquipo, @idTrabajador, @fec, @obs, 'VIGENTE')
-    `, {
-      idEquipo: data.IdMaeEquipo,
-      idTrabajador: data.IdReferente,
-      fec: data.FecAsignacion || new Date().toISOString().split('T')[0],
-      obs: data.Obs || null,
-    });
-    return result[0]?.IdMovEquipoAsignacion;
-  },
-
-  async cesar(id) {
-    await query(DB, `
-      UPDATE Tab_EQ_MovEquiposAsignaciones
-      SET Estado = 'CESADO', FecCese = GETDATE()
-      WHERE IdMovEquipoAsignacion = @id
-    `, { id });
-  },
-
-  async cesarActivoByEquipo(idEquipo, fecCese) {
-    await query(DB, `
-      UPDATE Tab_EQ_MovEquiposAsignaciones
-      SET Estado = 'CESADO', FecCese = @fec
-      WHERE IdMaeEquipo = @id AND Estado = 'VIGENTE'
-    `, { id: idEquipo, fec: fecCese || new Date().toISOString().split('T')[0] });
   },
 };

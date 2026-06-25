@@ -75,6 +75,7 @@ export const api = {
     createConAccesorios: (data) => request('/asignaciones/con-accesorios', { method: 'POST', body: JSON.stringify(data) }),
     cesar: (id) => request(`/asignaciones/${id}/cesar`, { method: 'POST' }),
     cesarTrabajador: (id) => request(`/asignaciones/cesar-trabajador/${id}`, { method: 'POST' }),
+    acta: (id) => `${BASE}/asignaciones/${id}/acta`,
     historialEquipo: (id) => request(`/asignaciones/equipo/${id}`),
     historialTrabajador: (id) => request(`/asignaciones/trabajador/${id}`),
     activasTrabajador: (id) => request(`/asignaciones/trabajador/${id}/activas`),

@@ -10,8 +10,16 @@ import { Input } from '#components/ui/input.jsx';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '#components/ui/dialog.jsx';
-import { Plus, XCircle, Check, Monitor } from 'lucide-react';
+import { Plus, XCircle, Check, Monitor, Search, FileText, Printer } from 'lucide-react';
 import { formatDate } from '../lib/utils';
+
+const TABS = [
+  { key: 'VIGENTE', label: 'Vigentes' },
+  { key: 'CESADO', label: 'Cesadas' },
+  { key: '', label: 'Todas' },
+];
+
+const PAGE_SIZE = 20;
 
 const columns = [
   {
@@ -43,15 +51,22 @@ export default function Asignaciones() {
   const [searchParams] = useSearchParams();
   const nuevoEquipoId = searchParams.get('nuevoEquipo');
   const queryClient = useQueryClient();
+  const [tab, setTab] = useState('VIGENTE');
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     if (nuevoEquipoId) setShowModal(true);
   }, [nuevoEquipoId]);
 
+  const queryParams = { page, pageSize: PAGE_SIZE };
+  if (tab) queryParams.estado = tab;
+
   const { data: asignaciones, isLoading } = useQuery({
-    queryKey: ['asignaciones'],
-    queryFn: () => api.asignaciones.list({ estado: 'VIGENTE' }),
+    queryKey: ['asignaciones', tab, page],
+    queryFn: () => api.asignaciones.list(queryParams),
   });
+
+  useEffect(() => { setPage(1); }, [tab]);
 
   const cesarMutation = useMutation({
     mutationFn: api.asignaciones.cesar,
@@ -76,6 +91,9 @@ export default function Asignaciones() {
     setShowCesarDialog(true);
   };
 
+  const rows = asignaciones?.rows || [];
+  const totalPages = asignaciones?.totalPages || 1;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -83,6 +101,22 @@ export default function Asignaciones() {
         <Button onClick={() => setShowModal(true)}>
           <Plus className="w-4 h-4" /> Nueva Asignación
         </Button>
+      </div>
+
+      <div className="flex gap-1 border-b border-border">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`px-4 py-2 text-sm font-medium transition-colors rounded-t-lg ${
+              tab === t.key
+                ? 'bg-background border border-b-0 border-border text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
       <DataTable
@@ -93,16 +127,35 @@ export default function Asignaciones() {
             label: 'Acciones',
             sortable: false,
             render: (row) => (
-              row.Estado === 'VIGENTE' && (
-                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); confirmCesar(row); }}>
-                  <XCircle className="w-3 h-3" /> Cesar
+              <div className="flex gap-1">
+                {row.Estado === 'VIGENTE' && (
+                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); confirmCesar(row); }}>
+                    <XCircle className="w-3 h-3" /> Cesar
+                  </Button>
+                )}
+                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); window.open(api.asignaciones.acta(row.IdMovEquipoAsignacion), '_blank'); }}>
+                  <Printer className="w-3 h-3" /> Acta
                 </Button>
-              )
+              </div>
             ),
           },
         ]}
-        data={asignaciones}
+        data={rows}
       />
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-2">
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+            Anterior
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            Página {page} de {totalPages} ({asignaciones?.total || 0} registros)
+          </span>
+          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+            Siguiente
+          </Button>
+        </div>
+      )}
 
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="sm:max-w-2xl">
@@ -135,7 +188,7 @@ export default function Asignaciones() {
 }
 
 function AsignarForm({ onSuccess, equipoInicial }) {
-  const [step, setStep] = useState(equipoInicial ? 1 : 1);
+  const [step, setStep] = useState(1);
   const [searchTrab, setSearchTrab] = useState('');
   const [searchEquipo, setSearchEquipo] = useState('');
   const [selectedTrab, setSelectedTrab] = useState(null);
@@ -164,7 +217,7 @@ function AsignarForm({ onSuccess, equipoInicial }) {
   const { data: accDisponibles } = useQuery({
     queryKey: ['componentes-disponibles-asig', searchAcc],
     queryFn: () => api.componentes.list({ estado: 'DISPONIBLE' }),
-    enabled: step === 4,
+    enabled: step === 3,
   });
 
   useEffect(() => {
@@ -173,7 +226,7 @@ function AsignarForm({ onSuccess, equipoInicial }) {
     }
   }, [equipoInicialData]);
 
-  const totalSteps = 4; // 1: Trabajador, 2: Equipos, 3: Accesorios, 4: Confirmar
+  const totalSteps = 4;
 
   const asignarMutation = useMutation({
     mutationFn: api.asignaciones.createBulk,
@@ -341,23 +394,40 @@ function AsignarForm({ onSuccess, equipoInicial }) {
         <div className="space-y-3">
           <h3 className="font-medium">Confirmar Asignación</h3>
           <div className="bg-muted p-4 rounded-lg space-y-2 text-sm">
-            <p><strong>Trabajador:</strong> {selectedTrab?.Trabajador}</p>
-            <p><strong>Total equipos:</strong> {selectedEquipos.length}</p>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {Object.entries(totalEquipos).map(([tipo, count]) => (
-                <span key={tipo} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground text-xs">
-                  <Monitor className="w-3 h-3" /> {tipo}: {count}
-                </span>
+            <p className="font-semibold text-base border-b border-border pb-2 mb-2">Trabajador</p>
+            <p><strong>Nombre:</strong> {selectedTrab?.Trabajador}</p>
+            <p><strong>DNI:</strong> {selectedTrab?.DOI || '—'}</p>
+            <p><strong>Área:</strong> {selectedTrab?.Area || '—'}</p>
+            <p><strong>Cargo:</strong> {selectedTrab?.Ocupacion || '—'}</p>
+
+            <p className="font-semibold text-base border-b border-border pb-2 mt-3 mb-2">Equipos asignados ({selectedEquipos.length})</p>
+            <div className="space-y-1">
+              {selectedEquipos.map((eq) => (
+                <p key={eq.IdMaeEquipo} className="text-xs">
+                  {eq.CodEquipo} — {eq.DesTipodeEquipo}{eq.Marca ? ` / ${eq.Marca}` : ''}
+                </p>
               ))}
             </div>
+
             {selectedAcc.length > 0 && (
-              <div className="mt-2 pt-2 border-t border-border">
-                <p className="text-xs text-muted-foreground mb-1">Accesorios incluidos:</p>
-                {selectedAcc.map((a) => (
-                  <p key={a.IdComponente} className="text-xs">{a.CodComponente} - {a.DesComponente}</p>
-                ))}
-              </div>
+              <>
+                <p className="font-semibold text-base border-b border-border pb-2 mt-3 mb-2">
+                  Accesorios incluidos ({selectedAcc.length})
+                </p>
+                <div className="space-y-1">
+                  {selectedAcc.map((a) => (
+                    <p key={a.IdComponente} className="text-xs">
+                      {a.CodComponente} — {a.DesComponente || 'Sin descripción'}
+                    </p>
+                  ))}
+                </div>
+              </>
             )}
+
+            <div className="mt-3 pt-2 border-t border-border bg-amber-50 dark:bg-amber-950/20 p-2 rounded text-xs text-muted-foreground">
+              Los equipos pasarán a estado <strong>ASIGNADO</strong>.
+              Los accesorios pasarán a <strong>ASIGNADO</strong> al trabajador.
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Observaciones</label>
