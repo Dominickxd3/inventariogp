@@ -75,6 +75,11 @@ export const api = {
     createConAccesorios: (data) => request('/asignaciones/con-accesorios', { method: 'POST', body: JSON.stringify(data) }),
     cesar: (id) => request(`/asignaciones/${id}/cesar`, { method: 'POST' }),
     cesarTrabajador: (id) => request(`/asignaciones/cesar-trabajador/${id}`, { method: 'POST' }),
+    cesar: (id, accesorios) => {
+      const body = accesorios ? { accesorios } : {};
+      return request(`/asignaciones/${id}/cesar`, { method: 'POST', body: JSON.stringify(body) });
+    },
+    linkedAccs: (id) => request(`/asignaciones/${id}/accesorios`),
     acta: (id) => `${BASE}/asignaciones/${id}/acta`,
     historialEquipo: (id) => request(`/asignaciones/equipo/${id}`),
     historialTrabajador: (id) => request(`/asignaciones/trabajador/${id}`),
@@ -104,6 +109,7 @@ export const api = {
     create: (data) => request('/componentes', { method: 'POST', body: JSON.stringify(data) }),
     createQuick: (data) => request('/componentes/rapido', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) => request(`/componentes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    accesoriosDisponibles: () => request('/componentes/accesorios-disponibles'),
     tipos: {
       list: () => request('/componentes/tipos'),
       create: (data) => request('/componentes/tipos', { method: 'POST', body: JSON.stringify(data) }),

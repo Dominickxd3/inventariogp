@@ -65,6 +65,10 @@ export const ComponentesService = {
     return tipos.filter((tipo) => !INVALID_COMPONENT_TYPES.has(normalizeTypeName(tipo.DesTipodeComponente)));
   },
 
+  async listAccDisponibles() {
+    return ComponentesRepository.listAccDisponibles();
+  },
+
   async create(data) {
     return ComponentesRepository.create(data);
   },

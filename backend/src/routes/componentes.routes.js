@@ -18,6 +18,13 @@ router.get('/tipos', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.get('/accesorios-disponibles', authMiddleware, async (req, res, next) => {
+  try {
+    const list = await ComponentesService.listAccDisponibles();
+    res.json(list);
+  } catch (e) { next(e); }
+});
+
 router.get('/:id', async (req, res, next) => {
   try {
     const c = await ComponentesService.getById(parseInt(req.params.id));

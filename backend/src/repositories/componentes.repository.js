@@ -89,6 +89,16 @@ export const ComponentesRepository = {
     return rows[0] || null;
   },
 
+  async listAccDisponibles() {
+    return query(DB, `
+      SELECT c.*, tc.DesTipodeComponente
+      FROM Tab_EQ_Componentes c
+      JOIN Tab_EQ_TipodeComponentes tc ON c.IdTipodeComponente = tc.IdTipodeComponente
+      WHERE c.Estado = 'DISPONIBLE' AND tc.Categoria = 'ACCESORIO'
+      ORDER BY tc.DesTipodeComponente, c.CodComponente
+    `);
+  },
+
   async getLastCodComponenteByPrefix(prefix) {
     const rows = await query(DB, `
       SELECT TOP 1 CodComponente FROM Tab_EQ_Componentes

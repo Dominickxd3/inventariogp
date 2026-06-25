@@ -2,7 +2,7 @@ import { AsignacionesRepository } from '../repositories/asignaciones.repository.
 import { EquiposRepository } from '../repositories/equipos.repository.js';
 import { ComponentesRepository } from '../repositories/componentes.repository.js';
 import { TrabajadoresRepository } from '../repositories/trabajadores.repository.js';
-import { withTransaction, createRequest } from '../config/db.js';
+import { withTransaction, createRequest, query } from '../config/db.js';
 
 const DB = 'InventarioGP';
 const fec = () => new Date().toISOString().split('T')[0];
@@ -65,7 +65,19 @@ export const AsignacionesService = {
     });
   },
 
-  async cesar(id, idUsuario) {
+  async getAccsByAsignacion(id) {
+    return query(DB, `
+      SELECT m.*, c.CodComponente, c.DesComponente, c.Marca, c.Modelo,
+             tc.DesTipodeComponente
+      FROM Tab_EQ_MovAccesoriosTrabajador m
+      JOIN Tab_EQ_Componentes c ON m.IdComponente = c.IdComponente
+      LEFT JOIN Tab_EQ_TipodeComponentes tc ON c.IdTipodeComponente = tc.IdTipodeComponente
+      WHERE m.IdMovEquipoAsignacion = @id
+      ORDER BY m.FecAsignacion DESC
+    `, { id });
+  },
+
+  async cesar(id, idUsuario, accesorios) {
     const asig = await AsignacionesRepository.getById(id);
     if (!asig) throw new Error('Asignación no encontrada');
 
@@ -78,6 +90,27 @@ export const AsignacionesService = {
         INSERT INTO Tab_EQ_MovEstadosEquipos (IdMaeEquipo, EstadoAnterior, EstadoNuevo, IdUsuario, Obs)
         VALUES (@idEquipo, 'ASIGNADO', 'DISPONIBLE', @idUsuario, 'Asignación finalizada')
       `, { idEquipo: asig.IdMaeEquipo, idUsuario: idUsuario || null });
+
+      if (accesorios?.length) {
+        for (const acc of accesorios) {
+          const { idMovAccesorio, accion } = acc;
+          if (accion === 'MANTENER') continue;
+
+          if (accion === 'DISPONIBLE') {
+            await req(`UPDATE Tab_EQ_MovAccesoriosTrabajador SET Estado = 'CESADO', FecCese = GETDATE() WHERE IdMovAccesorio = @id`, { id: idMovAccesorio });
+            const [comp] = await req(`SELECT IdComponente FROM Tab_EQ_MovAccesoriosTrabajador WHERE IdMovAccesorio = @id`, { id: idMovAccesorio });
+            if (comp) {
+              await req(`UPDATE Tab_EQ_Componentes SET Estado = 'DISPONIBLE' WHERE IdComponente = @id`, { id: comp.IdComponente });
+            }
+          } else if (accion === 'BAJA' || accion === 'PERDIDO') {
+            await req(`UPDATE Tab_EQ_MovAccesoriosTrabajador SET Estado = '${accion}', FecCese = GETDATE() WHERE IdMovAccesorio = @id`, { id: idMovAccesorio });
+            const [comp] = await req(`SELECT IdComponente FROM Tab_EQ_MovAccesoriosTrabajador WHERE IdMovAccesorio = @id`, { id: idMovAccesorio });
+            if (comp) {
+              await req(`UPDATE Tab_EQ_Componentes SET Estado = 'BAJA' WHERE IdComponente = @id`, { id: comp.IdComponente });
+            }
+          }
+        }
+      }
     });
   },
 
@@ -133,6 +166,14 @@ export const AsignacionesService = {
         if (accsValidos.some(a => a.IdComponente === acc.IdComponente)) {
           throw new Error(`Componente duplicado: ${c.CodComponente}`);
         }
+
+        const tipo = await ComponentesRepository.getTipoById(c.IdTipodeComponente);
+        if (tipo?.Categoria !== 'ACCESORIO') {
+          throw new Error(
+            `El componente ${c.CodComponente} (${c.DesTipodeComponente}) no puede asignarse como accesorio al trabajador. Debe instalarse en un equipo mediante una intervención técnica.`
+          );
+        }
+
         accsValidos.push(acc);
       }
     }

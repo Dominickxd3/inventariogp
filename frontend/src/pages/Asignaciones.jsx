@@ -10,7 +10,10 @@ import { Input } from '#components/ui/input.jsx';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '#components/ui/dialog.jsx';
-import { Plus, XCircle, Check, Monitor, Search, FileText, Printer } from 'lucide-react';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '#components/ui/select.jsx';
+import { Plus, XCircle, Check, Monitor, Printer } from 'lucide-react';
 import { formatDate } from '../lib/utils';
 
 const TABS = [
@@ -46,6 +49,13 @@ const columns = [
   },
 ];
 
+const ACC_OPTIONS = [
+  { value: 'DISPONIBLE', label: 'Devolver a disponible' },
+  { value: 'MANTENER', label: 'Mantener asignado al trabajador' },
+  { value: 'BAJA', label: 'Dar de baja' },
+  { value: 'PERDIDO', label: 'Marcar como perdido/dañado' },
+];
+
 export default function Asignaciones() {
   const [showModal, setShowModal] = useState(false);
   const [searchParams] = useSearchParams();
@@ -69,13 +79,14 @@ export default function Asignaciones() {
   useEffect(() => { setPage(1); }, [tab]);
 
   const cesarMutation = useMutation({
-    mutationFn: api.asignaciones.cesar,
+    mutationFn: ({ id, accesorios }) => api.asignaciones.cesar(id, accesorios),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['asignaciones'] });
       queryClient.invalidateQueries({ queryKey: ['equipos'] });
       queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
       setShowCesarDialog(false);
       setCesarTarget(null);
+      setAccActions([]);
       Swal.fire({ icon: 'success', title: 'Asignación finalizada', text: 'El equipo fue desasignado correctamente', timer: 2000, showConfirmButton: false });
     },
     onError: (err) => {
@@ -85,10 +96,38 @@ export default function Asignaciones() {
 
   const [showCesarDialog, setShowCesarDialog] = useState(false);
   const [cesarTarget, setCesarTarget] = useState(null);
+  const [accActions, setAccActions] = useState([]);
 
-  const confirmCesar = (row) => {
+  const { data: cesarAccs } = useQuery({
+    queryKey: ['cesar-accesorios', cesarTarget?.IdMovEquipoAsignacion],
+    queryFn: () => api.asignaciones.list({ pageSize: 50, idEquipo: cesarTarget?.IdMaeEquipo, estado: 'VIGENTE' }).then(() => {
+      return api.asignaciones.linkedAccs(cesarTarget?.IdMovEquipoAsignacion);
+    }),
+    enabled: !!cesarTarget && showCesarDialog,
+  });
+
+  const confirmCesar = async (row) => {
     setCesarTarget(row);
+
+    try {
+      const accs = await api.asignaciones.linkedAccs(row.IdMovEquipoAsignacion);
+      if (accs?.length) {
+        setAccActions(accs.map((a) => ({ idMovAccesorio: a.IdMovAccesorio, accion: 'DISPONIBLE' })));
+      } else {
+        setAccActions([]);
+      }
+    } catch {
+      setAccActions([]);
+    }
+
     setShowCesarDialog(true);
+  };
+
+  const handleCesar = () => {
+    cesarMutation.mutate({
+      id: cesarTarget.IdMovEquipoAsignacion,
+      accesorios: accActions.length ? accActions : undefined,
+    });
   };
 
   const rows = asignaciones?.rows || [];
@@ -167,17 +206,45 @@ export default function Asignaciones() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showCesarDialog} onOpenChange={(v) => { setShowCesarDialog(v); if (!v) setCesarTarget(null); }}>
-        <DialogContent className="sm:max-w-sm">
+      <Dialog open={showCesarDialog} onOpenChange={(v) => { setShowCesarDialog(v); if (!v) { setCesarTarget(null); setAccActions([]); } }}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Cesar asignación</DialogTitle>
             <DialogDescription>
               ¿Finalizar asignación de <strong>{cesarTarget?.CodEquipo}</strong> a {cesarTarget?.TrabajadorNombre}?
             </DialogDescription>
           </DialogHeader>
+
+          {accActions.length > 0 && (
+            <div className="space-y-3 py-2">
+              <p className="text-sm font-medium">Accesorios vinculados a esta entrega:</p>
+              {accActions.map((aa, i) => {
+                const acc = cesarAccs?.[i];
+                return (
+                  <div key={aa.idMovAccesorio} className="flex items-center gap-2 text-sm">
+                    <span className="flex-1 text-muted-foreground">{acc?.CodComponente || `ID ${aa.idMovAccesorio}`}</span>
+                    <Select
+                      value={aa.accion}
+                      onValueChange={(v) => setAccActions((prev) => prev.map((a) => a.idMovAccesorio === aa.idMovAccesorio ? { ...a, accion: v } : a))}
+                    >
+                      <SelectTrigger className="w-44">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ACC_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowCesarDialog(false); setCesarTarget(null); }}>Cancelar</Button>
-            <Button variant="destructive" onClick={() => cesarMutation.mutate(cesarTarget.IdMovEquipoAsignacion)} disabled={cesarMutation.isPending}>
+            <Button variant="outline" onClick={() => { setShowCesarDialog(false); setCesarTarget(null); setAccActions([]); }}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleCesar} disabled={cesarMutation.isPending}>
               {cesarMutation.isPending ? 'Cesando...' : 'Cesar'}
             </Button>
           </DialogFooter>
@@ -215,8 +282,8 @@ function AsignarForm({ onSuccess, equipoInicial }) {
   });
 
   const { data: accDisponibles } = useQuery({
-    queryKey: ['componentes-disponibles-asig', searchAcc],
-    queryFn: () => api.componentes.list({ estado: 'DISPONIBLE' }),
+    queryKey: ['accesorios-disponibles-asig', searchAcc],
+    queryFn: api.componentes.accesoriosDisponibles,
     enabled: step === 3,
   });
 
@@ -358,8 +425,11 @@ function AsignarForm({ onSuccess, equipoInicial }) {
 
       {step === 3 && selectedEquipos.length === 1 && (
         <div className="space-y-3">
-          <h3 className="font-medium">Accesorios incluidos</h3>
-          <p className="text-xs text-muted-foreground">Selecciona accesorios para entregar junto al equipo (opcional)</p>
+          <h3 className="font-medium">Accesorios entregados al trabajador</h3>
+          <p className="text-xs text-muted-foreground bg-muted p-2 rounded">
+            Solo aparecen accesorios externos como cargadores, mouse, teclado, cables o adaptadores.
+            Los repuestos técnicos como RAM, SSD, discos o baterías se instalan desde el detalle del equipo o una intervención técnica.
+          </p>
           <Input value={searchAcc} onChange={(e) => setSearchAcc(e.target.value)} placeholder="Buscar accesorio..." />
           <div className="max-h-48 overflow-y-auto space-y-1">
             {accDisponibles?.map((c) => {
@@ -378,7 +448,7 @@ function AsignarForm({ onSuccess, equipoInicial }) {
               );
             })}
             {(!accDisponibles || accDisponibles.length === 0) && (
-              <p className="text-xs text-muted-foreground text-center py-2">No hay accesorios disponibles</p>
+              <p className="text-xs text-muted-foreground text-center py-2">No hay accesorios externos disponibles</p>
             )}
           </div>
           <div className="flex gap-2">
@@ -412,12 +482,12 @@ function AsignarForm({ onSuccess, equipoInicial }) {
             {selectedAcc.length > 0 && (
               <>
                 <p className="font-semibold text-base border-b border-border pb-2 mt-3 mb-2">
-                  Accesorios incluidos ({selectedAcc.length})
+                  Accesorios entregados ({selectedAcc.length})
                 </p>
                 <div className="space-y-1">
                   {selectedAcc.map((a) => (
                     <p key={a.IdComponente} className="text-xs">
-                      {a.CodComponente} — {a.DesComponente || 'Sin descripción'}
+                      {a.CodComponente} — {a.DesComponente || a.DesTipodeComponente}
                     </p>
                   ))}
                 </div>
@@ -426,7 +496,7 @@ function AsignarForm({ onSuccess, equipoInicial }) {
 
             <div className="mt-3 pt-2 border-t border-border bg-amber-50 dark:bg-amber-950/20 p-2 rounded text-xs text-muted-foreground">
               Los equipos pasarán a estado <strong>ASIGNADO</strong>.
-              Los accesorios pasarán a <strong>ASIGNADO</strong> al trabajador.
+              Los accesorios seleccionados quedarán asignados al trabajador y vinculados a esta entrega.
             </div>
           </div>
           <div>

@@ -48,8 +48,15 @@ router.post('/con-accesorios', roleMiddleware('ADMIN', 'TECNICO'), async (req, r
 
 router.post('/:id/cesar', roleMiddleware('ADMIN', 'TECNICO'), async (req, res, next) => {
   try {
-    await AsignacionesService.cesar(parseInt(req.params.id), req.usuario.id);
+    await AsignacionesService.cesar(parseInt(req.params.id), req.usuario.id, req.body?.accesorios);
     res.json({ message: 'Asignación finalizada' });
+  } catch (e) { next(e); }
+});
+
+router.get('/:id/accesorios', async (req, res, next) => {
+  try {
+    const accs = await AsignacionesService.getAccsByAsignacion(parseInt(req.params.id));
+    res.json(accs);
   } catch (e) { next(e); }
 });
 
