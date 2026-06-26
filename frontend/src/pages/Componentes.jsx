@@ -195,11 +195,20 @@ const columns = [
   { key: 'Estado', label: 'Estado', render: (r) => <EstadoBadge estado={r.Estado} /> },
 ];
 
-const normalizarCategoria = (cat) => String(cat || '')
+const normalizarCategoria = (cat) => {
+  const value = String(cat || '')
     .trim()
     .toUpperCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '_');
+
+  if (value === 'REPUESTO_TECNICO') return 'REPUESTO_TECNICO';
+  if (value === 'ACCESORIO') return 'ACCESORIO';
+  if (value === 'CONSUMIBLE') return 'CONSUMIBLE';
+
+  return value;
+};
 
 function normalizeTypeName(value) {
   return (value || '')
@@ -264,13 +273,14 @@ export default function Componentes() {
   });
 
   const tiposFiltrados = useMemo(() => {
-    if (!categoriaNuevo || !tipos) return [];
+    if (!categoriaNuevo || !Array.isArray(tipos)) return [];
     const catActual = normalizarCategoria(categoriaNuevo);
     return tipos.filter((t) => {
       const catTipo = normalizarCategoria(t.Categoria);
       return catTipo === catActual;
     });
   }, [categoriaNuevo, tipos]);
+
 
   const selectedTipo = tipos?.find((t) => String(t.IdTipodeComponente) === String(form.IdTipodeComponente)) || null;
   const selectedTypeName = normalizeTypeName(selectedTipo?.DesTipodeComponente || '');
@@ -484,6 +494,8 @@ export default function Componentes() {
                   <p className="text-xs text-muted-foreground">{typeConfig.ayuda}</p>
                 ) : autoDescription ? (
                   <p className="text-xs text-muted-foreground">Vista previa automática: {autoDescription}</p>
+                ) : !selectedTipo ? (
+                  <p className="text-xs text-muted-foreground">Selecciona un tipo para generar vista previa</p>
                 ) : null}
               </div>
               <div className="space-y-1.5">
