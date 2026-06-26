@@ -73,10 +73,9 @@ export const api = {
     create: (data) => request('/asignaciones', { method: 'POST', body: JSON.stringify(data) }),
     createBulk: (data) => request('/asignaciones/bulk', { method: 'POST', body: JSON.stringify(data) }),
     createConAccesorios: (data) => request('/asignaciones/con-accesorios', { method: 'POST', body: JSON.stringify(data) }),
-    cesar: (id) => request(`/asignaciones/${id}/cesar`, { method: 'POST' }),
     cesarTrabajador: (id) => request(`/asignaciones/cesar-trabajador/${id}`, { method: 'POST' }),
-    cesar: (id, accesorios) => {
-      const body = accesorios ? { accesorios } : {};
+    cesar: (id, accesorios, extra) => {
+      const body = { ...(accesorios ? { accesorios } : {}), ...(extra || {}) };
       return request(`/asignaciones/${id}/cesar`, { method: 'POST', body: JSON.stringify(body) });
     },
     linkedAccs: (id) => request(`/asignaciones/${id}/accesorios`),
@@ -110,6 +109,7 @@ export const api = {
     createQuick: (data) => request('/componentes/rapido', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) => request(`/componentes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     accesoriosDisponibles: () => request('/componentes/accesorios-disponibles'),
+    accesoriosPorTrabajador: (id) => request(`/componentes/accesorios-por-trabajador/${id}`),
     tipos: {
       list: () => request('/componentes/tipos'),
       create: (data) => request('/componentes/tipos', { method: 'POST', body: JSON.stringify(data) }),

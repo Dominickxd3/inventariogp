@@ -69,6 +69,10 @@ export const ComponentesService = {
     return ComponentesRepository.listAccDisponibles();
   },
 
+  async listAccsPorTrabajador(idTrabajador) {
+    return ComponentesRepository.listAccesoriosPorTrabajador(idTrabajador);
+  },
+
   async create(data) {
     return ComponentesRepository.create(data);
   },

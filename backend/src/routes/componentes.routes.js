@@ -25,6 +25,13 @@ router.get('/accesorios-disponibles', authMiddleware, async (req, res, next) => 
   } catch (e) { next(e); }
 });
 
+router.get('/accesorios-por-trabajador/:idTrabajador', authMiddleware, async (req, res, next) => {
+  try {
+    const accs = await ComponentesService.listAccsPorTrabajador(parseInt(req.params.idTrabajador));
+    res.json(accs);
+  } catch (e) { next(e); }
+});
+
 router.get('/:id', async (req, res, next) => {
   try {
     const c = await ComponentesService.getById(parseInt(req.params.id));

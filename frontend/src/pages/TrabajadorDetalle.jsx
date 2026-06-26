@@ -10,7 +10,7 @@ import { Badge } from '#components/ui/badge.jsx';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '#components/ui/dialog.jsx';
-import { ArrowLeft, Monitor, XCircle, ClipboardList } from 'lucide-react';
+import { ArrowLeft, Monitor, XCircle, ClipboardList, Mouse, AlertTriangle } from 'lucide-react';
 import { formatDate } from '../lib/utils';
 import { useState } from 'react';
 
@@ -33,6 +33,11 @@ export default function TrabajadorDetalle() {
   const { data: historial, isLoading: historialLoading } = useQuery({
     queryKey: ['historial-trabajador', id],
     queryFn: () => api.asignaciones.historialTrabajador(id),
+  });
+
+  const { data: accesorios, isLoading: accsLoading } = useQuery({
+    queryKey: ['accesorios-trabajador', id],
+    queryFn: () => api.componentes.accesoriosPorTrabajador(id),
   });
 
   const cesarTodoMutation = useMutation({
@@ -145,27 +150,75 @@ export default function TrabajadorDetalle() {
       </Card>
 
       <Card>
+        <CardHeader><CardTitle>Accesorios Vigentes</CardTitle></CardHeader>
+        <CardContent>
+          {accsLoading ? (
+            <div className="space-y-3">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-12" />)}</div>
+          ) : accesorios?.length > 0 ? (
+            <div className="space-y-2">
+              {accesorios.map((a) => (
+                <div key={a.IdMovAccesorio} className="flex items-center gap-3 p-3 rounded-lg border">
+                  <Mouse className="w-5 h-5 text-muted-foreground shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{a.CodComponente} — {a.DesComponente || a.DesTipodeComponente}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {a.DesTipodeComponente}{a.Marca ? ` / ${a.Marca}` : ''}
+                      {a.Serie ? ` · S/N: ${a.Serie}` : ''}
+                      {' · '}{formatDate(a.FecAsignacion)}
+                    </p>
+                  </div>
+                  <EstadoBadge estado={a.Estado} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <Mouse className="w-8 h-8 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">Sin accesorios asignados</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader><CardTitle>Historial de Asignaciones</CardTitle></CardHeader>
         <CardContent>
           {historialLoading ? (
-            <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14" />)}</div>
+            <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
           ) : historial?.length > 0 ? (
             <div className="space-y-2">
               {historial.map((h) => (
                 <div key={h.IdMovEquipoAsignacion}
-                  className="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors"
+                  className="p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors"
                   onClick={() => navigate(`/equipos/${h.IdMaeEquipo}`)}
                 >
-                  <div className="flex items-center gap-3">
-                    <ClipboardList className="w-5 h-5 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm font-medium">{h.CodEquipo} - {h.DesTipodeEquipo}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDate(h.FecAsignacion)} {h.FecCese ? `- ${formatDate(h.FecCese)}` : ''}
-                      </p>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <ClipboardList className="w-5 h-5 text-muted-foreground shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium">{h.CodEquipo} - {h.DesTipodeEquipo}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDate(h.FecAsignacion)} {h.FecCese ? `→ ${formatDate(h.FecCese)}` : '(vigente)'}
+                        </p>
+                      </div>
                     </div>
+                    <EstadoBadge estado={h.Estado} />
                   </div>
-                  <EstadoBadge estado={h.Estado} />
+                  {h.Estado === 'CESADO' && (
+                    <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5 text-xs text-muted-foreground ml-8">
+                      {h.MotivoCese && <span>Motivo: {h.MotivoCese}</span>}
+                      {h.EstadoFisicoDevolucion && <span>Estado devolución: {h.EstadoFisicoDevolucion}</span>}
+                      {h.ObservacionesDevolucion && <span>Obs: {h.ObservacionesDevolucion}</span>}
+                      {h.EstadoFisicoEntrega && <span>Estado entrega: {h.EstadoFisicoEntrega}</span>}
+                      {h.ObservacionesEntrega && <span>Obs entrega: {h.ObservacionesEntrega}</span>}
+                    </div>
+                  )}
+                  {h.Estado === 'VIGENTE' && h.EstadoFisicoEntrega && (
+                    <p className="text-xs text-muted-foreground ml-8 mt-1">
+                      Estado entrega: {h.EstadoFisicoEntrega}
+                      {h.ObservacionesEntrega ? ` — ${h.ObservacionesEntrega}` : ''}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>

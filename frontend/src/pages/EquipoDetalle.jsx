@@ -607,14 +607,32 @@ export default function EquipoDetalle() {
         <CardHeader><CardTitle>Historial de Asignaciones</CardTitle></CardHeader>
         <CardContent>
           {historial?.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {historial.map((h) => (
-                <div key={h.IdMovEquipoAsignacion} className="flex items-center justify-between py-2 border-b last:border-0">
-                  <div>
-                    <p className="text-sm font-medium">{h.Trabajador || `ID: ${h.IdReferente}`}</p>
-                    <p className="text-xs text-muted-foreground">{formatDate(h.FecAsignacion)} - {formatDate(h.FecCese) || 'Actual'}</p>
+                <div key={h.IdMovEquipoAsignacion} className="py-2 border-b last:border-0">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">{h.Trabajador || `ID: ${h.IdReferente}`}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(h.FecAsignacion)} {h.FecCese ? `→ ${formatDate(h.FecCese)}` : '(vigente)'}
+                      </p>
+                    </div>
+                    <EstadoBadge estado={h.Estado} />
                   </div>
-                  <EstadoBadge estado={h.Estado} />
+                  {h.Estado === 'CESADO' && (
+                    <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-xs text-muted-foreground">
+                      {h.MotivoCese && <span>Motivo: {h.MotivoCese}</span>}
+                      {h.EstadoFisicoDevolucion && <span>Estado devolución: {h.EstadoFisicoDevolucion}</span>}
+                      {h.ObservacionesDevolucion && <span>Obs: {h.ObservacionesDevolucion}</span>}
+                      {h.EstadoFisicoEntrega && <span>Estado entrega: {h.EstadoFisicoEntrega}</span>}
+                    </div>
+                  )}
+                  {h.Estado === 'VIGENTE' && h.EstadoFisicoEntrega && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Estado entrega: {h.EstadoFisicoEntrega}
+                      {h.ObservacionesEntrega ? ` — ${h.ObservacionesEntrega}` : ''}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
