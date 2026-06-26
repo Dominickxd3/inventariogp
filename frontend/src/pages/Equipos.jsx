@@ -18,7 +18,7 @@ import {
   DialogFooter,
 } from '#components/ui/dialog.jsx';
 import { Skeleton } from '#components/ui/skeleton.jsx';
-import { Plus, QrCode, Eye, Trash2, Monitor, CheckCircle, Clock, AlertTriangle, Archive } from 'lucide-react';
+import { Plus, QrCode, Eye, Archive, Monitor, CheckCircle, Clock, AlertTriangle, Trash2 } from 'lucide-react';
 import { formatDate } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 
@@ -68,17 +68,17 @@ export default function Equipos() {
     queryFn: api.equipos.tipos.list,
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: api.equipos.delete,
+  const bajaMutation = useMutation({
+    mutationFn: api.equipos.baja,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipos'] });
       queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
       setShowDeleteOpen(false);
       setDeleteTarget(null);
-      Swal.fire({ icon: 'success', title: 'Equipo eliminado', text: 'El equipo se eliminó correctamente', timer: 2000, showConfirmButton: false });
+      Swal.fire({ icon: 'success', title: 'Equipo dado de baja', text: 'El equipo se marcó como BAJA correctamente', timer: 2000, showConfirmButton: false });
     },
     onError: (err) => {
-      Swal.fire({ icon: 'error', title: 'Error al eliminar', text: err.message });
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message });
     },
   });
 
@@ -220,9 +220,11 @@ export default function Equipos() {
                 <Button variant="ghost" size="icon" onClick={() => qrMutation.mutate(row.IdMaeEquipo)}>
                   <QrCode className="w-4 h-4" />
                 </Button>
-                <Button variant="ghost" size="icon" onClick={() => confirmDelete(row)}>
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                {row.Estado !== 'BAJA' && (
+                  <Button variant="ghost" size="icon" onClick={() => confirmDelete(row)}>
+                    <Archive className="w-4 h-4" />
+                  </Button>
+                )}
               </div>
             ),
           },
@@ -248,11 +250,11 @@ export default function Equipos() {
               }}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Seleccionar tipo de equipo...">
-                    {tipos?.find(t => String(t.IdTipodeEquipo) === form.IdTipodeEquipo)?.DesTipodeEquipo}
+                    {tipos?.filter(t => !['TECLADO','MOUSE','CARGADOR','CABLE','ADAPTADOR','MOCHILA','AUDIFONOS'].includes(t.DesTipodeEquipo.toUpperCase().trim())).find(t => String(t.IdTipodeEquipo) === form.IdTipodeEquipo)?.DesTipodeEquipo}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {tipos?.map((t) => (
+                  {tipos?.filter(t => !['TECLADO','MOUSE','CARGADOR','CABLE','ADAPTADOR','MOCHILA','AUDIFONOS'].includes(t.DesTipodeEquipo.toUpperCase().trim())).map((t) => (
                     <SelectItem key={t.IdTipodeEquipo} value={String(t.IdTipodeEquipo)}>{t.DesTipodeEquipo}</SelectItem>
                   ))}
                 </SelectContent>
@@ -305,18 +307,16 @@ export default function Equipos() {
       <Dialog open={showDeleteOpen} onOpenChange={(v) => { setShowDeleteOpen(v); if (!v) setDeleteTarget(null); }}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Confirmar eliminación</DialogTitle>
+            <DialogTitle>Confirmar baja</DialogTitle>
             <DialogDescription>
-              ¿Estás seguro de eliminar el equipo <strong>{deleteTarget?.CodEquipo}</strong>?
-              {deleteTarget?.Estado === 'ASIGNADO' && (
-                <span className="block mt-2 text-destructive">No se puede eliminar un equipo con asignación activa.</span>
-              )}
+              ¿Estás seguro de dar de baja el equipo <strong>{deleteTarget?.CodEquipo}</strong>?
+              <span className="block mt-2 text-muted-foreground text-sm">El equipo quedará en estado BAJA y no podrá ser asignado ni editado.</span>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowDeleteOpen(false); setDeleteTarget(null); }}>Cancelar</Button>
-            <Button variant="destructive" onClick={() => deleteMutation.mutate(deleteTarget.IdMaeEquipo)} disabled={deleteMutation.isPending}>
-              {deleteMutation.isPending ? 'Eliminando...' : 'Eliminar'}
+            <Button variant="destructive" onClick={() => bajaMutation.mutate(deleteTarget.IdMaeEquipo)} disabled={bajaMutation.isPending}>
+              {bajaMutation.isPending ? 'Dando de baja...' : 'Dar de baja'}
             </Button>
           </DialogFooter>
         </DialogContent>

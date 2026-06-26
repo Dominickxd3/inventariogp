@@ -46,18 +46,22 @@ export const EquiposService = {
   },
 
   async update(id, data) {
-    const anterior = await EquiposRepository.getById(id);
-    await EquiposRepository.update(id, data);
-    if (data.Estado && anterior && anterior.Estado !== data.Estado) {
-      await EquiposRepository.registrarCambioEstado(id, anterior.Estado, data.Estado, data.IdUsuario);
-    }
+    const safeData = { ...data };
+    delete safeData.CodEquipo;
+    delete safeData.Estado;
+    await EquiposRepository.update(id, safeData);
     return this.getById(id);
   },
 
-  async delete(id) {
+  async bajaEquipo(id, idUsuario) {
+    const equipo = await EquiposRepository.getById(id);
+    if (!equipo) throw new Error('Equipo no encontrado');
+    if (equipo.Estado === 'BAJA') throw new Error('El equipo ya está dado de baja');
     const activa = await AsignacionesRepository.getActivaByEquipo(id);
-    if (activa) throw new Error('No se puede eliminar un equipo con asignación activa');
-    await EquiposRepository.delete(id);
+    if (activa) throw new Error('No se puede dar de baja un equipo con asignación activa');
+    await EquiposRepository.updateEstado(id, 'BAJA');
+    await EquiposRepository.registrarCambioEstado(id, equipo.Estado, 'BAJA', idUsuario, 'Baja lógica del equipo');
+    return this.getById(id);
   },
 
   async cambiarEstado(id, nuevoEstado, idUsuario, obs) {
@@ -79,6 +83,16 @@ export const EquiposService = {
 
   async listTipos() {
     return EquiposRepository.listTipos();
+  },
+
+  async getTiposAsignables() {
+    return EquiposRepository.getTiposAsignables();
+  },
+
+  async getTimeline(id) {
+    const equipo = await EquiposRepository.getById(id);
+    if (!equipo) return [];
+    return EquiposRepository.getTimeline(id);
   },
 
   async createTipo(data) {
@@ -137,10 +151,10 @@ export const EquiposService = {
     await withTransaction('InventarioGP', async (trx) => {
       const req = (params) => createRequest(trx, params);
       for (const c of caracteristicas) {
-        const existing = await req({ idEquipo, idPlantilla: c.IdPlantilla })
+        const { recordset } = await req({ idEquipo, idPlantilla: c.IdPlantilla })
           .query('SELECT IdCaracteristica FROM Tab_EQ_CaracteristicasEquipo WHERE IdMaeEquipo = @idEquipo AND IdPlantilla = @idPlantilla');
-        if (existing.length > 0) {
-          await req({ id: existing[0].IdCaracteristica, valor: c.Valor || null, idUsuario: idUsuario || null })
+        if (recordset.length > 0) {
+          await req({ id: recordset[0].IdCaracteristica, valor: c.Valor || null, idUsuario: idUsuario || null })
             .query('UPDATE Tab_EQ_CaracteristicasEquipo SET Valor = @valor, IdUsuarioModifica = @idUsuario, FecModificacion = GETDATE() WHERE IdCaracteristica = @id');
         } else {
           await req({ idEquipo, idPlantilla: c.IdPlantilla, valor: c.Valor || null, idUsuario: idUsuario || null })

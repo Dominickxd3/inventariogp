@@ -18,7 +18,7 @@ import { useState, useMemo } from 'react';
 import ComponentSearchSelect from '../components/ComponentSearchSelect';
 import IncidenciaSelect from '../components/IncidenciaSelect';
 import {
-  ArrowLeft, QrCode, Pencil, Save, X, Plus, Trash2, Monitor, Search, Cpu, Wrench, Hammer, AlertTriangle,
+  ArrowLeft, QrCode, Pencil, Save, X, Plus, Trash2, Monitor, Search, Cpu, Wrench, Hammer, AlertTriangle, Clock,
 } from 'lucide-react';
 
 export default function EquipoDetalle() {
@@ -52,8 +52,8 @@ export default function EquipoDetalle() {
   });
 
   const { data: tipos } = useQuery({
-    queryKey: ['equipos-tipos'],
-    queryFn: api.equipos.tipos.list,
+    queryKey: ['equipos-tipos-asignables'],
+    queryFn: api.equipos.tiposAsignables,
   });
 
   const { data: historial } = useQuery({
@@ -79,6 +79,11 @@ export default function EquipoDetalle() {
   const { data: incidencias } = useQuery({
     queryKey: ['incidencias-equipo', id],
     queryFn: () => api.equipos.incidencias.list(id),
+  });
+
+  const { data: timeline } = useQuery({
+    queryKey: ['timeline-equipo', id],
+    queryFn: () => api.equipos.timeline(id),
   });
 
   const { data: componentesDisponibles } = useQuery({
@@ -148,11 +153,9 @@ export default function EquipoDetalle() {
 
   const handleEditClick = () => {
     setForm({
-      CodEquipo: equipo.CodEquipo,
       IdTipodeEquipo: String(equipo.IdTipodeEquipo),
       CodBarra: equipo.CodBarra || '',
       Obs: equipo.Obs || '',
-      Estado: equipo.Estado,
     });
     setEditMode(true);
   };
@@ -182,6 +185,7 @@ export default function EquipoDetalle() {
   const tieneDatosTecnicos = tecData?.caracteristicas?.some(c => c.Valor);
 
   const tipoNombre = equipo?.DesTipodeEquipo || '';
+  const esBaja = equipo?.Estado === 'BAJA';
   const esPC = tipoNombre.toUpperCase().trim() === 'PC ESCRITORIO';
   const filtrados = useMemo(() => {
     if (!componentesDisponibles || !componentesEquipo) return [];
@@ -276,9 +280,11 @@ export default function EquipoDetalle() {
               </div>
               <div className="flex items-center gap-2">
                 <EstadoBadge estado={equipo.Estado} />
-                <Button variant="ghost" size="icon" onClick={handleEditClick}>
-                  <Pencil className="w-4 h-4" />
-                </Button>
+                {!esBaja && (
+                  <Button variant="ghost" size="icon" onClick={handleEditClick}>
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                )}
               </div>
             </div>
           ) : (
@@ -292,10 +298,6 @@ export default function EquipoDetalle() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Código</label>
-                  <Input value={form.CodEquipo} onChange={(e) => setForm({ ...form, CodEquipo: e.target.value })} required />
-                </div>
-                <div className="space-y-2">
                   <label className="text-sm font-medium">Código de Barra</label>
                   <Input value={form.CodBarra} onChange={(e) => setForm({ ...form, CodBarra: e.target.value })} />
                 </div>
@@ -306,17 +308,6 @@ export default function EquipoDetalle() {
                     <SelectContent>
                       {tipos?.map((t) => (
                         <SelectItem key={t.IdTipodeEquipo} value={String(t.IdTipodeEquipo)}>{t.DesTipodeEquipo}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Estado</label>
-                  <Select value={form.Estado} onValueChange={(v) => setForm({ ...form, Estado: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {['DISPONIBLE', 'ASIGNADO', 'MANTENIMIENTO', 'INCIDENCIA', 'BAJA'].map((e) => (
-                        <SelectItem key={e} value={e}>{e}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -362,16 +353,18 @@ export default function EquipoDetalle() {
       </Card>
 
       {!esPC && (
-        <Card>
+        <Card className={esBaja ? 'opacity-60' : ''}>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Wrench className="w-4 h-4" />
                 <CardTitle>Datos técnicos</CardTitle>
               </div>
-              <Button variant="outline" size="sm" onClick={openTecEdit}>
-                <Pencil className="w-4 h-4" /> {tieneDatosTecnicos ? 'Editar' : 'Agregar'}
-              </Button>
+              {!esBaja && (
+                <Button variant="outline" size="sm" onClick={openTecEdit}>
+                  <Pencil className="w-4 h-4" /> {tieneDatosTecnicos ? 'Editar' : 'Agregar'}
+                </Button>
+              )}
             </div>
           </CardHeader>
           <CardContent>
@@ -399,7 +392,7 @@ export default function EquipoDetalle() {
       )}
 
       {esPC ? (
-        <Card>
+        <Card className={esBaja ? 'opacity-60' : ''}>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2">
               <Cpu className="w-4 h-4" /> Configuración del equipo
@@ -407,11 +400,13 @@ export default function EquipoDetalle() {
             <p className="text-xs text-muted-foreground">PC armado por componentes</p>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-end mb-3">
-              <Button variant="outline" size="sm" onClick={() => setCompOpen(true)}>
-                <Plus className="w-4 h-4" /> Agregar componente
-              </Button>
-            </div>
+            {!esBaja && (
+              <div className="flex items-center justify-end mb-3">
+                <Button variant="outline" size="sm" onClick={() => setCompOpen(true)}>
+                  <Plus className="w-4 h-4" /> Agregar componente
+                </Button>
+              </div>
+            )}
             {componentesEquipo?.length > 0 ? (
               <div className="space-y-1">
                 {componentesEquipo.map((c) => (
@@ -430,16 +425,18 @@ export default function EquipoDetalle() {
                         {c.Motivo && <span className="text-[10px] text-muted-foreground">· {c.Motivo}</span>}
                       </div>
                     </div>
-                    <Button variant="ghost" size="icon" className="shrink-0 ml-2" onClick={() => {
-                      Swal.fire({
-                        title: '¿Quitar componente?',
-                        text: `${c.DesComponente || c.CodComponente}`,
-                        icon: 'warning', showCancelButton: true, confirmButtonText: 'Quitar', cancelButtonText: 'Cancelar',
-                        input: 'text', inputPlaceholder: 'Motivo (opcional)',
-                      }).then((r) => { if (r.isConfirmed) removeCompMutation.mutate({ idMov: c.IdMovEquipoComponente, Motivo: r.value || null }); });
-                    }}>
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
+                    {!esBaja && (
+                      <Button variant="ghost" size="icon" className="shrink-0 ml-2" onClick={() => {
+                        Swal.fire({
+                          title: '¿Quitar componente?',
+                          text: `${c.DesComponente || c.CodComponente}`,
+                          icon: 'warning', showCancelButton: true, confirmButtonText: 'Quitar', cancelButtonText: 'Cancelar',
+                          input: 'text', inputPlaceholder: 'Motivo (opcional)',
+                        }).then((r) => { if (r.isConfirmed) removeCompMutation.mutate({ idMov: c.IdMovEquipoComponente, Motivo: r.value || null }); });
+                      }}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -449,18 +446,20 @@ export default function EquipoDetalle() {
           </CardContent>
         </Card>
       ) : (
-        <Card>
+        <Card className={esBaja ? 'opacity-60' : ''}>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2">
               <Cpu className="w-4 h-4" /> Repuestos, mejoras o accesorios
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-end mb-3">
-              <Button variant="outline" size="sm" onClick={() => setCompOpen(true)}>
-                <Plus className="w-4 h-4" /> Agregar relacionado
-              </Button>
-            </div>
+            {!esBaja && (
+              <div className="flex items-center justify-end mb-3">
+                <Button variant="outline" size="sm" onClick={() => setCompOpen(true)}>
+                  <Plus className="w-4 h-4" /> Agregar relacionado
+                </Button>
+              </div>
+            )}
             {componentesEquipo?.length > 0 ? (
               <div className="space-y-1">
                 {componentesEquipo.map((c) => (
@@ -479,16 +478,18 @@ export default function EquipoDetalle() {
                         {c.Motivo && <span className="text-[10px] text-muted-foreground">· {c.Motivo}</span>}
                       </div>
                     </div>
-                    <Button variant="ghost" size="icon" className="shrink-0 ml-2" onClick={() => {
-                      Swal.fire({
-                        title: '¿Quitar relacionado?',
-                        text: `${c.DesComponente || c.CodComponente}`,
-                        icon: 'warning', showCancelButton: true, confirmButtonText: 'Quitar', cancelButtonText: 'Cancelar',
-                        input: 'text', inputPlaceholder: 'Motivo (opcional)',
-                      }).then((r) => { if (r.isConfirmed) removeCompMutation.mutate({ idMov: c.IdMovEquipoComponente, Motivo: r.value || null }); });
-                    }}>
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
+                    {!esBaja && (
+                      <Button variant="ghost" size="icon" className="shrink-0 ml-2" onClick={() => {
+                        Swal.fire({
+                          title: '¿Quitar relacionado?',
+                          text: `${c.DesComponente || c.CodComponente}`,
+                          icon: 'warning', showCancelButton: true, confirmButtonText: 'Quitar', cancelButtonText: 'Cancelar',
+                          input: 'text', inputPlaceholder: 'Motivo (opcional)',
+                        }).then((r) => { if (r.isConfirmed) removeCompMutation.mutate({ idMov: c.IdMovEquipoComponente, Motivo: r.value || null }); });
+                      }}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -499,16 +500,18 @@ export default function EquipoDetalle() {
         </Card>
       )}
 
-      <Card>
+      <Card className={esBaja ? 'opacity-60' : ''}>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Hammer className="w-4 h-4" />
               <CardTitle>Intervenciones técnicas</CardTitle>
             </div>
-            <Button variant="outline" size="sm" onClick={() => setIntervOpen(true)}>
-              <Plus className="w-4 h-4" /> Nueva intervención
-            </Button>
+            {!esBaja && (
+              <Button variant="outline" size="sm" onClick={() => setIntervOpen(true)}>
+                <Plus className="w-4 h-4" /> Nueva intervención
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -545,7 +548,7 @@ export default function EquipoDetalle() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className={esBaja ? 'opacity-60' : ''}>
         <CardHeader>
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4" />
@@ -577,8 +580,50 @@ export default function EquipoDetalle() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4" />
+            <CardTitle>Historial del equipo</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {timeline?.length > 0 ? (
+            <div className="space-y-3">
+              {timeline.map((ev, i) => {
+                const iconMap = {
+                  CREACION: Plus, ESTADO: Clock, ASIGNACION: Monitor,
+                  CESE: X, INCIDENCIA: AlertTriangle, INTERVENCION: Wrench, COMPONENTE: Cpu,
+                };
+                const Icon = iconMap[ev.Tipo] || Clock;
+                const colorMap = {
+                  CREACION: 'text-blue-500', ESTADO: 'text-gray-500', ASIGNACION: 'text-green-500',
+                  CESE: 'text-orange-500', INCIDENCIA: 'text-red-500', INTERVENCION: 'text-purple-500', COMPONENTE: 'text-cyan-500',
+                };
+                return (
+                  <div key={i} className="flex gap-3">
+                    <div className={`mt-0.5 ${colorMap[ev.Tipo] || 'text-muted-foreground'}`}>
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm">{ev.Descripcion}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {ev.Fecha ? formatDate(ev.Fecha) : ''}
+                        {ev.Usuario ? ` · ${ev.Usuario}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No hay eventos registrados para este equipo.</p>
+          )}
+        </CardContent>
+      </Card>
+
       {equipo.asignacion && (
-        <Card>
+        <Card className={esBaja ? 'opacity-60' : ''}>
           <CardHeader><CardTitle>Asignación Actual</CardTitle></CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -603,7 +648,15 @@ export default function EquipoDetalle() {
         </Card>
       )}
 
-      <Card>
+      {esBaja && (
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardContent className="py-4">
+            <p className="text-sm text-destructive font-medium">Este equipo está dado de baja. No se pueden realizar acciones sobre él.</p>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className={esBaja ? 'opacity-60' : ''}>
         <CardHeader><CardTitle>Historial de Asignaciones</CardTitle></CardHeader>
         <CardContent>
           {historial?.length > 0 ? (

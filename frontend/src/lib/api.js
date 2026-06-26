@@ -32,12 +32,14 @@ export const api = {
     create: (data) => request('/equipos', { method: 'POST', body: JSON.stringify(data) }),
     rapido: (data) => request('/equipos/rapido', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) => request(`/equipos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-    delete: (id) => request(`/equipos/${id}`, { method: 'DELETE' }),
+    baja: (id) => request(`/equipos/${id}/baja`, { method: 'POST' }),
+    timeline: (id) => request(`/equipos/${id}/timeline`),
     qr: (id) => request(`/equipos/${id}/qr`, { method: 'POST' }),
     tipos: {
       list: () => request('/equipos/tipos'),
       create: (data) => request('/equipos/tipos', { method: 'POST', body: JSON.stringify(data) }),
     },
+    tiposAsignables: () => request('/equipos/tipos-asignables'),
     dashboard: () => request('/equipos/dashboard'),
     intervenciones: {
       list: (id) => request(`/equipos/${id}/intervenciones`),

@@ -118,10 +118,6 @@ export const EquiposRepository = {
     await query(DB, 'UPDATE Tab_EQ_MaeEquipos SET Estado = @estado WHERE IdMaeEquipo = @id', { id, estado });
   },
 
-  async delete(id) {
-    await query(DB, 'DELETE FROM Tab_EQ_MaeEquipos WHERE IdMaeEquipo = @id', { id });
-  },
-
   async getTipoById(id) {
     const rows = await query(DB, 'SELECT * FROM Tab_EQ_TipodeEquipos WHERE IdTipodeEquipo = @id', { id });
     return rows[0] || null;
@@ -230,6 +226,105 @@ export const EquiposRepository = {
       INSERT INTO Tab_EQ_CaracteristicasEquipo (IdMaeEquipo, Clave, Valor, IdUsuarioCrea)
       VALUES (@idEquipo, @clave, @valor, @idUsuario)
     `, { idEquipo, clave, valor: valor || null, idUsuario: idUsuario || null });
+  },
+
+  async getTiposAsignables() {
+    const accesorios = ['TECLADO', 'MOUSE', 'CARGADOR', 'CABLE', 'ADAPTADOR', 'MOCHILA', 'AUDIFONOS'];
+    return query(DB, `
+      SELECT * FROM Tab_EQ_TipodeEquipos
+      WHERE Estado = 'ACTIVO'
+        AND DesTipodeEquipo NOT IN (${accesorios.map((_, i) => `@acc${i}`).join(', ')})
+      ORDER BY DesTipodeEquipo
+    `, Object.fromEntries(accesorios.map((a, i) => [`acc${i}`, a])));
+  },
+
+  async getTimeline(idEquipo) {
+    return query(DB, `
+      SELECT Fecha, Tipo, Descripcion, Usuario FROM (
+        SELECT
+          e.FecCreacion AS Fecha,
+          'CREACION' AS Tipo,
+          'Equipo creado' AS Descripcion,
+          CAST(NULL AS varchar(100)) AS Usuario,
+          e.FecCreacion AS Orden
+        FROM Tab_EQ_MaeEquipos e WHERE e.IdMaeEquipo = @id
+        UNION ALL
+        SELECT
+          h.FecCambio,
+          'ESTADO',
+          CONCAT('Cambio de ', ISNULL(h.EstadoAnterior, '(nuevo)'), ' a ', h.EstadoNuevo),
+          u.User_Fullname,
+          h.FecCambio
+        FROM Tab_EQ_MovEstadosEquipos h
+        LEFT JOIN Tab_SYS_Usuarios u ON h.IdUsuario = u.IdUsuario
+        WHERE h.IdMaeEquipo = @id
+        UNION ALL
+        SELECT
+          a.FecAsignacion,
+          'ASIGNACION',
+          CONCAT('Asignado a ', t.ApePaterno, ' ', t.ApeMaterno, ', ', t.Nombres),
+          u.User_Fullname,
+          a.FecAsignacion
+        FROM Tab_EQ_MovEquiposAsignaciones a
+        LEFT JOIN RH_Referentes r ON a.IdReferente = r.IdReferente
+        LEFT JOIN RH_TablaTrabajadores t ON r.IdTrabajador = t.IdTrabajador
+        LEFT JOIN Tab_SYS_Usuarios u ON a.IdUsuarioCrea = u.IdUsuario
+        WHERE a.IdMaeEquipo = @id
+        UNION ALL
+        SELECT
+          a.FecCese,
+          'CESE',
+          CONCAT('Cese de asignación: ', t.ApePaterno, ' ', t.ApeMaterno, ', ', t.Nombres),
+          u.User_Fullname,
+          a.FecCese
+        FROM Tab_EQ_MovEquiposAsignaciones a
+        LEFT JOIN RH_Referentes r ON a.IdReferente = r.IdReferente
+        LEFT JOIN RH_TablaTrabajadores t ON r.IdTrabajador = t.IdTrabajador
+        LEFT JOIN Tab_SYS_Usuarios u ON a.IdUsuarioModifica = u.IdUsuario
+        WHERE a.IdMaeEquipo = @id AND a.FecCese IS NOT NULL
+        UNION ALL
+        SELECT
+          i.FecIncidencia,
+          'INCIDENCIA',
+          CONCAT(i.TipoIncidencia, ': ', i.Descripcion),
+          u.User_Fullname,
+          i.FecIncidencia
+        FROM Tab_EQ_Incidencias i
+        LEFT JOIN Tab_SYS_Usuarios u ON i.IdUsuario = u.IdUsuario
+        WHERE i.IdMaeEquipo = @id
+        UNION ALL
+        SELECT
+          iv.FecIntervencion,
+          'INTERVENCION',
+          CONCAT(iv.TipoIntervencion, ': ', iv.Descripcion),
+          u.User_Fullname,
+          iv.FecIntervencion
+        FROM Tab_EQ_IntervencionesTecnicas iv
+        LEFT JOIN Tab_SYS_Usuarios u ON iv.IdUsuario = u.IdUsuario
+        WHERE iv.IdMaeEquipo = @id
+        UNION ALL
+        SELECT
+          mc.FecCreacion,
+          'COMPONENTE',
+          CONCAT('Componente ', mc.CodComponente, ' vinculado'),
+          u.User_Fullname,
+          mc.FecCreacion
+        FROM Tab_EQ_MovEquiposComponentes mc
+        LEFT JOIN Tab_SYS_Usuarios u ON mc.IdUsuarioCrea = u.IdUsuario
+        WHERE mc.IdMaeEquipo = @id AND mc.FecBaja IS NULL
+        UNION ALL
+        SELECT
+          mc.FecBaja,
+          'COMPONENTE',
+          CONCAT('Componente ', mc.CodComponente, ' desvinculado'),
+          u.User_Fullname,
+          mc.FecBaja
+        FROM Tab_EQ_MovEquiposComponentes mc
+        LEFT JOIN Tab_SYS_Usuarios u ON mc.IdUsuarioModifica = u.IdUsuario
+        WHERE mc.IdMaeEquipo = @id AND mc.FecBaja IS NOT NULL
+      ) t
+      ORDER BY Orden DESC
+    `, { id: idEquipo });
   },
 
   async upsertCaracteristicaPlantilla(idEquipo, idPlantilla, valor, idUsuario) {
