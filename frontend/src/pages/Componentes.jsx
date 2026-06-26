@@ -158,13 +158,11 @@ const initialForm = {
 const formatCategoria = (cat) => ({
   REPUESTO_TECNICO: 'Repuesto técnico',
   ACCESORIO: 'Accesorio',
-  CONSUMIBLE: 'Consumible',
 }[cat] || 'Sin categoría');
 
 const CATEGORIA_OPTS = [
   { value: 'REPUESTO_TECNICO', label: 'Repuesto técnico' },
   { value: 'ACCESORIO', label: 'Accesorio' },
-  { value: 'CONSUMIBLE', label: 'Consumible' },
 ];
 
 function CategoriaBadge({ categoria }) {
@@ -266,8 +264,8 @@ export default function Componentes() {
     });
   }, [categoriaNuevo, tipos]);
 
-  const selectedTipo = tipos?.find((t) => String(t.IdTipodeComponente) === String(form.IdTipodeComponente));
-  const selectedTypeName = normalizeTypeName(selectedTipo?.DesTipodeComponente);
+  const selectedTipo = tipos?.find((t) => String(t.IdTipodeComponente) === String(form.IdTipodeComponente)) || null;
+  const selectedTypeName = normalizeTypeName(selectedTipo?.DesTipodeComponente || '');
   const typeConfig = componentTypeConfig[selectedTypeName] || defaultTypeConfig;
   const autoDescription = buildAutoDescription(
     selectedTipo?.DesTipodeComponente,
@@ -276,12 +274,15 @@ export default function Componentes() {
     form.Capacidad
   );
 
+  const categoriaLabel = categoriaNuevo ? formatCategoria(categoriaNuevo) : '';
+
   const createMutation = useMutation({
     mutationFn: api.componentes.createQuick,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['componentes'] });
       setShowModal(false);
       setForm({ ...initialForm });
+      setCategoriaNuevo('');
     },
   });
 
@@ -388,7 +389,7 @@ export default function Componentes() {
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Seleccionar categoría">
-                    {categoriaNuevo ? formatCategoria(categoriaNuevo) : null}
+                    {categoriaLabel || null}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
@@ -419,7 +420,7 @@ export default function Componentes() {
                   ))}
                   {tiposFiltrados.length === 0 && categoriaNuevo && (
                     <div className="px-2 py-4 text-xs text-muted-foreground text-center">
-                      No hay tipos disponibles para esta categoría
+                      No hay tipos disponibles para {categoriaLabel.toLowerCase()}
                     </div>
                   )}
                 </SelectContent>

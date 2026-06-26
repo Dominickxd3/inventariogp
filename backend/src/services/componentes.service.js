@@ -137,16 +137,9 @@ export const ComponentesService = {
 
   async getDetalle(id) {
     if (!Number.isInteger(id) || id <= 0) throw businessError('ID de componente inválido', 400);
-    const comp = await ComponentesRepository.getById(id);
-    if (!comp) throw businessError('Componente no encontrado', 404);
-    try {
-      const usoActual = await ComponentesRepository.getUsoActual(id);
-      const timeline = await ComponentesRepository.getTimeline(id);
-      return { ...comp, usoActual, timeline };
-    } catch (innerErr) {
-      console.error('[getDetalle] Error interno al obtener usoActual/timeline:', innerErr.message);
-      throw innerErr;
-    }
+    const detalle = await ComponentesRepository.getDetalleById(id);
+    if (!detalle?.componente) throw businessError('Componente no encontrado', 404);
+    return detalle;
   },
 
   async baja(id) {

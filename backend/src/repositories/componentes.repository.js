@@ -201,58 +201,192 @@ export const ComponentesRepository = {
     await query(DB, "UPDATE Tab_EQ_Componentes SET Estado = 'BAJA' WHERE IdComponente = @id", { id });
   },
 
-  async getUsoActual(idComponente) {
+  async getDetalleById(id) {
+    const rows = await query(DB, `
+      SELECT
+        c.IdComponente, c.CodComponente, c.DesComponente,
+        c.Marca, c.Modelo, c.Serie, c.Lote, c.Capacidad, c.Obs, c.Estado,
+        tc.IdTipodeComponente,
+        tc.DesTipodeComponente AS TipoComponente,
+        tc.Categoria
+      FROM Tab_EQ_Componentes c
+      LEFT JOIN Tab_EQ_TipodeComponentes tc ON c.IdTipodeComponente = tc.IdTipodeComponente
+      WHERE c.IdComponente = @id
+    `, { id });
+    const componente = rows[0] || null;
+    if (!componente) return { componente: null, usoActual: null, timeline: [] };
+
+    const usoActual = await this._getUsoActual(id, componente.Estado);
+    const timeline = await this._getTimeline(id);
+
+    return { componente, usoActual, timeline };
+  },
+
+  async _getUsoActual(idComponente, estado) {
+    if (estado === 'BAJA') {
+      return { tipo: 'BAJA', equipo: null, trabajador: null };
+    }
+
     const enEquipo = await query(DB, `
-      SELECT TOP 1 e.IdMaeEquipo, e.CodEquipo, e.CodBarra,
-             mc.IdMovEquipoComponente, mc.FecAsigComponente, mc.Estado AS RelEstado
+      SELECT TOP 1 e.IdMaeEquipo, e.CodEquipo, te.DesTipodeEquipo AS TipoEquipo,
+             e.Estado AS EstadoEquipo, mc.FecAsigComponente AS FechaInstalacion
       FROM Tab_EQ_MovEquiposComponentes mc
       JOIN Tab_EQ_MaeEquipos e ON mc.IdMaeEquipo = e.IdMaeEquipo
+      LEFT JOIN Tab_EQ_TipodeEquipos te ON e.IdTipodeEquipo = te.IdTipodeEquipo
       WHERE mc.IdComponente = @id AND mc.Estado = 'VIGENTE'
       ORDER BY mc.IdMovEquipoComponente DESC
     `, { id: idComponente });
-    if (enEquipo.length) return { tipo: 'EQUIPO', detalle: enEquipo[0] };
+    if (enEquipo.length) {
+      const e = enEquipo[0];
+      return {
+        tipo: 'EQUIPO',
+        equipo: {
+          IdMaeEquipo: e.IdMaeEquipo,
+          CodEquipo: e.CodEquipo,
+          TipoEquipo: e.TipoEquipo,
+          EstadoEquipo: e.EstadoEquipo,
+          FechaInstalacion: e.FechaInstalacion,
+        },
+        trabajador: null,
+      };
+    }
 
     const enTrabajador = await query(DB, `
-      SELECT TOP 1 t.IdTrabajador, t.Trabajador AS NombreTrabajador,
-             m.IdMovAccesorio, m.FecAsignacion
+      SELECT TOP 1 m.IdReferente, t.Trabajador AS NombreTrabajador,
+             t.DOI AS DNI, t.Area, t.Ocupacion AS Cargo,
+             m.FecAsignacion AS FechaAsignacion
       FROM Tab_EQ_MovAccesoriosTrabajador m
       JOIN Tab_EQ_Trabajadores t ON m.IdReferente = t.IdTrabajador
       WHERE m.IdComponente = @id AND m.Estado = 'VIGENTE'
       ORDER BY m.IdMovAccesorio DESC
     `, { id: idComponente });
-    if (enTrabajador.length) return { tipo: 'TRABAJADOR', detalle: enTrabajador[0] };
+    if (enTrabajador.length) {
+      const t = enTrabajador[0];
+      return {
+        tipo: 'TRABAJADOR',
+        equipo: null,
+        trabajador: {
+          IdReferente: t.IdReferente,
+          NombreTrabajador: t.NombreTrabajador,
+          DNI: t.DNI,
+          Area: t.Area,
+          Cargo: t.Cargo,
+          FechaAsignacion: t.FechaAsignacion,
+        },
+      };
+    }
 
-    return null;
+    return { tipo: 'DISPONIBLE', equipo: null, trabajador: null };
   },
 
-  async getTimeline(idComponente) {
+  async _getTimeline(idComponente) {
+    const entries = [];
+
     const movEquipos = await query(DB, `
-      SELECT 'EQUIPO' AS Tipo, mc.IdMovEquipoComponente AS IdMov,
-             mc.FecAsigComponente AS FechaInicio, mc.FecBajaComponente AS FechaFin,
-             mc.Estado, mc.Obs, mc.Motivo, mc.OrigenVinculo,
-             e.CodEquipo, e.CodBarra AS DesEquipo
+      SELECT 'VINCULADO_EQUIPO' AS Tipo, mc.IdMovEquipoComponente AS IdMov,
+             mc.FecAsigComponente AS Fecha, mc.Obs AS Descripcion,
+             e.CodEquipo
       FROM Tab_EQ_MovEquiposComponentes mc
       JOIN Tab_EQ_MaeEquipos e ON mc.IdMaeEquipo = e.IdMaeEquipo
-      WHERE mc.IdComponente = @id
+      WHERE mc.IdComponente = @id AND mc.Estado = 'VIGENTE'
       ORDER BY mc.FecAsigComponente DESC
     `, { id: idComponente });
+    for (const r of movEquipos) {
+      entries.push({
+        fecha: r.Fecha,
+        tipo: 'VINCULADO_EQUIPO',
+        titulo: 'Vinculado a equipo',
+        descripcion: `Componente vinculado al equipo ${r.CodEquipo}`,
+      });
+    }
+
+    const movEquiposBaja = await query(DB, `
+      SELECT 'DESVINCULADO_EQUIPO' AS Tipo, mc.IdMovEquipoComponente AS IdMov,
+             mc.FecBajaComponente AS Fecha, mc.Motivo AS Descripcion,
+             e.CodEquipo
+      FROM Tab_EQ_MovEquiposComponentes mc
+      JOIN Tab_EQ_MaeEquipos e ON mc.IdMaeEquipo = e.IdMaeEquipo
+      WHERE mc.IdComponente = @id AND mc.Estado = 'BAJA'
+        AND mc.FecBajaComponente IS NOT NULL
+      ORDER BY mc.FecBajaComponente DESC
+    `, { id: idComponente });
+    for (const r of movEquiposBaja) {
+      entries.push({
+        fecha: r.Fecha,
+        tipo: 'DESVINCULADO_EQUIPO',
+        titulo: 'Desvinculado de equipo',
+        descripcion: `Componente retirado del equipo ${r.CodEquipo}${r.Descripcion ? ` — ${r.Descripcion}` : ''}`,
+      });
+    }
 
     const movAcc = await query(DB, `
-      SELECT 'TRABAJADOR' AS Tipo, m.IdMovAccesorio AS IdMov,
-             m.FecAsignacion AS FechaInicio, m.FecCese AS FechaFin,
-             m.Estado, m.Obs, NULL AS Motivo, NULL AS OrigenVinculo,
-             NULL AS CodEquipo, t.Trabajador AS DesEquipo
+      SELECT 'ASIGNADO_TRABAJADOR' AS Tipo, m.IdMovAccesorio AS IdMov,
+             m.FecAsignacion AS Fecha, NULL AS Descripcion,
+             t.Trabajador AS Nombre
       FROM Tab_EQ_MovAccesoriosTrabajador m
       JOIN Tab_EQ_Trabajadores t ON m.IdReferente = t.IdTrabajador
-      WHERE m.IdComponente = @id
+      WHERE m.IdComponente = @id AND m.Estado = 'VIGENTE'
       ORDER BY m.FecAsignacion DESC
     `, { id: idComponente });
+    for (const r of movAcc) {
+      entries.push({
+        fecha: r.Fecha,
+        tipo: 'ASIGNADO_TRABAJADOR',
+        titulo: 'Asignado a trabajador',
+        descripcion: `Asignado a ${r.Nombre}`,
+      });
+    }
 
-    return [...movEquipos, ...movAcc].sort((a, b) => {
-      const da = a.FechaInicio ? new Date(a.FechaInicio) : new Date(0);
-      const db = b.FechaInicio ? new Date(b.FechaInicio) : new Date(0);
+    const movAccCesado = await query(DB, `
+      SELECT 'CESADO_TRABAJADOR' AS Tipo, m.IdMovAccesorio AS IdMov,
+             m.FecCese AS Fecha, NULL AS Descripcion,
+             t.Trabajador AS Nombre
+      FROM Tab_EQ_MovAccesoriosTrabajador m
+      JOIN Tab_EQ_Trabajadores t ON m.IdReferente = t.IdTrabajador
+      WHERE m.IdComponente = @id AND m.Estado = 'CESADO'
+        AND m.FecCese IS NOT NULL
+      ORDER BY m.FecCese DESC
+    `, { id: idComponente });
+    for (const r of movAccCesado) {
+      entries.push({
+        fecha: r.Fecha,
+        tipo: 'CESADO_TRABAJADOR',
+        titulo: 'Cesado de trabajador',
+        descripcion: `Cesado de ${r.Nombre}`,
+      });
+    }
+
+    // Intervenciones técnicas (no falla si la tabla no existe)
+    try {
+      const intervenciones = await query(DB, `
+        SELECT 'INTERVENCION' AS Tipo, i.IdIntervencion AS IdMov,
+               i.FecIntervencion AS Fecha, i.Descripcion,
+               e.CodEquipo,
+               CASE WHEN i.IdComponenteInstalado = @id THEN 'instalado' ELSE 'retirado' END AS Rol
+        FROM Tab_EQ_IntervencionesTecnicas i
+        JOIN Tab_EQ_MaeEquipos e ON i.IdMaeEquipo = e.IdMaeEquipo
+        WHERE i.IdComponenteInstalado = @id OR i.IdComponenteRetirado = @id
+        ORDER BY i.FecIntervencion DESC
+      `, { id: idComponente });
+      for (const r of intervenciones) {
+        entries.push({
+          fecha: r.Fecha,
+          tipo: 'INTERVENCION',
+          titulo: 'Intervención técnica',
+          descripcion: `Componente ${r.Rol} durante intervención en equipo ${r.CodEquipo} — ${r.Descripcion}`,
+        });
+      }
+    } catch (_) {
+      // Tabla o columnas no existen, se omite
+    }
+
+    entries.sort((a, b) => {
+      const da = a.fecha ? new Date(a.fecha) : new Date(0);
+      const db = b.fecha ? new Date(b.fecha) : new Date(0);
       return db - da;
     });
+
+    return entries;
   },
 
   async listAccesoriosPorTrabajador(idTrabajador) {
