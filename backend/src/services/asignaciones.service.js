@@ -7,6 +7,16 @@ import { withTransaction, createRequest, query } from '../config/db.js';
 const DB = 'InventarioGP';
 const fec = () => new Date().toISOString().split('T')[0];
 
+// Helpers transaccionales seguros para mssql
+const trxRows = async (trx, sqlText, params = {}) => {
+  const result = await createRequest(trx, params).query(sqlText);
+  return result.recordset || [];
+};
+
+const trxExec = async (trx, sqlText, params = {}) => {
+  await createRequest(trx, params).query(sqlText);
+};
+
 const MOTIVO_TO_ESTADO = {
   DEVUELTO_BUEN_ESTADO: 'DISPONIBLE',
   DEVUELTO_CON_DANO: 'MANTENIMIENTO',
@@ -48,29 +58,27 @@ export const AsignacionesService = {
     await validarTrabajador(data.IdReferente);
 
     return withTransaction(DB, async (trx) => {
-      const req = (sql, p) => createRequest(trx, p).query(sql);
-
-      const [asig] = await req(`
+      const rows = await trxRows(trx, `
         INSERT INTO Tab_EQ_MovEquiposAsignaciones (IdMaeEquipo, IdReferente, FecAsignacion, Obs, Estado, EstadoFisicoEntrega, ObservacionesEntrega)
         OUTPUT INSERTED.IdMovEquipoAsignacion
         VALUES (@idEquipo, @idTrabajador, @fec, @obs, 'VIGENTE', @estadoFisico, @obsEntrega)
       `, { idEquipo: data.IdMaeEquipo, idTrabajador: data.IdReferente, fec: fec(), obs: data.Obs || null, estadoFisico: data.EstadoFisicoEntrega || null, obsEntrega: data.ObservacionesEntrega || null });
-      const idAsig = asig.IdMovEquipoAsignacion;
+      const idAsig = rows[0].IdMovEquipoAsignacion;
 
-      await req(`UPDATE Tab_EQ_MaeEquipos SET Estado = 'ASIGNADO' WHERE IdMaeEquipo = @id`, { id: data.IdMaeEquipo });
+      await trxExec(trx, `UPDATE Tab_EQ_MaeEquipos SET Estado = 'ASIGNADO' WHERE IdMaeEquipo = @id`, { id: data.IdMaeEquipo });
 
-      await req(`
+      await trxExec(trx, `
         INSERT INTO Tab_EQ_MovEstadosEquipos (IdMaeEquipo, EstadoAnterior, EstadoNuevo, IdUsuario, Obs)
         VALUES (@idEquipo, @estadoAnt, 'ASIGNADO', @idUsuario, 'Equipo asignado')
       `, { idEquipo: data.IdMaeEquipo, estadoAnt: equipo.Estado, idUsuario: data.IdUsuario || null });
 
       if (data.componentes?.length) {
         for (const comp of data.componentes) {
-          await req(`
+          await trxExec(trx, `
             INSERT INTO Tab_EQ_MovEquiposComponentes (IdMaeEquipo, IdComponente, Obs, Estado)
             VALUES (@idEquipo, @idComponente, @obs, 'VIGENTE')
           `, { idEquipo: data.IdMaeEquipo, idComponente: comp.IdComponente, obs: comp.Obs || null });
-          await req(`UPDATE Tab_EQ_Componentes SET Estado = 'ASIGNADO' WHERE IdComponente = @id`, { id: comp.IdComponente });
+          await trxExec(trx, `UPDATE Tab_EQ_Componentes SET Estado = 'ASIGNADO' WHERE IdComponente = @id`, { id: comp.IdComponente });
         }
       }
 
@@ -99,9 +107,7 @@ export const AsignacionesService = {
     const obsCese = data?.ObservacionesDevolucion || null;
 
     return withTransaction(DB, async (trx) => {
-      const req = (sql, p) => createRequest(trx, p).query(sql);
-
-      await req(`
+      await trxExec(trx, `
         UPDATE Tab_EQ_MovEquiposAsignaciones
         SET Estado = 'CESADO', FecCese = GETDATE(),
             EstadoFisicoDevolucion = @estadoFisico,
@@ -114,8 +120,8 @@ export const AsignacionesService = {
         obsDev: obsCese,
         motivo,
       });
-      await req(`UPDATE Tab_EQ_MaeEquipos SET Estado = @nuevoEstado WHERE IdMaeEquipo = @id`, { id: asig.IdMaeEquipo, nuevoEstado });
-      await req(`
+      await trxExec(trx, `UPDATE Tab_EQ_MaeEquipos SET Estado = @nuevoEstado WHERE IdMaeEquipo = @id`, { id: asig.IdMaeEquipo, nuevoEstado });
+      await trxExec(trx, `
         INSERT INTO Tab_EQ_MovEstadosEquipos (IdMaeEquipo, EstadoAnterior, EstadoNuevo, IdUsuario, Obs)
         VALUES (@idEquipo, 'ASIGNADO', @nuevoEstado, @idUsuario, @obs)
       `, { idEquipo: asig.IdMaeEquipo, nuevoEstado, idUsuario: idUsuario || null, obs: motivo ? `Cese: ${motivo}` : 'Asignación finalizada' });
@@ -126,16 +132,16 @@ export const AsignacionesService = {
           if (accion === 'MANTENER') continue;
 
           if (accion === 'DISPONIBLE') {
-            await req(`UPDATE Tab_EQ_MovAccesoriosTrabajador SET Estado = 'CESADO', FecCese = GETDATE() WHERE IdMovAccesorio = @id`, { id: idMovAccesorio });
-            const [comp] = await req(`SELECT IdComponente FROM Tab_EQ_MovAccesoriosTrabajador WHERE IdMovAccesorio = @id`, { id: idMovAccesorio });
-            if (comp) {
-              await req(`UPDATE Tab_EQ_Componentes SET Estado = 'DISPONIBLE' WHERE IdComponente = @id`, { id: comp.IdComponente });
+            await trxExec(trx, `UPDATE Tab_EQ_MovAccesoriosTrabajador SET Estado = 'CESADO', FecCese = GETDATE() WHERE IdMovAccesorio = @id`, { id: idMovAccesorio });
+            const compRows = await trxRows(trx, `SELECT IdComponente FROM Tab_EQ_MovAccesoriosTrabajador WHERE IdMovAccesorio = @id`, { id: idMovAccesorio });
+            if (compRows[0]) {
+              await trxExec(trx, `UPDATE Tab_EQ_Componentes SET Estado = 'DISPONIBLE' WHERE IdComponente = @id`, { id: compRows[0].IdComponente });
             }
           } else if (accion === 'BAJA' || accion === 'PERDIDO') {
-            await req(`UPDATE Tab_EQ_MovAccesoriosTrabajador SET Estado = '${accion}', FecCese = GETDATE() WHERE IdMovAccesorio = @id`, { id: idMovAccesorio });
-            const [comp] = await req(`SELECT IdComponente FROM Tab_EQ_MovAccesoriosTrabajador WHERE IdMovAccesorio = @id`, { id: idMovAccesorio });
-            if (comp) {
-              await req(`UPDATE Tab_EQ_Componentes SET Estado = 'BAJA' WHERE IdComponente = @id`, { id: comp.IdComponente });
+            await trxExec(trx, `UPDATE Tab_EQ_MovAccesoriosTrabajador SET Estado = '${accion}', FecCese = GETDATE() WHERE IdMovAccesorio = @id`, { id: idMovAccesorio });
+            const compRows = await trxRows(trx, `SELECT IdComponente FROM Tab_EQ_MovAccesoriosTrabajador WHERE IdMovAccesorio = @id`, { id: idMovAccesorio });
+            if (compRows[0]) {
+              await trxExec(trx, `UPDATE Tab_EQ_Componentes SET Estado = 'BAJA' WHERE IdComponente = @id`, { id: compRows[0].IdComponente });
             }
           }
         }
@@ -156,19 +162,18 @@ export const AsignacionesService = {
     }
 
     return withTransaction(DB, async (trx) => {
-      const req = (sql, p) => createRequest(trx, p).query(sql);
       const results = [];
 
       for (const idEquipo of IdMaeEquipos) {
-        const [asig] = await req(`
+        const rows = await trxRows(trx, `
           INSERT INTO Tab_EQ_MovEquiposAsignaciones (IdMaeEquipo, IdReferente, FecAsignacion, Obs, Estado, EstadoFisicoEntrega, ObservacionesEntrega)
           OUTPUT INSERTED.IdMovEquipoAsignacion
           VALUES (@idEquipo, @idTrabajador, @fec, @obs, 'VIGENTE', @estadoFisico, @obsEntrega)
         `, { idEquipo, idTrabajador: IdReferente, fec: fec(), obs: Obs || null, estadoFisico: data.EstadoFisicoEntrega || null, obsEntrega: data.ObservacionesEntrega || null });
-        const idAsig = asig.IdMovEquipoAsignacion;
+        const idAsig = rows[0].IdMovEquipoAsignacion;
 
-        await req(`UPDATE Tab_EQ_MaeEquipos SET Estado = 'ASIGNADO' WHERE IdMaeEquipo = @id`, { id: idEquipo });
-        await req(`
+        await trxExec(trx, `UPDATE Tab_EQ_MaeEquipos SET Estado = 'ASIGNADO' WHERE IdMaeEquipo = @id`, { id: idEquipo });
+        await trxExec(trx, `
           INSERT INTO Tab_EQ_MovEstadosEquipos (IdMaeEquipo, EstadoAnterior, EstadoNuevo, IdUsuario, Obs)
           VALUES (@idEquipo, 'DISPONIBLE', 'ASIGNADO', @idUsuario, 'Asignación múltiple')
         `, { idEquipo, idUsuario: idUsuario || null });
@@ -208,24 +213,22 @@ export const AsignacionesService = {
     }
 
     return withTransaction(DB, async (trx) => {
-      const req = (sql, p) => createRequest(trx, p).query(sql);
-
-      const [asigResult] = await req(`
+      const rows = await trxRows(trx, `
         INSERT INTO Tab_EQ_MovEquiposAsignaciones (IdMaeEquipo, IdReferente, FecAsignacion, Obs, Estado, EstadoFisicoEntrega, ObservacionesEntrega)
         OUTPUT INSERTED.IdMovEquipoAsignacion
         VALUES (@idEquipo, @idTrabajador, @fec, @obs, 'VIGENTE', @estadoFisico, @obsEntrega)
       `, { idEquipo: IdMaeEquipo, idTrabajador: IdReferente, fec: fec(), obs: Obs || null, estadoFisico: data.EstadoFisicoEntrega || null, obsEntrega: data.ObservacionesEntrega || null });
-      const idAsig = asigResult.IdMovEquipoAsignacion;
+      const idAsig = rows[0].IdMovEquipoAsignacion;
 
-      await req(`UPDATE Tab_EQ_MaeEquipos SET Estado = 'ASIGNADO' WHERE IdMaeEquipo = @id`, { id: IdMaeEquipo });
+      await trxExec(trx, `UPDATE Tab_EQ_MaeEquipos SET Estado = 'ASIGNADO' WHERE IdMaeEquipo = @id`, { id: IdMaeEquipo });
 
-      await req(`
+      await trxExec(trx, `
         INSERT INTO Tab_EQ_MovEstadosEquipos (IdMaeEquipo, EstadoAnterior, EstadoNuevo, IdUsuario, Obs)
         VALUES (@idEquipo, @estadoAnt, 'ASIGNADO', @idUsuario, 'Equipo asignado con accesorios')
       `, { idEquipo: IdMaeEquipo, estadoAnt: equipo.Estado, idUsuario: IdUsuario || null });
 
       for (const acc of accsValidos) {
-        await req(`
+        await trxExec(trx, `
           INSERT INTO Tab_EQ_MovAccesoriosTrabajador
             (IdComponente, IdReferente, FecAsignacion, Obs, Estado, IdUsuarioCrea, IdMovEquipoAsignacion)
           VALUES (@idComponente, @idTrabajador, @fec, @obs, 'VIGENTE', @idUsuario, @idAsig)
@@ -238,7 +241,7 @@ export const AsignacionesService = {
           idAsig,
         });
 
-        await req(`UPDATE Tab_EQ_Componentes SET Estado = 'ASIGNADO' WHERE IdComponente = @id`, { id: acc.IdComponente });
+        await trxExec(trx, `UPDATE Tab_EQ_Componentes SET Estado = 'ASIGNADO' WHERE IdComponente = @id`, { id: acc.IdComponente });
       }
 
       return { idAsig, equipo: IdMaeEquipo, accesorios: accsValidos.length };
@@ -252,24 +255,34 @@ export const AsignacionesService = {
     const accs = await ComponentesRepository.listAccesoriosPorTrabajador(idTrabajador);
 
     return withTransaction(DB, async (trx) => {
-      const req = (sql, p) => createRequest(trx, p).query(sql);
-
       for (const asig of activas) {
-        await req(`UPDATE Tab_EQ_MovEquiposAsignaciones SET Estado = 'CESADO', FecCese = GETDATE() WHERE IdMovEquipoAsignacion = @id`, { id: asig.IdMovEquipoAsignacion });
-        await req(`UPDATE Tab_EQ_MaeEquipos SET Estado = 'DISPONIBLE' WHERE IdMaeEquipo = @id`, { id: asig.IdMaeEquipo });
-        await req(`
+        await trxExec(trx, `UPDATE Tab_EQ_MovEquiposAsignaciones SET Estado = 'CESADO', FecCese = GETDATE() WHERE IdMovEquipoAsignacion = @id`, { id: asig.IdMovEquipoAsignacion });
+        await trxExec(trx, `UPDATE Tab_EQ_MaeEquipos SET Estado = 'DISPONIBLE' WHERE IdMaeEquipo = @id`, { id: asig.IdMaeEquipo });
+        await trxExec(trx, `
           INSERT INTO Tab_EQ_MovEstadosEquipos (IdMaeEquipo, EstadoAnterior, EstadoNuevo, IdUsuario, Obs)
           VALUES (@idEquipo, 'ASIGNADO', 'DISPONIBLE', @idUsuario, 'Asignación finalizada (desasignación masiva)')
         `, { idEquipo: asig.IdMaeEquipo, idUsuario: idUsuario || null });
       }
 
       for (const acc of accs) {
-        await req(`UPDATE Tab_EQ_MovAccesoriosTrabajador SET Estado = 'CESADO', FecCese = GETDATE() WHERE IdMovAccesorio = @id`, { id: acc.IdMovAccesorio });
-        await req(`UPDATE Tab_EQ_Componentes SET Estado = 'DISPONIBLE' WHERE IdComponente = @id`, { id: acc.IdComponente });
+        await trxExec(trx, `UPDATE Tab_EQ_MovAccesoriosTrabajador SET Estado = 'CESADO', FecCese = GETDATE() WHERE IdMovAccesorio = @id`, { id: acc.IdMovAccesorio });
+        await trxExec(trx, `UPDATE Tab_EQ_Componentes SET Estado = 'DISPONIBLE' WHERE IdComponente = @id`, { id: acc.IdComponente });
       }
 
       return { count: activas.length, accesoriosCesados: accs.length };
     });
+  },
+
+  async getHistorialByEquipo(idEquipo) {
+    return AsignacionesRepository.getHistorialByEquipo(idEquipo);
+  },
+
+  async getHistorialByTrabajador(idTrabajador) {
+    return AsignacionesRepository.getHistorialByTrabajador(idTrabajador);
+  },
+
+  async getActivasByTrabajador(idTrabajador) {
+    return AsignacionesRepository.getActivasByTrabajador(idTrabajador);
   },
 
   async getActa(id) {

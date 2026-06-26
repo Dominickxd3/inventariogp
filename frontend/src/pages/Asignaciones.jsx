@@ -155,6 +155,21 @@ export default function Asignaciones() {
     });
   };
 
+  const abrirActa = async (id) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/asignaciones/${id}/acta`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Error al generar acta');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch (e) {
+      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo generar el acta' });
+    }
+  };
+
   const rows = asignaciones?.rows || [];
   const totalPages = asignaciones?.totalPages || 1;
 
@@ -197,7 +212,7 @@ export default function Asignaciones() {
                     <XCircle className="w-3 h-3" /> Cesar
                   </Button>
                 )}
-                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); window.open(api.asignaciones.acta(row.IdMovEquipoAsignacion), '_blank'); }}>
+                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); abrirActa(row.IdMovEquipoAsignacion); }}>
                   <Printer className="w-3 h-3" /> Acta
                 </Button>
               </div>
@@ -369,7 +384,10 @@ function AsignarForm({ onSuccess, equipoInicial }) {
       onSuccess();
       Swal.fire({ icon: 'success', title: 'Equipos asignados', text: `${selectedEquipos.length} equipo(s) asignado(s) correctamente`, timer: 2000, showConfirmButton: false });
     },
-    onError: (err) => Swal.fire({ icon: 'error', title: 'Error al asignar', text: err.message }),
+    onError: (err) => {
+      console.error('Error al asignar:', err);
+      Swal.fire({ icon: 'error', title: 'Error al asignar', text: 'No se pudo crear la asignación. Verifica los datos e intenta nuevamente.' });
+    },
   });
 
   const asignarConAccMutation = useMutation({
@@ -378,7 +396,10 @@ function AsignarForm({ onSuccess, equipoInicial }) {
       onSuccess();
       Swal.fire({ icon: 'success', title: 'Asignación completada', text: `Equipo y ${resp.accesorios} accesorio(s) asignados`, timer: 2000, showConfirmButton: false });
     },
-    onError: (err) => Swal.fire({ icon: 'error', title: 'Error', text: err.message }),
+    onError: (err) => {
+      console.error('Error al asignar con accesorios:', err);
+      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo crear la asignación. Verifica los datos e intenta nuevamente.' });
+    },
   });
 
   const toggleEquipo = (eq) => {

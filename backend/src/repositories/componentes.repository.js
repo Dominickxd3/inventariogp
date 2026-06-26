@@ -142,36 +142,39 @@ export const ComponentesRepository = {
 
   async asignarAEquipo(idEquipo, idComponente, obs, origenVinculo, motivo, idIntervencion) {
     return withTransaction(DB, async (trx) => {
-      const req = (params) => createRequest(trx, params);
-      const vigente = await req({ idComponente }).query(`
+      const trxRows = async (sqlText, params = {}) => {
+        const r = await createRequest(trx, params).query(sqlText);
+        return r.recordset || [];
+      };
+      const trxExec = async (sqlText, params = {}) => {
+        await createRequest(trx, params).query(sqlText);
+      };
+
+      const vigente = await trxRows(`
         SELECT TOP 1 IdMovEquipoComponente, IdMaeEquipo
         FROM Tab_EQ_MovEquiposComponentes
         WHERE IdComponente = @idComponente AND Estado = 'VIGENTE'
         ORDER BY IdMovEquipoComponente DESC
-      `);
+      `, { idComponente });
       if (vigente.length > 0) {
         throw new Error('El componente ya está vinculado a otro equipo');
       }
 
-      const result = await req({
+      const result = await trxRows(`
+        INSERT INTO Tab_EQ_MovEquiposComponentes
+          (IdMaeEquipo, IdComponente, FecAsigComponente, Obs, Estado, OrigenVinculo, Motivo, FecInstalacion, IdIntervencion)
+        OUTPUT INSERTED.IdMovEquipoComponente
+        VALUES (@idEquipo, @idComponente, GETDATE(), @obs, 'VIGENTE', @origenVinculo, @motivo, GETDATE(), @idIntervencion)
+      `, {
         idEquipo,
         idComponente,
         obs: obs || null,
         origenVinculo: origenVinculo || null,
         motivo: motivo || null,
         idIntervencion: idIntervencion || null,
-      }).query(`
-        INSERT INTO Tab_EQ_MovEquiposComponentes
-          (IdMaeEquipo, IdComponente, FecAsigComponente, Obs, Estado, OrigenVinculo, Motivo, FecInstalacion, IdIntervencion)
-        OUTPUT INSERTED.IdMovEquipoComponente
-        VALUES (@idEquipo, @idComponente, GETDATE(), @obs, 'VIGENTE', @origenVinculo, @motivo, GETDATE(), @idIntervencion)
-      `);
+      });
 
-      await req({ id: idComponente }).query(`
-        UPDATE Tab_EQ_Componentes
-        SET Estado = 'ASIGNADO'
-        WHERE IdComponente = @id
-      `);
+      await trxExec(`UPDATE Tab_EQ_Componentes SET Estado = 'ASIGNADO' WHERE IdComponente = @id`, { id: idComponente });
 
       return result[0]?.IdMovEquipoComponente;
     });
