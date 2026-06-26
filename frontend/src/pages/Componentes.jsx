@@ -166,6 +166,7 @@ const CATEGORIA_OPTS = [
 ];
 
 function CategoriaBadge({ categoria }) {
+  const cat = String(categoria ?? '');
   const colors = {
     REPUESTO_TECNICO: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
     ACCESORIO: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
@@ -177,8 +178,8 @@ function CategoriaBadge({ categoria }) {
     CONSUMIBLE: 'Consumible',
   };
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colors[categoria] || 'bg-gray-100 text-gray-800'}`}>
-      {label[categoria] || categoria || 'Otro'}
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colors[cat] || 'bg-gray-100 text-gray-800'}`}>
+      {label[cat] || cat || 'Otro'}
     </span>
   );
 }
@@ -259,7 +260,7 @@ export default function Componentes() {
   const tiposFiltrados = useMemo(() => {
     if (!categoriaNuevo || !tipos) return [];
     return tipos.filter((t) => {
-      const cat = (t.Categoria || '').trim().toUpperCase();
+      const cat = String(t.Categoria ?? '').trim().toUpperCase();
       return cat === categoriaNuevo;
     });
   }, [categoriaNuevo, tipos]);
