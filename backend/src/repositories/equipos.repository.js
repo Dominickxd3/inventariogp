@@ -101,16 +101,13 @@ export const EquiposRepository = {
   async update(id, data) {
     await query(DB, `
       UPDATE Tab_EQ_MaeEquipos
-      SET CodEquipo = @codEquipo, IdTipodeEquipo = @idTipo, CodBarra = @codBarra,
-          Obs = @obs, Estado = @estado
+      SET IdTipodeEquipo = @idTipo, CodBarra = @codBarra, Obs = @obs
       WHERE IdMaeEquipo = @id
     `, {
       id,
-      codEquipo: data.CodEquipo,
       idTipo: data.IdTipodeEquipo,
       codBarra: data.CodBarra,
       obs: data.Obs,
-      estado: data.Estado,
     });
   },
 
@@ -262,24 +259,22 @@ export const EquiposRepository = {
         SELECT
           a.FecAsignacion,
           'ASIGNACION',
-          CONCAT('Asignado a ', t.ApePaterno, ' ', t.ApeMaterno, ', ', t.Nombres),
+          ISNULL(CONCAT('Asignado a ', tr.Trabajador), CONCAT('Asignado a ID: ', a.IdReferente)),
           u.User_Fullname,
           a.FecAsignacion
         FROM Tab_EQ_MovEquiposAsignaciones a
-        LEFT JOIN RH_Referentes r ON a.IdReferente = r.IdReferente
-        LEFT JOIN RH_TablaTrabajadores t ON r.IdTrabajador = t.IdTrabajador
+        LEFT JOIN Tab_EQ_Trabajadores tr ON a.IdReferente = tr.IdTrabajador
         LEFT JOIN Tab_SYS_Usuarios u ON a.IdUsuarioCrea = u.IdUsuario
         WHERE a.IdMaeEquipo = @id
         UNION ALL
         SELECT
           a.FecCese,
           'CESE',
-          CONCAT('Cese de asignación: ', t.ApePaterno, ' ', t.ApeMaterno, ', ', t.Nombres),
+          ISNULL(CONCAT('Cese de asignación: ', tr.Trabajador), CONCAT('Cese de asignación ID: ', a.IdReferente)),
           u.User_Fullname,
           a.FecCese
         FROM Tab_EQ_MovEquiposAsignaciones a
-        LEFT JOIN RH_Referentes r ON a.IdReferente = r.IdReferente
-        LEFT JOIN RH_TablaTrabajadores t ON r.IdTrabajador = t.IdTrabajador
+        LEFT JOIN Tab_EQ_Trabajadores tr ON a.IdReferente = tr.IdTrabajador
         LEFT JOIN Tab_SYS_Usuarios u ON a.IdUsuarioModifica = u.IdUsuario
         WHERE a.IdMaeEquipo = @id AND a.FecCese IS NOT NULL
         UNION ALL

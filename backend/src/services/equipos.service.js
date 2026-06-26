@@ -6,6 +6,21 @@ import { IntervencionesRepository } from '../repositories/intervenciones.reposit
 import { withTransaction, createRequest } from '../config/db.js';
 import QRCode from 'qrcode';
 
+const TIPOS_NO_EQUIPO = [
+  'TECLADO', 'MOUSE', 'CARGADOR', 'CABLE', 'ADAPTADOR', 'MOCHILA', 'AUDIFONOS', 'AUDÍFONOS',
+];
+
+function esTipoNoEquipo(tipo) {
+  const nombre = (tipo.DesTipodeEquipo || tipo.CodTipodeEquipo || '').toUpperCase().trim();
+  return TIPOS_NO_EQUIPO.some(t => nombre === t || nombre === t.normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+}
+
+function validarNoBaja(equipo) {
+  if (equipo.Estado === 'BAJA') {
+    throw new Error('No se puede editar un equipo dado de baja.');
+  }
+}
+
 export const EquiposService = {
   async list(filtros) {
     return EquiposRepository.listAll(filtros);
@@ -33,6 +48,11 @@ export const EquiposService = {
   },
 
   async create(data) {
+    const tipo = await EquiposRepository.getTipoById(data.IdTipodeEquipo);
+    if (tipo && esTipoNoEquipo(tipo)) {
+      throw new Error('Este tipo debe registrarse como accesorio/componente, no como equipo principal.');
+    }
+
     const existente = await EquiposRepository.getByCodEquipo(data.CodEquipo);
     if (existente) throw new Error(`Ya existe un equipo con el código ${data.CodEquipo}`);
 
@@ -46,6 +66,10 @@ export const EquiposService = {
   },
 
   async update(id, data) {
+    const equipo = await EquiposRepository.getById(id);
+    if (!equipo) throw new Error('Equipo no encontrado');
+    validarNoBaja(equipo);
+
     const safeData = { ...data };
     delete safeData.CodEquipo;
     delete safeData.Estado;
@@ -67,6 +91,7 @@ export const EquiposService = {
   async cambiarEstado(id, nuevoEstado, idUsuario, obs) {
     const equipo = await EquiposRepository.getById(id);
     if (!equipo) throw new Error('Equipo no encontrado');
+    if (equipo.Estado === 'BAJA') throw new Error('No se puede cambiar el estado de un equipo dado de baja.');
     const estadoAnterior = equipo.Estado;
     await EquiposRepository.updateEstado(id, nuevoEstado);
     await EquiposRepository.registrarCambioEstado(id, estadoAnterior, nuevoEstado, idUsuario, obs);
@@ -137,6 +162,7 @@ export const EquiposService = {
   async saveCaracteristicas(idEquipo, caracteristicas, idUsuario) {
     const equipo = await EquiposRepository.getById(idEquipo);
     if (!equipo) throw new Error('Equipo no encontrado');
+    validarNoBaja(equipo);
 
     const plantilla = await EquiposRepository.getPlantillaByTipo(equipo.IdTipodeEquipo);
     const idsValidos = new Set(plantilla.map(p => p.IdPlantilla));
@@ -169,6 +195,7 @@ export const EquiposService = {
   async agregarComponenteAEquipo(idEquipo, idComponente, obs, idUsuario, origenVinculo, motivo, idIntervencion) {
     const equipo = await EquiposRepository.getById(idEquipo);
     if (!equipo) throw new Error('Equipo no encontrado');
+    validarNoBaja(equipo);
 
     const componente = await ComponentesRepository.getById(idComponente);
     if (!componente) throw new Error('Componente no encontrado');
@@ -185,6 +212,7 @@ export const EquiposService = {
   async quitarComponenteDeEquipo(idEquipo, idMovComponente, idUsuario, motivo, nuevoEstado) {
     const equipo = await EquiposRepository.getById(idEquipo);
     if (!equipo) throw new Error('Equipo no encontrado');
+    validarNoBaja(equipo);
     return ComponentesRepository.desasignarDeEquipo(idMovComponente, motivo, nuevoEstado);
   },
 
@@ -203,6 +231,10 @@ export const EquiposService = {
     }
     if (tipo.Estado !== 'ACTIVO') {
       throw new Error('El tipo de equipo no está activo');
+    }
+
+    if (esTipoNoEquipo(tipo)) {
+      throw new Error('Este tipo debe registrarse como accesorio/componente, no como equipo principal.');
     }
 
     if (data.CodBarra) {
@@ -240,8 +272,6 @@ export const EquiposService = {
       ['IMPRESORA', 'IMP'],
       ['ACCESS POINT', 'AP'],
       ['SWITCH', 'SW'],
-      ['TECLADO', 'TEC'],
-      ['MOUSE', 'MOU'],
       ['PC ESCRITORIO', 'PC'],
       ['TABLET', 'TAB'],
     ]);
@@ -268,6 +298,7 @@ export const EquiposService = {
   async crearIntervencion(idEquipo, data, idUsuario) {
     const equipo = await EquiposRepository.getById(idEquipo);
     if (!equipo) throw new Error('Equipo no encontrado');
+    if (equipo.Estado === 'BAJA') throw new Error('No se pueden registrar intervenciones en un equipo dado de baja.');
 
     const VALIDOS = ['MANTENIMIENTO', 'REEMPLAZO', 'MEJORA', 'REPARACION', 'DIAGNOSTICO', 'LIMPIEZA', 'INSTALACION_SO', 'BAJA_EQUIPO', 'BAJA_COMPONENTE'];
     if (!VALIDOS.includes(data.TipoIntervencion)) {
