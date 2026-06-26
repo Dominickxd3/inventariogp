@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { EstadoBadge } from '../components/Badge';
@@ -12,6 +12,11 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '#components/ui/dialog.jsx';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '#components/ui/alert-dialog.jsx';
+import ComponenteDetalleDrawer from '../components/componentes/ComponenteDetalleDrawer';
 import { Plus } from 'lucide-react';
 
 const componentTypeConfig = {
@@ -95,6 +100,38 @@ const componentTypeConfig = {
     detalleLabel: 'Detalle técnico',
     detalle: 'Ej: Negro / CE285A',
   },
+  TINTA: {
+    descripcion: 'Ej: Tinta de impresora',
+    marca: 'Ej: Epson',
+    modelo: 'Ej: T664',
+    serie: 'Opcional',
+    detalleLabel: 'Detalle técnico',
+    detalle: 'Ej: Negro / CMYK',
+  },
+  CARTUCHO: {
+    descripcion: 'Ej: Cartucho de impresora',
+    marca: 'Ej: HP',
+    modelo: 'Ej: 65XL',
+    serie: 'Opcional',
+    detalleLabel: 'Detalle técnico',
+    detalle: 'Ej: Negro / Alto rendimiento',
+  },
+  AUDIFONOS: {
+    descripcion: 'Ej: Audífonos',
+    marca: 'Ej: Logitech',
+    modelo: 'Ej: H390',
+    serie: 'Opcional',
+    detalleLabel: 'Detalle técnico',
+    detalle: 'Ej: USB / diadema',
+  },
+  MOCHILA: {
+    descripcion: 'Ej: Mochila',
+    marca: 'Ej: Targus',
+    modelo: 'Ej: TSB026',
+    serie: 'Opcional',
+    detalleLabel: 'Detalle técnico',
+    detalle: 'Ej: 15.6 pulgadas',
+  },
 };
 
 const defaultTypeConfig = {
@@ -118,10 +155,41 @@ const initialForm = {
   Obs: '',
 };
 
+const formatCategoria = (cat) => ({
+  REPUESTO_TECNICO: 'Repuesto técnico',
+  ACCESORIO: 'Accesorio',
+  CONSUMIBLE: 'Consumible',
+}[cat] || 'Sin categoría');
+
+const CATEGORIA_OPTS = [
+  { value: 'REPUESTO_TECNICO', label: 'Repuesto técnico' },
+  { value: 'ACCESORIO', label: 'Accesorio' },
+  { value: 'CONSUMIBLE', label: 'Consumible' },
+];
+
+function CategoriaBadge({ categoria }) {
+  const colors = {
+    REPUESTO_TECNICO: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+    ACCESORIO: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+    CONSUMIBLE: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
+  };
+  const label = {
+    REPUESTO_TECNICO: 'Rep. Técnico',
+    ACCESORIO: 'Accesorio',
+    CONSUMIBLE: 'Consumible',
+  };
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colors[categoria] || 'bg-gray-100 text-gray-800'}`}>
+      {label[categoria] || categoria || 'Otro'}
+    </span>
+  );
+}
+
 const columns = [
   { key: 'CodComponente', label: 'Código' },
   { key: 'DesComponente', label: 'Descripción' },
   { key: 'DesTipodeComponente', label: 'Tipo' },
+  { key: 'Categoria', label: 'Categoría', render: (r) => <CategoriaBadge categoria={r.Categoria} /> },
   { key: 'Marca', label: 'Marca' },
   { key: 'Modelo', label: 'Modelo' },
   { key: 'Serie', label: 'Serie' },
@@ -143,21 +211,60 @@ function buildAutoDescription(tipoNombre, marca, modelo, detalle) {
     .join(' ');
 }
 
+const CATEGORIA_TABS = [
+  { value: '', label: 'Todo' },
+  { value: 'REPUESTO_TECNICO', label: 'Repuestos Técnicos' },
+  { value: 'ACCESORIO', label: 'Accesorios' },
+  { value: 'CONSUMIBLE', label: 'Consumibles' },
+];
+
+const ESTADO_FILTERS = [
+  { value: '', label: 'Todo' },
+  { value: 'DISPONIBLE', label: 'Disponible' },
+  { value: 'ASIGNADO', label: 'Asignado' },
+  { value: 'BAJA', label: 'Baja' },
+  { value: 'INACTIVO', label: 'Inactivo' },
+];
+
 export default function Componentes() {
   const [search, setSearch] = useState('');
+  const [categoria, setCategoria] = useState('');
+  const [estadoFilter, setEstadoFilter] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [selectedId, setSelectedId] = useState(null);
+  const [showDetalle, setShowDetalle] = useState(false);
+  const [bajaId, setBajaId] = useState(null);
+  const [categoriaNuevo, setCategoriaNuevo] = useState('');
   const [form, setForm] = useState({ ...initialForm });
   const queryClient = useQueryClient();
 
+  const params = { search };
+  if (categoria) params.categoria = categoria;
+  if (estadoFilter) params.estado = estadoFilter;
+
   const { data } = useQuery({
-    queryKey: ['componentes', search],
-    queryFn: () => api.componentes.list({ search }),
+    queryKey: ['componentes', params],
+    queryFn: () => api.componentes.list(params),
   });
 
   const { data: tipos } = useQuery({
     queryKey: ['componentes-tipos'],
     queryFn: api.componentes.tipos.list,
   });
+
+  const { data: detalle, isLoading: detalleLoading, error: detalleError } = useQuery({
+    queryKey: ['componente-detalle', selectedId],
+    queryFn: () => api.componentes.detalle(selectedId),
+    enabled: !!selectedId && showDetalle,
+  });
+
+  const tiposFiltrados = useMemo(() => {
+    if (!categoriaNuevo || !tipos) return [];
+    return tipos.filter((t) => {
+      const cat = (t.Categoria || '').trim().toUpperCase();
+      return cat === categoriaNuevo;
+    });
+  }, [categoriaNuevo, tipos]);
 
   const selectedTipo = tipos?.find((t) => String(t.IdTipodeComponente) === String(form.IdTipodeComponente));
   const selectedTypeName = normalizeTypeName(selectedTipo?.DesTipodeComponente);
@@ -178,6 +285,16 @@ export default function Componentes() {
     },
   });
 
+  const bajaMutation = useMutation({
+    mutationFn: api.componentes.baja,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['componentes'] });
+      queryClient.invalidateQueries({ queryKey: ['componente-detalle'] });
+      setBajaId(null);
+      setShowDetalle(false);
+    },
+  });
+
   const handleSubmit = (e) => {
     e.preventDefault();
     createMutation.mutate({
@@ -192,22 +309,65 @@ export default function Componentes() {
     });
   };
 
+  const handleRowClick = (row) => {
+    setSelectedId(row.IdComponente);
+    setShowDetalle(true);
+  };
+
+  const handleBaja = (id) => {
+    setBajaId(id);
+  };
+
+  const handleBajaConfirm = () => {
+    if (bajaId) bajaMutation.mutate(bajaId);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-foreground">Componentes / Accesorios</h1>
-        <Button onClick={() => { setForm({ ...initialForm }); setShowModal(true); }}>
+        <Button onClick={() => { setForm({ ...initialForm }); setCategoriaNuevo(''); setShowModal(true); }}>
           <Plus className="w-4 h-4" /> Nuevo Componente
         </Button>
       </div>
 
-      <SearchInput
-        value={search}
-        onChange={setSearch}
-        placeholder="Buscar por código, descripción, marca, modelo o serie..."
-      />
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex-1">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Buscar por código, descripción, marca, modelo o serie..."
+          />
+        </div>
+        <Select value={estadoFilter} onValueChange={setEstadoFilter}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="Estado" />
+          </SelectTrigger>
+          <SelectContent>
+            {ESTADO_FILTERS.map((f) => (
+              <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-      <DataTable columns={columns} data={data} />
+      <div className="flex gap-1 border-b border-border pb-1">
+        {CATEGORIA_TABS.map((tab) => (
+          <button
+            key={tab.value}
+            onClick={() => setCategoria(tab.value)}
+            className={`px-3 py-1.5 text-sm rounded-t-md transition-colors ${
+              categoria === tab.value
+                ? 'bg-primary text-primary-foreground font-medium'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <DataTable columns={columns} data={data} onRowClick={handleRowClick} />
 
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="sm:max-w-2xl">
@@ -218,22 +378,50 @@ export default function Componentes() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
+              <label className="text-sm font-medium">Categoría <span className="text-destructive">*</span></label>
+              <Select
+                value={categoriaNuevo}
+                onValueChange={(v) => {
+                  setCategoriaNuevo(v);
+                  setForm((prev) => ({ ...prev, IdTipodeComponente: '' }));
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Seleccionar categoría">
+                    {categoriaNuevo ? formatCategoria(categoriaNuevo) : null}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIA_OPTS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
               <label className="text-sm font-medium">Tipo de componente/accesorio <span className="text-destructive">*</span></label>
               <Select
                 value={form.IdTipodeComponente ? String(form.IdTipodeComponente) : ''}
                 onValueChange={(v) => setForm((prev) => ({ ...prev, IdTipodeComponente: Number(v) }))}
+                disabled={!categoriaNuevo}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Seleccionar tipo...">
+                  <SelectValue placeholder={categoriaNuevo ? 'Seleccionar tipo...' : 'Primero selecciona una categoría'}>
                     {selectedTipo?.DesTipodeComponente}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="max-h-64">
-                  {tipos?.map((t) => (
+                  {tiposFiltrados.map((t) => (
                     <SelectItem key={t.IdTipodeComponente} value={String(t.IdTipodeComponente)}>
                       {t.DesTipodeComponente}
                     </SelectItem>
                   ))}
+                  {tiposFiltrados.length === 0 && categoriaNuevo && (
+                    <div className="px-2 py-4 text-xs text-muted-foreground text-center">
+                      No hay tipos disponibles para esta categoría
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -318,6 +506,33 @@ export default function Componentes() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <ComponenteDetalleDrawer
+        open={showDetalle}
+        onOpenChange={setShowDetalle}
+        detalle={detalle}
+        loading={detalleLoading}
+        error={!!detalleError}
+        onBaja={handleBaja}
+      />
+
+      <AlertDialog open={!!bajaId} onOpenChange={(v) => { if (!v) setBajaId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Dar de baja componente</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción cambiará el estado del componente a BAJA. No podrá ser asignado ni editado luego de esto.
+              ¿Estás seguro?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBajaConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {bajaMutation.isPending ? 'Procesando...' : 'Sí, dar de baja'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

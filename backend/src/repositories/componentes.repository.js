@@ -5,13 +5,14 @@ const DB = 'InventarioGP';
 export const ComponentesRepository = {
   async listAll(filtros = {}) {
     let sql = `
-      SELECT c.*, tc.DesTipodeComponente
+      SELECT c.*, tc.DesTipodeComponente, tc.Categoria
       FROM Tab_EQ_Componentes c
       LEFT JOIN Tab_EQ_TipodeComponentes tc ON c.IdTipodeComponente = tc.IdTipodeComponente
       WHERE 1=1
     `;
     const params = {};
     if (filtros.estado) { sql += ' AND c.Estado = @estado'; params.estado = filtros.estado; }
+    if (filtros.categoria) { sql += ' AND tc.Categoria = @categoria'; params.categoria = filtros.categoria; }
     if (filtros.idTipo) { sql += ' AND c.IdTipodeComponente = @idTipo'; params.idTipo = filtros.idTipo; }
     if (filtros.search) { sql += " AND (c.CodComponente LIKE @search OR c.DesComponente LIKE @search OR c.Marca LIKE @search OR c.Modelo LIKE @search OR c.Serie LIKE @search OR c.Capacidad LIKE @search)"; params.search = `%${filtros.search}%`; }
     sql += ' ORDER BY c.DesComponente';
@@ -20,7 +21,7 @@ export const ComponentesRepository = {
 
   async getById(id) {
     const rows = await query(DB, `
-      SELECT c.*, tc.DesTipodeComponente
+      SELECT c.*, tc.DesTipodeComponente, tc.Categoria
       FROM Tab_EQ_Componentes c
       LEFT JOIN Tab_EQ_TipodeComponentes tc ON c.IdTipodeComponente = tc.IdTipodeComponente
       WHERE c.IdComponente = @id
@@ -52,14 +53,13 @@ export const ComponentesRepository = {
   async update(id, data) {
     await query(DB, `
       UPDATE Tab_EQ_Componentes
-      SET IdTipodeComponente = @idTipo, CodComponente = @cod, DesComponente = @desc,
+      SET IdTipodeComponente = @idTipo, DesComponente = @desc,
           Marca = @marca, Modelo = @modelo, Serie = @serie, Lote = @lote,
-          Capacidad = @capacidad, Obs = @obs, Estado = @estado
+          Capacidad = @capacidad, Obs = @obs
       WHERE IdComponente = @id
     `, {
       id,
       idTipo: data.IdTipodeComponente,
-      cod: data.CodComponente,
       desc: data.DesComponente,
       marca: data.Marca,
       modelo: data.Modelo,
@@ -67,16 +67,15 @@ export const ComponentesRepository = {
       lote: data.Lote,
       capacidad: data.Capacidad,
       obs: data.Obs,
-      estado: data.Estado,
     });
   },
 
   async listTipos() {
-    return query(DB, "SELECT * FROM Tab_EQ_TipodeComponentes WHERE Estado = 'ACTIVO' ORDER BY DesTipodeComponente");
+    return query(DB, "SELECT *, COALESCE(Categoria, 'OTRO') AS Categoria FROM Tab_EQ_TipodeComponentes WHERE Estado = 'ACTIVO' ORDER BY DesTipodeComponente");
   },
 
   async getTipoById(id) {
-    const rows = await query(DB, 'SELECT * FROM Tab_EQ_TipodeComponentes WHERE IdTipodeComponente = @id', { id });
+    const rows = await query(DB, "SELECT *, COALESCE(Categoria, 'OTRO') AS Categoria FROM Tab_EQ_TipodeComponentes WHERE IdTipodeComponente = @id", { id });
     return rows[0] || null;
   },
 
@@ -196,6 +195,64 @@ export const ComponentesRepository = {
         estado: nuevoEstado || 'DISPONIBLE',
       });
     }
+  },
+
+  async baja(id) {
+    await query(DB, "UPDATE Tab_EQ_Componentes SET Estado = 'BAJA' WHERE IdComponente = @id", { id });
+  },
+
+  async getUsoActual(idComponente) {
+    const enEquipo = await query(DB, `
+      SELECT TOP 1 e.IdMaeEquipo, e.CodEquipo, e.CodBarra,
+             mc.IdMovEquipoComponente, mc.FecAsigComponente, mc.Estado AS RelEstado
+      FROM Tab_EQ_MovEquiposComponentes mc
+      JOIN Tab_EQ_MaeEquipos e ON mc.IdMaeEquipo = e.IdMaeEquipo
+      WHERE mc.IdComponente = @id AND mc.Estado = 'VIGENTE'
+      ORDER BY mc.IdMovEquipoComponente DESC
+    `, { id: idComponente });
+    if (enEquipo.length) return { tipo: 'EQUIPO', detalle: enEquipo[0] };
+
+    const enTrabajador = await query(DB, `
+      SELECT TOP 1 t.IdTrabajador, t.Trabajador AS NombreTrabajador,
+             m.IdMovAccesorio, m.FecAsignacion
+      FROM Tab_EQ_MovAccesoriosTrabajador m
+      JOIN Tab_EQ_Trabajadores t ON m.IdReferente = t.IdTrabajador
+      WHERE m.IdComponente = @id AND m.Estado = 'VIGENTE'
+      ORDER BY m.IdMovAccesorio DESC
+    `, { id: idComponente });
+    if (enTrabajador.length) return { tipo: 'TRABAJADOR', detalle: enTrabajador[0] };
+
+    return null;
+  },
+
+  async getTimeline(idComponente) {
+    const movEquipos = await query(DB, `
+      SELECT 'EQUIPO' AS Tipo, mc.IdMovEquipoComponente AS IdMov,
+             mc.FecAsigComponente AS FechaInicio, mc.FecBajaComponente AS FechaFin,
+             mc.Estado, mc.Obs, mc.Motivo, mc.OrigenVinculo,
+             e.CodEquipo, e.CodBarra AS DesEquipo
+      FROM Tab_EQ_MovEquiposComponentes mc
+      JOIN Tab_EQ_MaeEquipos e ON mc.IdMaeEquipo = e.IdMaeEquipo
+      WHERE mc.IdComponente = @id
+      ORDER BY mc.FecAsigComponente DESC
+    `, { id: idComponente });
+
+    const movAcc = await query(DB, `
+      SELECT 'TRABAJADOR' AS Tipo, m.IdMovAccesorio AS IdMov,
+             m.FecAsignacion AS FechaInicio, m.FecCese AS FechaFin,
+             m.Estado, m.Obs, NULL AS Motivo, NULL AS OrigenVinculo,
+             NULL AS CodEquipo, t.Trabajador AS DesEquipo
+      FROM Tab_EQ_MovAccesoriosTrabajador m
+      JOIN Tab_EQ_Trabajadores t ON m.IdReferente = t.IdTrabajador
+      WHERE m.IdComponente = @id
+      ORDER BY m.FecAsignacion DESC
+    `, { id: idComponente });
+
+    return [...movEquipos, ...movAcc].sort((a, b) => {
+      const da = a.FechaInicio ? new Date(a.FechaInicio) : new Date(0);
+      const db = b.FechaInicio ? new Date(b.FechaInicio) : new Date(0);
+      return db - da;
+    });
   },
 
   async listAccesoriosPorTrabajador(idTrabajador) {

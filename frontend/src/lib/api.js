@@ -108,9 +108,11 @@ export const api = {
   componentes: {
     list: (params) => request(`/componentes?${new URLSearchParams(params)}`),
     get: (id) => request(`/componentes/${id}`),
+    detalle: (id) => request(`/componentes/${id}/detalle`),
     create: (data) => request('/componentes', { method: 'POST', body: JSON.stringify(data) }),
     createQuick: (data) => request('/componentes/rapido', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) => request(`/componentes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    baja: (id) => request(`/componentes/${id}/baja`, { method: 'POST' }),
     accesoriosDisponibles: () => request('/componentes/accesorios-disponibles'),
     accesoriosPorTrabajador: (id) => request(`/componentes/accesorios-por-trabajador/${id}`),
     tipos: {
