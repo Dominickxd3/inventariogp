@@ -23,6 +23,6 @@ export function errorHandler(err, req, res, _next) {
     return res.status(500).json({ error: 'No se pudo completar la operación.' });
   }
 
-  const status = err.status || (err.message?.includes('no encontrado') ? 404 : 500);
-  res.status(status).json({ error: err.message || 'Error interno del servidor' });
+  const statusCode = err.statusCode || err.status || (err.message?.includes('no encontrado') ? 404 : 500);
+  res.status(statusCode).json({ error: err.message || 'Error interno del servidor' });
 }

@@ -6,18 +6,33 @@ import { IntervencionesRepository } from '../repositories/intervenciones.reposit
 import { withTransaction, createRequest } from '../config/db.js';
 import QRCode from 'qrcode';
 
+function normalizarTexto(valor) {
+  return String(valor || '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
 const TIPOS_NO_EQUIPO = [
-  'TECLADO', 'MOUSE', 'CARGADOR', 'CABLE', 'ADAPTADOR', 'MOCHILA', 'AUDIFONOS', 'AUDÍFONOS',
+  'TECLADO', 'MOUSE', 'CARGADOR', 'CABLE', 'ADAPTADOR', 'MOCHILA', 'AUDIFONOS',
 ];
 
 function esTipoNoEquipo(tipo) {
-  const nombre = (tipo.DesTipodeEquipo || tipo.CodTipodeEquipo || '').toUpperCase().trim();
-  return TIPOS_NO_EQUIPO.some(t => nombre === t || nombre === t.normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+  if (!tipo) return false;
+  const nombre = normalizarTexto(tipo.DesTipodeEquipo || tipo.CodTipodeEquipo);
+  return TIPOS_NO_EQUIPO.includes(nombre);
+}
+
+function businessError(message, statusCode = 400) {
+  const err = new Error(message);
+  err.statusCode = statusCode;
+  return err;
 }
 
 function validarNoBaja(equipo) {
   if (equipo.Estado === 'BAJA') {
-    throw new Error('No se puede editar un equipo dado de baja.');
+    throw businessError('No se puede editar un equipo dado de baja.');
   }
 }
 
@@ -48,13 +63,23 @@ export const EquiposService = {
   },
 
   async create(data) {
+    if (!data.IdTipodeEquipo) {
+      throw businessError('El tipo de equipo es obligatorio');
+    }
+
     const tipo = await EquiposRepository.getTipoById(data.IdTipodeEquipo);
-    if (tipo && esTipoNoEquipo(tipo)) {
-      throw new Error('Este tipo debe registrarse como accesorio/componente, no como equipo principal.');
+    if (!tipo) {
+      throw businessError('El tipo de equipo no existe');
+    }
+    if (tipo.Estado !== 'ACTIVO') {
+      throw businessError('El tipo de equipo no está activo', 400);
+    }
+    if (esTipoNoEquipo(tipo)) {
+      throw businessError('Este tipo debe registrarse como accesorio/componente, no como equipo principal.');
     }
 
     const existente = await EquiposRepository.getByCodEquipo(data.CodEquipo);
-    if (existente) throw new Error(`Ya existe un equipo con el código ${data.CodEquipo}`);
+    if (existente) throw businessError(`Ya existe un equipo con el código ${data.CodEquipo}`);
 
     if (!data.CodBarra) {
       data.CodBarra = `QR-${data.CodEquipo}-${Date.now().toString(36).toUpperCase()}`;
@@ -67,7 +92,7 @@ export const EquiposService = {
 
   async update(id, data) {
     const equipo = await EquiposRepository.getById(id);
-    if (!equipo) throw new Error('Equipo no encontrado');
+    if (!equipo) throw businessError('Equipo no encontrado', 404);
     validarNoBaja(equipo);
 
     const safeData = { ...data };
@@ -79,10 +104,10 @@ export const EquiposService = {
 
   async bajaEquipo(id, idUsuario) {
     const equipo = await EquiposRepository.getById(id);
-    if (!equipo) throw new Error('Equipo no encontrado');
-    if (equipo.Estado === 'BAJA') throw new Error('El equipo ya está dado de baja');
+    if (!equipo) throw businessError('Equipo no encontrado', 404);
+    if (equipo.Estado === 'BAJA') throw businessError('El equipo ya está dado de baja');
     const activa = await AsignacionesRepository.getActivaByEquipo(id);
-    if (activa) throw new Error('No se puede dar de baja un equipo con asignación activa');
+    if (activa) throw businessError('No se puede dar de baja un equipo con asignación activa');
     await EquiposRepository.updateEstado(id, 'BAJA');
     await EquiposRepository.registrarCambioEstado(id, equipo.Estado, 'BAJA', idUsuario, 'Baja lógica del equipo');
     return this.getById(id);
@@ -90,8 +115,8 @@ export const EquiposService = {
 
   async cambiarEstado(id, nuevoEstado, idUsuario, obs) {
     const equipo = await EquiposRepository.getById(id);
-    if (!equipo) throw new Error('Equipo no encontrado');
-    if (equipo.Estado === 'BAJA') throw new Error('No se puede cambiar el estado de un equipo dado de baja.');
+    if (!equipo) throw businessError('Equipo no encontrado', 404);
+    if (equipo.Estado === 'BAJA') throw businessError('No se puede cambiar el estado de un equipo dado de baja.');
     const estadoAnterior = equipo.Estado;
     await EquiposRepository.updateEstado(id, nuevoEstado);
     await EquiposRepository.registrarCambioEstado(id, estadoAnterior, nuevoEstado, idUsuario, obs);
@@ -134,7 +159,7 @@ export const EquiposService = {
 
   async getCaracteristicas(idEquipo) {
     const equipo = await EquiposRepository.getById(idEquipo);
-    if (!equipo) throw new Error('Equipo no encontrado');
+    if (!equipo) throw businessError('Equipo no encontrado', 404);
 
     const plantilla = await EquiposRepository.getPlantillaByTipo(equipo.IdTipodeEquipo);
     const valores = await EquiposRepository.getCaracteristicas(idEquipo);
@@ -161,16 +186,16 @@ export const EquiposService = {
 
   async saveCaracteristicas(idEquipo, caracteristicas, idUsuario) {
     const equipo = await EquiposRepository.getById(idEquipo);
-    if (!equipo) throw new Error('Equipo no encontrado');
+    if (!equipo) throw businessError('Equipo no encontrado', 404);
     validarNoBaja(equipo);
 
     const plantilla = await EquiposRepository.getPlantillaByTipo(equipo.IdTipodeEquipo);
     const idsValidos = new Set(plantilla.map(p => p.IdPlantilla));
 
     for (const c of caracteristicas) {
-      if (!c.IdPlantilla) throw new Error('IdPlantilla es requerido');
+      if (!c.IdPlantilla) throw businessError('IdPlantilla es requerido');
       if (!idsValidos.has(c.IdPlantilla)) {
-        throw new Error(`La característica con IdPlantilla ${c.IdPlantilla} no pertenece al tipo de equipo ${equipo.DesTipodeEquipo}`);
+        throw businessError(`La característica con IdPlantilla ${c.IdPlantilla} no pertenece al tipo de equipo ${equipo.DesTipodeEquipo}`);
       }
     }
 
@@ -194,16 +219,16 @@ export const EquiposService = {
 
   async agregarComponenteAEquipo(idEquipo, idComponente, obs, idUsuario, origenVinculo, motivo, idIntervencion) {
     const equipo = await EquiposRepository.getById(idEquipo);
-    if (!equipo) throw new Error('Equipo no encontrado');
+    if (!equipo) throw businessError('Equipo no encontrado', 404);
     validarNoBaja(equipo);
 
     const componente = await ComponentesRepository.getById(idComponente);
-    if (!componente) throw new Error('Componente no encontrado');
-    if (componente.Estado !== 'DISPONIBLE') throw new Error('El componente no está disponible');
+    if (!componente) throw businessError('Componente no encontrado', 404);
+    if (componente.Estado !== 'DISPONIBLE') throw businessError('El componente no está disponible');
 
     const existentes = await ComponentesRepository.getByEquipo(idEquipo);
     if (existentes.some(c => c.IdComponente === idComponente)) {
-      throw new Error('El componente ya está instalado en este equipo');
+      throw businessError('El componente ya está instalado en este equipo');
     }
 
     return ComponentesRepository.asignarAEquipo(idEquipo, idComponente, obs, origenVinculo, motivo, idIntervencion);
@@ -222,32 +247,32 @@ export const EquiposService = {
 
   async createQuick(data) {
     if (!data.IdTipodeEquipo) {
-      throw new Error('El tipo de equipo es obligatorio');
+      throw businessError('El tipo de equipo es obligatorio');
     }
 
     const tipo = await EquiposRepository.getTipoById(data.IdTipodeEquipo);
     if (!tipo) {
-      throw new Error('El tipo de equipo no existe');
+      throw businessError('El tipo de equipo no existe');
     }
     if (tipo.Estado !== 'ACTIVO') {
-      throw new Error('El tipo de equipo no está activo');
+      throw businessError('El tipo de equipo no está activo');
     }
 
     if (esTipoNoEquipo(tipo)) {
-      throw new Error('Este tipo debe registrarse como accesorio/componente, no como equipo principal.');
+      throw businessError('Este tipo debe registrarse como accesorio/componente, no como equipo principal.');
     }
 
     if (data.CodBarra) {
       const existente = await EquiposRepository.getByCodigo(data.CodBarra);
       if (existente) {
-        throw new Error(`Ya existe un equipo con el código de barra ${data.CodBarra}`);
+        throw businessError(`Ya existe un equipo con el código de barra ${data.CodBarra}`);
       }
     }
 
     const codEquipo = await this.generateNextCodEquipo(tipo);
     const existenteCod = await EquiposRepository.getByCodEquipo(codEquipo);
     if (existenteCod) {
-      throw new Error('Conflicto al generar código interno, intente nuevamente');
+      throw businessError('Conflicto al generar código interno, intente nuevamente');
     }
 
     const codBarra = data.CodBarra || `QR-${codEquipo}-${Date.now().toString(36).toUpperCase()}`;
@@ -291,46 +316,46 @@ export const EquiposService = {
   // Intervenciones técnicas
   async getIntervenciones(idEquipo) {
     const equipo = await EquiposRepository.getById(idEquipo);
-    if (!equipo) throw new Error('Equipo no encontrado');
+    if (!equipo) throw businessError('Equipo no encontrado', 404);
     return IntervencionesRepository.getByEquipo(idEquipo);
   },
 
   async crearIntervencion(idEquipo, data, idUsuario) {
     const equipo = await EquiposRepository.getById(idEquipo);
-    if (!equipo) throw new Error('Equipo no encontrado');
-    if (equipo.Estado === 'BAJA') throw new Error('No se pueden registrar intervenciones en un equipo dado de baja.');
+    if (!equipo) throw businessError('Equipo no encontrado', 404);
+    if (equipo.Estado === 'BAJA') throw businessError('No se pueden registrar intervenciones en un equipo dado de baja.');
 
     const VALIDOS = ['MANTENIMIENTO', 'REEMPLAZO', 'MEJORA', 'REPARACION', 'DIAGNOSTICO', 'LIMPIEZA', 'INSTALACION_SO', 'BAJA_EQUIPO', 'BAJA_COMPONENTE'];
     if (!VALIDOS.includes(data.TipoIntervencion)) {
-      throw new Error(`Tipo de intervención inválido.`);
+      throw businessError('Tipo de intervención inválido.');
     }
     if (!data.Descripcion?.trim()) {
-      throw new Error('La descripción es obligatoria.');
+      throw businessError('La descripción es obligatoria.');
     }
 
     // Validar incidencia si se envía
     if (data.IdIncidencia) {
       const inc = await IncidenciasRepository.getById(data.IdIncidencia);
-      if (!inc) throw new Error('Incidencia no encontrada');
-      if (inc.IdMaeEquipo !== idEquipo) throw new Error('La incidencia no pertenece a este equipo');
+      if (!inc) throw businessError('Incidencia no encontrada', 404);
+      if (inc.IdMaeEquipo !== idEquipo) throw businessError('La incidencia no pertenece a este equipo');
     }
 
     // Validar componente instalado si se envía
     if (data.IdComponenteInstalado) {
       const comp = await ComponentesRepository.getById(data.IdComponenteInstalado);
-      if (!comp) throw new Error('Componente instalado no encontrado');
+      if (!comp) throw businessError('Componente instalado no encontrado', 404);
       if (['BAJA', 'ASIGNADO'].includes(comp.Estado)) {
-        throw new Error(`El componente ${comp.CodComponente} no está disponible (estado: ${comp.Estado})`);
+        throw businessError(`El componente ${comp.CodComponente} no está disponible (estado: ${comp.Estado})`);
       }
     }
 
     // Validar componente retirado si se envía (debe estar asignado a este equipo)
     if (data.IdComponenteRetirado) {
       const comp = await ComponentesRepository.getById(data.IdComponenteRetirado);
-      if (!comp) throw new Error('Componente retirado no encontrado');
+      if (!comp) throw businessError('Componente retirado no encontrado', 404);
       const equipoComps = await ComponentesRepository.getByEquipo(idEquipo);
       if (!equipoComps.some(c => c.IdComponente === data.IdComponenteRetirado)) {
-        throw new Error('El componente retirado no está asignado a este equipo');
+        throw businessError('El componente retirado no está asignado a este equipo');
       }
     }
 
@@ -397,7 +422,7 @@ export const EquiposService = {
         // Validar que no tenga asignación activa
         const activa = await AsignacionesRepository.getActivaByEquipo(idEquipo);
         if (activa) {
-          throw new Error('No se puede dar de baja un equipo con asignación activa. Cesé la asignación primero.');
+          throw businessError('No se puede dar de baja un equipo con asignación activa. Cesé la asignación primero.');
         }
         const idIntervencion = await IntervencionesRepository.create(payload);
         // Cambiar estado del equipo

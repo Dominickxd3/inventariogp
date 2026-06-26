@@ -230,7 +230,8 @@ export const EquiposRepository = {
     return query(DB, `
       SELECT * FROM Tab_EQ_TipodeEquipos
       WHERE Estado = 'ACTIVO'
-        AND DesTipodeEquipo NOT IN (${accesorios.map((_, i) => `@acc${i}`).join(', ')})
+        AND UPPER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(DesTipodeEquipo, 'Í', 'I'), 'É', 'E'), 'Ó', 'O'), 'Á', 'A'), 'Ú', 'U'))
+          NOT IN (${accesorios.map((_, i) => `@acc${i}`).join(', ')})
       ORDER BY DesTipodeEquipo
     `, Object.fromEntries(accesorios.map((a, i) => [`acc${i}`, a])));
   },

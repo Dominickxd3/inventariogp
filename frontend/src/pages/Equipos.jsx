@@ -68,6 +68,11 @@ export default function Equipos() {
     queryFn: api.equipos.tipos.list,
   });
 
+  const { data: tiposAsignables } = useQuery({
+    queryKey: ['equipos-tipos-asignables'],
+    queryFn: api.equipos.tiposAsignables,
+  });
+
   const bajaMutation = useMutation({
     mutationFn: api.equipos.baja,
     onSuccess: () => {
@@ -250,11 +255,11 @@ export default function Equipos() {
               }}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Seleccionar tipo de equipo...">
-                    {tipos?.filter(t => !['TECLADO','MOUSE','CARGADOR','CABLE','ADAPTADOR','MOCHILA','AUDIFONOS'].includes(t.DesTipodeEquipo.toUpperCase().trim())).find(t => String(t.IdTipodeEquipo) === form.IdTipodeEquipo)?.DesTipodeEquipo}
+                    {tiposAsignables?.find(t => String(t.IdTipodeEquipo) === form.IdTipodeEquipo)?.DesTipodeEquipo}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {tipos?.filter(t => !['TECLADO','MOUSE','CARGADOR','CABLE','ADAPTADOR','MOCHILA','AUDIFONOS'].includes(t.DesTipodeEquipo.toUpperCase().trim())).map((t) => (
+                  {tiposAsignables?.map((t) => (
                     <SelectItem key={t.IdTipodeEquipo} value={String(t.IdTipodeEquipo)}>{t.DesTipodeEquipo}</SelectItem>
                   ))}
                 </SelectContent>
