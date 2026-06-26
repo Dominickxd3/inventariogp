@@ -195,6 +195,12 @@ const columns = [
   { key: 'Estado', label: 'Estado', render: (r) => <EstadoBadge estado={r.Estado} /> },
 ];
 
+const normalizarCategoria = (cat) => String(cat || '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
 function normalizeTypeName(value) {
   return (value || '')
     .normalize('NFD')
@@ -259,9 +265,10 @@ export default function Componentes() {
 
   const tiposFiltrados = useMemo(() => {
     if (!categoriaNuevo || !tipos) return [];
+    const catActual = normalizarCategoria(categoriaNuevo);
     return tipos.filter((t) => {
-      const cat = String(t.Categoria ?? '').trim().toUpperCase();
-      return cat === categoriaNuevo;
+      const catTipo = normalizarCategoria(t.Categoria);
+      return catTipo === catActual;
     });
   }, [categoriaNuevo, tipos]);
 
@@ -421,7 +428,7 @@ export default function Componentes() {
                   ))}
                   {tiposFiltrados.length === 0 && categoriaNuevo && (
                     <div className="px-2 py-4 text-xs text-muted-foreground text-center">
-                      No hay tipos disponibles para {categoriaLabel.toLowerCase()}
+                      No hay tipos disponibles para esta categoría
                     </div>
                   )}
                 </SelectContent>

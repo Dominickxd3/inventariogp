@@ -71,11 +71,11 @@ export const ComponentesRepository = {
   },
 
   async listTipos() {
-    return query(DB, "SELECT IdTipodeComponente, DesTipodeComponente, Marca, Modelo, COALESCE(Categoria, 'OTRO') AS Categoria FROM Tab_EQ_TipodeComponentes WHERE Estado = 'ACTIVO' ORDER BY DesTipodeComponente");
+    return query(DB, "SELECT IdTipodeComponente, DesTipodeComponente, Categoria, Estado FROM Tab_EQ_TipodeComponentes WHERE Estado = 'ACTIVO' OR Estado IS NULL ORDER BY DesTipodeComponente");
   },
 
   async getTipoById(id) {
-    const rows = await query(DB, "SELECT IdTipodeComponente, DesTipodeComponente, Marca, Modelo, COALESCE(Categoria, 'OTRO') AS Categoria FROM Tab_EQ_TipodeComponentes WHERE IdTipodeComponente = @id", { id });
+    const rows = await query(DB, "SELECT IdTipodeComponente, DesTipodeComponente, Categoria, Estado FROM Tab_EQ_TipodeComponentes WHERE IdTipodeComponente = @id", { id });
     return rows[0] || null;
   },
 
