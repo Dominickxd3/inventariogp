@@ -262,6 +262,86 @@ export const AsignacionesService = {
     return AsignacionesRepository.getActivasByTrabajador(idTrabajador);
   },
 
+  async getDetalle(id) {
+    if (!id || isNaN(id)) throw new Error('ID de asignación no válido');
+
+    const asig = await AsignacionesRepository.getDetalleById(id);
+    if (!asig) throw new Error('Asignación no encontrada');
+
+    const accs = await this.getAccsByAsignacion(id);
+
+    const timeline = [];
+
+    timeline.push({
+      fecha: asig.FecAsignacion,
+      tipo: 'ASIGNACION_CREADA',
+      titulo: 'Asignación creada',
+      descripcion: `Equipo ${asig.CodEquipo} asignado a ${asig.NombreTrabajador || 'trabajador'}`,
+    });
+
+    if (accs.length) {
+      timeline.push({
+        fecha: accs[0].FecAsignacion || asig.FecAsignacion,
+        tipo: 'ACCESORIO_ENTREGADO',
+        titulo: `Accesorio${accs.length > 1 ? 's' : ''} entregado${accs.length > 1 ? 's' : ''}`,
+        descripcion: accs.map(a => `${a.CodComponente} ${a.DesComponente || a.DesTipodeComponente}`).join(', '),
+      });
+    }
+
+    if (asig.Estado === 'CESADO' || asig.FecCese) {
+      timeline.push({
+        fecha: asig.FecCese || asig.FecAsignacion,
+        tipo: 'ASIGNACION_CESADA',
+        titulo: 'Asignación cesada',
+        descripcion: 'Asignación finalizada',
+      });
+    }
+
+    const trabajador = asig.NombreTrabajador
+      ? {
+          IdReferente: asig.IdReferente,
+          NombreTrabajador: asig.NombreTrabajador,
+          DNI: asig.DOI || null,
+          Area: asig.Area || null,
+          Cargo: asig.Ocupacion || null,
+        }
+      : {
+          IdReferente: asig.IdReferente,
+          NombreTrabajador: null,
+          DNI: null,
+          Area: null,
+          Cargo: null,
+        };
+
+    return {
+      asignacion: {
+        IdMovEquipoAsignacion: asig.IdMovEquipoAsignacion,
+        Estado: asig.Estado,
+        FecAsignacion: asig.FecAsignacion,
+        FecCese: asig.FecCese,
+        Obs: asig.Obs,
+      },
+      trabajador,
+      equipo: {
+        IdMaeEquipo: asig.IdMaeEquipo,
+        CodEquipo: asig.CodEquipo,
+        TipoEquipo: asig.TipoEquipo,
+        CodBarra: asig.CodBarra,
+        EstadoActual: asig.EstadoActual,
+      },
+      accesorios: accs.map(a => ({
+        IdComponente: a.IdComponente,
+        CodComponente: a.CodComponente,
+        TipoComponente: a.DesTipodeComponente,
+        DesComponente: a.DesComponente,
+        Marca: a.Marca,
+        Modelo: a.Modelo,
+        Estado: a.Estado,
+      })),
+      timeline,
+    };
+  },
+
   async getActa(id) {
     const asig = await AsignacionesRepository.getById(id);
     if (!asig) return null;

@@ -13,6 +13,13 @@ router.get('/', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.get('/:id/detalle', async (req, res, next) => {
+  try {
+    const data = await AsignacionesService.getDetalle(Number(req.params.id));
+    res.json(data);
+  } catch (e) { next(e); }
+});
+
 router.get('/:id', async (req, res, next) => {
   try {
     const a = await AsignacionesService.getById(parseInt(req.params.id));

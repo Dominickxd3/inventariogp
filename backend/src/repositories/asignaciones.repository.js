@@ -85,6 +85,20 @@ export const AsignacionesRepository = {
     `, { id: idTrabajador });
   },
 
+  async getDetalleById(id) {
+    const rows = await query(DB, `
+      SELECT a.*, e.CodEquipo, e.CodBarra, e.Estado as EstadoActual,
+             t.DesTipodeEquipo as TipoEquipo,
+             tr.Trabajador as NombreTrabajador, tr.DOI, tr.Area, tr.Ocupacion
+      FROM Tab_EQ_MovEquiposAsignaciones a
+      JOIN Tab_EQ_MaeEquipos e ON a.IdMaeEquipo = e.IdMaeEquipo
+      LEFT JOIN Tab_EQ_TipodeEquipos t ON e.IdTipodeEquipo = t.IdTipodeEquipo
+      LEFT JOIN Tab_EQ_Trabajadores tr ON a.IdReferente = tr.IdTrabajador
+      WHERE a.IdMovEquipoAsignacion = @id
+    `, { id });
+    return rows[0] || null;
+  },
+
   async getActivasByTrabajador(idTrabajador) {
     return query(DB, `
       SELECT a.*, e.CodEquipo, e.CodBarra, t.DesTipodeEquipo,

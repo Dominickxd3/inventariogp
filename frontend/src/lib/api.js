@@ -80,6 +80,7 @@ export const api = {
     },
     linkedAccs: (id) => request(`/asignaciones/${id}/accesorios`),
     acta: (id) => `${BASE}/asignaciones/${id}/acta`,
+    detalle: (id) => request(`/asignaciones/${id}/detalle`),
     historialEquipo: (id) => request(`/asignaciones/equipo/${id}`),
     historialTrabajador: (id) => request(`/asignaciones/trabajador/${id}`),
     activasTrabajador: (id) => request(`/asignaciones/trabajador/${id}/activas`),

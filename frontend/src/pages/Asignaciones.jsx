@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import Swal from 'sweetalert2';
@@ -13,8 +13,9 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '#components/ui/select.jsx';
-import { Plus, XCircle, Check, Monitor, Printer } from 'lucide-react';
+import { Plus, XCircle, Check, Printer } from 'lucide-react';
 import { formatDate } from '../lib/utils';
+import AsignacionDetalleDrawer from '../components/asignaciones/AsignacionDetalleDrawer';
 
 const TABS = [
   { key: 'VIGENTE', label: 'Vigentes' },
@@ -57,12 +58,16 @@ const ACC_OPTIONS = [
 ];
 
 export default function Asignaciones() {
+  const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
   const [searchParams] = useSearchParams();
   const nuevoEquipoId = searchParams.get('nuevoEquipo');
   const queryClient = useQueryClient();
   const [tab, setTab] = useState('VIGENTE');
   const [page, setPage] = useState(1);
+
+  const [selectedAsignacionId, setSelectedAsignacionId] = useState(null);
+  const [detalleOpen, setDetalleOpen] = useState(false);
 
   useEffect(() => {
     if (nuevoEquipoId) setShowModal(true);
@@ -78,58 +83,42 @@ export default function Asignaciones() {
 
   useEffect(() => { setPage(1); }, [tab]);
 
+  const detalleQuery = useQuery({
+    queryKey: ['asignacion-detalle', selectedAsignacionId],
+    queryFn: () => api.asignaciones.detalle(selectedAsignacionId),
+    enabled: detalleOpen && !!selectedAsignacionId,
+  });
+
   const cesarMutation = useMutation({
-    mutationFn: ({ id, accesorios, motivo, estadoFisico, obsDev }) => api.asignaciones.cesar(id, accesorios, { MotivoCese: motivo, EstadoFisicoDevolucion: estadoFisico, ObservacionesDevolucion: obsDev }),
+    mutationFn: ({ id, accesorios }) => api.asignaciones.cesar(id, accesorios, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['asignaciones'] });
       queryClient.invalidateQueries({ queryKey: ['equipos'] });
       queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['asignacion-detalle'] });
       setShowCesarDialog(false);
       setCesarTarget(null);
       setAccActions([]);
       Swal.fire({ icon: 'success', title: 'Asignación finalizada', text: 'El equipo fue desasignado correctamente', timer: 2000, showConfirmButton: false });
     },
     onError: (err) => {
-      Swal.fire({ icon: 'error', title: 'Error al cesar', text: err.message });
+      Swal.fire({ icon: 'error', title: 'Error al cesar', text: 'No se pudo cesar la asignación.' });
+      console.error('Error al cesar:', err);
     },
   });
 
   const [showCesarDialog, setShowCesarDialog] = useState(false);
   const [cesarTarget, setCesarTarget] = useState(null);
   const [accActions, setAccActions] = useState([]);
-  const [cesarMotivo, setCesarMotivo] = useState('');
-  const [cesarEstadoFisico, setCesarEstadoFisico] = useState('');
-  const [cesarObsDev, setCesarObsDev] = useState('');
-
-  const MOTIVOS_CESE = [
-    { value: 'DEVUELTO_BUEN_ESTADO', label: 'Devuelto en buen estado' },
-    { value: 'DEVUELTO_CON_DANO', label: 'Devuelto con daño' },
-    { value: 'PERDIDO', label: 'Perdido' },
-    { value: 'ROBADO', label: 'Robado' },
-    { value: 'A_MANTENIMIENTO', label: 'Pasa a mantenimiento' },
-    { value: 'A_BAJA', label: 'Pasa a baja' },
-  ];
-
-  const ESTADOS_FISICOS_DEV = [
-    { value: 'BUENO', label: 'Bueno' },
-    { value: 'DANADO', label: 'Dañado' },
-    { value: 'INCOMPLETO', label: 'Incompleto' },
-    { value: 'PERDIDO', label: 'Perdido' },
-  ];
 
   const { data: cesarAccs } = useQuery({
     queryKey: ['cesar-accesorios', cesarTarget?.IdMovEquipoAsignacion],
-    queryFn: () => api.asignaciones.list({ pageSize: 50, idEquipo: cesarTarget?.IdMaeEquipo, estado: 'VIGENTE' }).then(() => {
-      return api.asignaciones.linkedAccs(cesarTarget?.IdMovEquipoAsignacion);
-    }),
+    queryFn: () => api.asignaciones.linkedAccs(cesarTarget?.IdMovEquipoAsignacion),
     enabled: !!cesarTarget && showCesarDialog,
   });
 
   const confirmCesar = async (row) => {
     setCesarTarget(row);
-    setCesarMotivo('');
-    setCesarEstadoFisico('');
-    setCesarObsDev('');
 
     try {
       const accs = await api.asignaciones.linkedAccs(row.IdMovEquipoAsignacion);
@@ -149,9 +138,6 @@ export default function Asignaciones() {
     cesarMutation.mutate({
       id: cesarTarget.IdMovEquipoAsignacion,
       accesorios: accActions.length ? accActions : undefined,
-      motivo: cesarMotivo || null,
-      estadoFisico: cesarEstadoFisico || null,
-      obsDev: cesarObsDev || null,
     });
   };
 
@@ -166,8 +152,23 @@ export default function Asignaciones() {
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
     } catch (e) {
-      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo generar el acta' });
+      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo abrir el acta.' });
+      console.error('Error al abrir acta:', e);
     }
+  };
+
+  const handleRowClick = (row) => {
+    setSelectedAsignacionId(row.IdMovEquipoAsignacion);
+    setDetalleOpen(true);
+  };
+
+  const handleCesarFromDrawer = (id, equipo, trabajador) => {
+    confirmCesar({
+      IdMovEquipoAsignacion: id,
+      IdMaeEquipo: equipo.IdMaeEquipo,
+      CodEquipo: equipo.CodEquipo,
+      TrabajadorNombre: trabajador?.NombreTrabajador,
+    });
   };
 
   const rows = asignaciones?.rows || [];
@@ -220,6 +221,7 @@ export default function Asignaciones() {
           },
         ]}
         data={rows}
+        onRowClick={handleRowClick}
       />
 
       {totalPages > 1 && (
@@ -246,47 +248,30 @@ export default function Asignaciones() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showCesarDialog} onOpenChange={(v) => { setShowCesarDialog(v); if (!v) { setCesarTarget(null); setAccActions([]); setCesarMotivo(''); setCesarEstadoFisico(''); setCesarObsDev(''); } }}>
+      <AsignacionDetalleDrawer
+        open={detalleOpen}
+        onOpenChange={(v) => { setDetalleOpen(v); if (!v) { setSelectedAsignacionId(null); } }}
+        detalle={detalleQuery.data}
+        loading={detalleQuery.isLoading}
+        error={detalleQuery.error}
+        onVerActa={abrirActa}
+        onCesar={handleCesarFromDrawer}
+        navigate={navigate}
+      />
+
+      <Dialog open={showCesarDialog} onOpenChange={(v) => { setShowCesarDialog(v); if (!v) { setCesarTarget(null); setAccActions([]); } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Cesar asignación</DialogTitle>
             <DialogDescription>
-              Finalizar asignación de <strong>{cesarTarget?.CodEquipo}</strong> a {cesarTarget?.TrabajadorNombre}
+              Finalizar asignación de <strong>{cesarTarget?.CodEquipo}</strong>
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">¿Qué pasó con el equipo?</label>
-              <Select value={cesarMotivo} onValueChange={setCesarMotivo}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar motivo" /></SelectTrigger>
-                <SelectContent>
-                  {MOTIVOS_CESE.map((m) => (
-                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Estado físico al devolver</label>
-              <Select value={cesarEstadoFisico} onValueChange={setCesarEstadoFisico}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar estado" /></SelectTrigger>
-                <SelectContent>
-                  {ESTADOS_FISICOS_DEV.map((ef) => (
-                    <SelectItem key={ef.value} value={ef.value}>{ef.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Observaciones</label>
-              <textarea value={cesarObsDev} onChange={(e) => setCesarObsDev(e.target.value)}
-                className="w-full min-h-[60px] rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm"
-                placeholder="Ej: Pantalla rota, sin cargador, teclado con teclas faltantes..."
-                rows={2} />
-            </div>
+            <p className="text-sm text-muted-foreground">
+              El equipo volverá a estado <strong>DISPONIBLE</strong>.
+            </p>
 
             {accActions.length > 0 && (
               <>
@@ -317,7 +302,7 @@ export default function Asignaciones() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowCesarDialog(false); setCesarTarget(null); setAccActions([]); setCesarMotivo(''); setCesarEstadoFisico(''); setCesarObsDev(''); }}>Cancelar</Button>
+            <Button variant="outline" onClick={() => { setShowCesarDialog(false); setCesarTarget(null); setAccActions([]); }}>Cancelar</Button>
             <Button variant="destructive" onClick={handleCesar} disabled={cesarMutation.isPending}>
               {cesarMutation.isPending ? 'Cesando...' : 'Cesar'}
             </Button>
@@ -337,15 +322,6 @@ function AsignarForm({ onSuccess, equipoInicial }) {
   const [selectedAcc, setSelectedAcc] = useState([]);
   const [searchAcc, setSearchAcc] = useState('');
   const [obs, setObs] = useState('');
-  const [estadoFisico, setEstadoFisico] = useState('');
-  const [obsEntrega, setObsEntrega] = useState('');
-
-  const ESTADOS_FISICOS = [
-    { value: 'BUENO', label: 'Bueno' },
-    { value: 'REGULAR', label: 'Regular' },
-    { value: 'DANADO', label: 'Dañado' },
-    { value: 'CON_OBSERVACION', label: 'Con observación' },
-  ];
 
   const { data: trabajadores } = useQuery({
     queryKey: ['trabajadores-search', searchTrab],
@@ -421,15 +397,9 @@ function AsignarForm({ onSuccess, equipoInicial }) {
   const handleAsignar = () => {
     if (!selectedTrab || selectedEquipos.length === 0) return;
 
-    const baseData = {
-      EstadoFisicoEntrega: estadoFisico || null,
-      ObservacionesEntrega: obsEntrega || null,
-    };
-
     if (selectedEquipos.length === 1 && selectedAcc.length > 0) {
       const eq = selectedEquipos[0];
       asignarConAccMutation.mutate({
-        ...baseData,
         IdMaeEquipo: eq.IdMaeEquipo,
         IdReferente: selectedTrab.IdTrabajador,
         Obs: obs || null,
@@ -437,7 +407,6 @@ function AsignarForm({ onSuccess, equipoInicial }) {
       });
     } else {
       asignarMutation.mutate({
-        ...baseData,
         IdMaeEquipos: selectedEquipos.map((e) => e.IdMaeEquipo),
         IdReferente: selectedTrab.IdTrabajador,
         Obs: obs,
@@ -590,42 +559,10 @@ function AsignarForm({ onSuccess, equipoInicial }) {
               </>
             )}
 
-            {estadoFisico && (
-              <div className="mt-3 pt-2 border-t border-border">
-                <p className="font-semibold text-sm mb-1">Estado físico al entregar</p>
-                <p className="text-xs">
-                  {ESTADOS_FISICOS.find(ef => ef.value === estadoFisico)?.label || estadoFisico}
-                  {obsEntrega ? ` — ${obsEntrega}` : ''}
-                </p>
-              </div>
-            )}
-
             <div className="mt-3 pt-2 border-t border-border bg-amber-50 dark:bg-amber-950/20 p-2 rounded text-xs text-muted-foreground">
               Los equipos pasarán a estado <strong>ASIGNADO</strong>.
               Los accesorios seleccionados quedarán asignados al trabajador y vinculados a esta entrega.
             </div>
-          </div>
-          <div className="space-y-3 pt-2 border-t border-border">
-            <p className="font-semibold text-sm">Estado físico del equipo al entregar</p>
-            <div className="grid grid-cols-2 gap-3">
-              {ESTADOS_FISICOS.map((ef) => (
-                <div key={ef.value} onClick={() => setEstadoFisico(ef.value)}
-                  className={`p-3 rounded-lg cursor-pointer text-sm text-center border ${
-                    estadoFisico === ef.value ? 'bg-accent border-primary' : 'hover:bg-muted border-border'
-                  }`}>
-                  {ef.label}
-                </div>
-              ))}
-            </div>
-            {estadoFisico && (
-              <div>
-                <label className="block text-sm font-medium mb-1">Observaciones sobre el estado físico</label>
-                <textarea value={obsEntrega} onChange={(e) => setObsEntrega(e.target.value)}
-                  className="w-full min-h-[60px] rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm"
-                  placeholder="Ej: Pantalla con rayón leve, teclado con desgaste, sin cargador original..."
-                  rows={2} />
-              </div>
-            )}
           </div>
 
           <div>
