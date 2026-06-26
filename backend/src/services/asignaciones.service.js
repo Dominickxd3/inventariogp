@@ -17,18 +17,7 @@ const trxExec = async (trx, sqlText, params = {}) => {
   await createRequest(trx, params).query(sqlText);
 };
 
-const MOTIVO_TO_ESTADO = {
-  DEVUELTO_BUEN_ESTADO: 'DISPONIBLE',
-  DEVUELTO_CON_DANO: 'MANTENIMIENTO',
-  PERDIDO: 'BAJA',
-  ROBADO: 'BAJA',
-  A_MANTENIMIENTO: 'MANTENIMIENTO',
-  A_BAJA: 'BAJA',
-};
 
-function determinarEstadoEquipoPorMotivo(motivo) {
-  return MOTIVO_TO_ESTADO[motivo] || 'DISPONIBLE';
-}
 
 async function validarTrabajador(idReferente) {
   const t = await TrabajadoresRepository.getById(idReferente);
@@ -59,10 +48,10 @@ export const AsignacionesService = {
 
     return withTransaction(DB, async (trx) => {
       const rows = await trxRows(trx, `
-        INSERT INTO Tab_EQ_MovEquiposAsignaciones (IdMaeEquipo, IdReferente, FecAsignacion, Obs, Estado, EstadoFisicoEntrega, ObservacionesEntrega)
+        INSERT INTO Tab_EQ_MovEquiposAsignaciones (IdMaeEquipo, IdReferente, FecAsignacion, Obs, Estado)
         OUTPUT INSERTED.IdMovEquipoAsignacion
-        VALUES (@idEquipo, @idTrabajador, @fec, @obs, 'VIGENTE', @estadoFisico, @obsEntrega)
-      `, { idEquipo: data.IdMaeEquipo, idTrabajador: data.IdReferente, fec: fec(), obs: data.Obs || null, estadoFisico: data.EstadoFisicoEntrega || null, obsEntrega: data.ObservacionesEntrega || null });
+        VALUES (@idEquipo, @idTrabajador, @fec, @obs, 'VIGENTE')
+      `, { idEquipo: data.IdMaeEquipo, idTrabajador: data.IdReferente, fec: fec(), obs: data.Obs || null });
       const idAsig = rows[0].IdMovEquipoAsignacion;
 
       await trxExec(trx, `UPDATE Tab_EQ_MaeEquipos SET Estado = 'ASIGNADO' WHERE IdMaeEquipo = @id`, { id: data.IdMaeEquipo });
@@ -102,29 +91,17 @@ export const AsignacionesService = {
     const asig = await AsignacionesRepository.getById(id);
     if (!asig) throw new Error('Asignación no encontrada');
 
-    const motivo = data?.MotivoCese || null;
-    const nuevoEstado = determinarEstadoEquipoPorMotivo(motivo);
-    const obsCese = data?.ObservacionesDevolucion || null;
-
     return withTransaction(DB, async (trx) => {
       await trxExec(trx, `
         UPDATE Tab_EQ_MovEquiposAsignaciones
-        SET Estado = 'CESADO', FecCese = GETDATE(),
-            EstadoFisicoDevolucion = @estadoFisico,
-            ObservacionesDevolucion = @obsDev,
-            MotivoCese = @motivo
+        SET Estado = 'CESADO', FecCese = GETDATE()
         WHERE IdMovEquipoAsignacion = @id
-      `, {
-        id,
-        estadoFisico: data?.EstadoFisicoDevolucion || null,
-        obsDev: obsCese,
-        motivo,
-      });
-      await trxExec(trx, `UPDATE Tab_EQ_MaeEquipos SET Estado = @nuevoEstado WHERE IdMaeEquipo = @id`, { id: asig.IdMaeEquipo, nuevoEstado });
+      `, { id });
+      await trxExec(trx, `UPDATE Tab_EQ_MaeEquipos SET Estado = 'DISPONIBLE' WHERE IdMaeEquipo = @id`, { id: asig.IdMaeEquipo });
       await trxExec(trx, `
         INSERT INTO Tab_EQ_MovEstadosEquipos (IdMaeEquipo, EstadoAnterior, EstadoNuevo, IdUsuario, Obs)
-        VALUES (@idEquipo, 'ASIGNADO', @nuevoEstado, @idUsuario, @obs)
-      `, { idEquipo: asig.IdMaeEquipo, nuevoEstado, idUsuario: idUsuario || null, obs: motivo ? `Cese: ${motivo}` : 'Asignación finalizada' });
+        VALUES (@idEquipo, 'ASIGNADO', 'DISPONIBLE', @idUsuario, 'Asignación finalizada')
+      `, { idEquipo: asig.IdMaeEquipo, idUsuario: idUsuario || null });
 
       if (accesorios?.length) {
         for (const acc of accesorios) {
@@ -166,10 +143,10 @@ export const AsignacionesService = {
 
       for (const idEquipo of IdMaeEquipos) {
         const rows = await trxRows(trx, `
-          INSERT INTO Tab_EQ_MovEquiposAsignaciones (IdMaeEquipo, IdReferente, FecAsignacion, Obs, Estado, EstadoFisicoEntrega, ObservacionesEntrega)
+          INSERT INTO Tab_EQ_MovEquiposAsignaciones (IdMaeEquipo, IdReferente, FecAsignacion, Obs, Estado)
           OUTPUT INSERTED.IdMovEquipoAsignacion
-          VALUES (@idEquipo, @idTrabajador, @fec, @obs, 'VIGENTE', @estadoFisico, @obsEntrega)
-        `, { idEquipo, idTrabajador: IdReferente, fec: fec(), obs: Obs || null, estadoFisico: data.EstadoFisicoEntrega || null, obsEntrega: data.ObservacionesEntrega || null });
+          VALUES (@idEquipo, @idTrabajador, @fec, @obs, 'VIGENTE')
+        `, { idEquipo, idTrabajador: IdReferente, fec: fec(), obs: Obs || null });
         const idAsig = rows[0].IdMovEquipoAsignacion;
 
         await trxExec(trx, `UPDATE Tab_EQ_MaeEquipos SET Estado = 'ASIGNADO' WHERE IdMaeEquipo = @id`, { id: idEquipo });
@@ -214,10 +191,10 @@ export const AsignacionesService = {
 
     return withTransaction(DB, async (trx) => {
       const rows = await trxRows(trx, `
-        INSERT INTO Tab_EQ_MovEquiposAsignaciones (IdMaeEquipo, IdReferente, FecAsignacion, Obs, Estado, EstadoFisicoEntrega, ObservacionesEntrega)
+        INSERT INTO Tab_EQ_MovEquiposAsignaciones (IdMaeEquipo, IdReferente, FecAsignacion, Obs, Estado)
         OUTPUT INSERTED.IdMovEquipoAsignacion
-        VALUES (@idEquipo, @idTrabajador, @fec, @obs, 'VIGENTE', @estadoFisico, @obsEntrega)
-      `, { idEquipo: IdMaeEquipo, idTrabajador: IdReferente, fec: fec(), obs: Obs || null, estadoFisico: data.EstadoFisicoEntrega || null, obsEntrega: data.ObservacionesEntrega || null });
+        VALUES (@idEquipo, @idTrabajador, @fec, @obs, 'VIGENTE')
+      `, { idEquipo: IdMaeEquipo, idTrabajador: IdReferente, fec: fec(), obs: Obs || null });
       const idAsig = rows[0].IdMovEquipoAsignacion;
 
       await trxExec(trx, `UPDATE Tab_EQ_MaeEquipos SET Estado = 'ASIGNADO' WHERE IdMaeEquipo = @id`, { id: IdMaeEquipo });
@@ -352,13 +329,6 @@ export const AsignacionesService = {
     <tr><th>Código</th><th>Tipo</th><th>Descripción</th><th>Marca</th><th>Modelo</th></tr>
     ${accesoriosRowsHtml}
   </table>
-
-  ${asig.EstadoFisicoEntrega ? `
-  <table>
-    <tr><th colspan="2">Estado Físico al Entregar</th></tr>
-    <tr><td style="width:30%">Estado</td><td>${asig.EstadoFisicoEntrega}</td></tr>
-    ${asig.ObservacionesEntrega ? `<tr><td>Observaciones</td><td>${asig.ObservacionesEntrega}</td></tr>` : ''}
-  </table>` : ''}
 
   <table>
     <tr><th colspan="2">Información de la Entrega</th></tr>
