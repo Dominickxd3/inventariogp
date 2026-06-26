@@ -42,7 +42,7 @@ export const AsignacionesRepository = {
   async getById(id) {
     const rows = await query(DB, `
       SELECT a.*, e.CodEquipo, e.CodBarra, t.DesTipodeEquipo,
-             tr.Trabajador as TrabajadorNombre, tr.DOI, tr.Area
+             tr.Trabajador as TrabajadorNombre, tr.DOI, tr.Area, tr.Ocupacion
       FROM Tab_EQ_MovEquiposAsignaciones a
       JOIN Tab_EQ_MaeEquipos e ON a.IdMaeEquipo = e.IdMaeEquipo
       LEFT JOIN Tab_EQ_TipodeEquipos t ON e.IdTipodeEquipo = t.IdTipodeEquipo

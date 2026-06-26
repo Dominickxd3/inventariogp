@@ -289,14 +289,32 @@ export const AsignacionesService = {
     const asig = await AsignacionesRepository.getById(id);
     if (!asig) return null;
 
-    const accs = await ComponentesRepository.listAccesoriosPorTrabajador(asig.IdReferente);
+    const accs = await this.getAccsByAsignacion(id);
 
     const fec = new Date().toLocaleDateString('es-PE', { year: 'numeric', month: 'long', day: 'numeric' });
+    const fecAsig = asig.FecAsignacion
+      ? new Date(asig.FecAsignacion).toLocaleDateString('es-PE', { year: 'numeric', month: 'long', day: 'numeric' })
+      : '—';
+
+    const accesoriosRowsHtml = accs.length
+      ? accs.map(a => `        <tr>
+          <td>${a.CodComponente || ''}</td>
+          <td>${a.DesTipodeComponente || '—'}</td>
+          <td>${a.DesComponente || '—'}</td>
+          <td>${a.Marca || '—'}</td>
+          <td>${a.Modelo || '—'}</td>
+        </tr>
+      `).join('')
+      : `        <tr>
+          <td colspan="5" style="text-align:center;color:#999;">Sin accesorios entregados</td>
+        </tr>
+      `;
 
     return `<!DOCTYPE html>
 <html lang="es">
 <head><meta charset="UTF-8"><title>Acta de Entrega - ${asig.CodEquipo}</title>
 <style>
+  * { box-sizing: border-box; }
   body { font-family: 'Inter', Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; color: #1a1a1a; }
   h1 { text-align: center; font-size: 20px; margin-bottom: 4px; }
   .subtitle { text-align: center; color: #666; font-size: 13px; margin-bottom: 30px; }
@@ -312,27 +330,28 @@ export const AsignacionesService = {
 </head>
 <body>
   <h1>ACTA DE ENTREGA DE EQUIPO</h1>
-  <p class="subtitle">Fecha: ${fec} — Código: ACT-${String(asig.IdMovEquipoAsignacion).padStart(6, '0')}</p>
+  <p class="subtitle">Código: ACT-${String(asig.IdMovEquipoAsignacion).padStart(6, '0')} — ${fec}</p>
 
   <table>
     <tr><th colspan="2">Datos del Trabajador</th></tr>
     <tr><td style="width:30%">Nombre</td><td>${asig.TrabajadorNombre || '—'}</td></tr>
     <tr><td>DNI</td><td>${asig.DOI || '—'}</td></tr>
     <tr><td>Área</td><td>${asig.Area || '—'}</td></tr>
+    <tr><td>Cargo</td><td>${asig.Ocupacion || '—'}</td></tr>
   </table>
 
   <table>
-    <tr><th colspan="3">Equipo Entregado</th></tr>
-    <tr><th>Código</th><th>Tipo</th><th>Detalle</th></tr>
-    <tr><td>${asig.CodEquipo}</td><td>${asig.DesTipodeEquipo || '—'}</td><td>${asig.CodBarra ? `Código barra: ${asig.CodBarra}` : ''}</td></tr>
+    <tr><th colspan="2">Equipo Entregado</th></tr>
+    <tr><td style="width:30%">Código</td><td>${asig.CodEquipo}</td></tr>
+    <tr><td>Tipo</td><td>${asig.DesTipodeEquipo || '—'}</td></tr>
+    <tr><td>Código de barra / Serie</td><td>${asig.CodBarra || '—'}</td></tr>
   </table>
 
-  ${accs.length ? `
   <table>
     <tr><th colspan="3">Accesorios Entregados</th></tr>
-    <tr><th>Código</th><th>Tipo</th><th>Descripción</th></tr>
-    ${accs.map(a => `<tr><td>${a.CodComponente}</td><td>${a.DesTipodeComponente || '—'}</td><td>${a.DesComponente || '—'}${a.Marca ? ` / ${a.Marca}` : ''}</td></tr>`).join('')}
-  </table>` : ''}
+    <tr><th>Código</th><th>Tipo</th><th>Descripción</th><th>Marca</th><th>Modelo</th></tr>
+    ${accesoriosRowsHtml}
+  </table>
 
   ${asig.EstadoFisicoEntrega ? `
   <table>
@@ -341,14 +360,23 @@ export const AsignacionesService = {
     ${asig.ObservacionesEntrega ? `<tr><td>Observaciones</td><td>${asig.ObservacionesEntrega}</td></tr>` : ''}
   </table>` : ''}
 
+  <table>
+    <tr><th colspan="2">Información de la Entrega</th></tr>
+    <tr><td style="width:30%">Fecha de asignación</td><td>${fecAsig}</td></tr>
+  </table>
+
   ${asig.Obs ? `<div class="obs"><strong>Observaciones:</strong><p>${asig.Obs}</p></div>` : ''}
 
   <div class="firmas">
     <div class="firma">
-      <div class="linea">ENTREGÓ</div>
+      <div><strong>ENTREGÓ</strong></div>
+      <div style="margin-top:4px;font-size:12px;color:#666;">Responsable de TI</div>
+      <div class="linea"></div>
     </div>
     <div class="firma">
-      <div class="linea">RECIBIÓ</div>
+      <div><strong>RECIBIÓ</strong></div>
+      <div style="margin-top:4px;font-size:12px;color:#666;">${asig.TrabajadorNombre || 'Trabajador'}</div>
+      <div class="linea"></div>
     </div>
   </div>
 

@@ -150,6 +150,13 @@ export const ComponentesRepository = {
         await createRequest(trx, params).query(sqlText);
       };
 
+      const eq = await trxRows('SELECT IdMaeEquipo FROM Tab_EQ_MaeEquipos WHERE IdMaeEquipo = @id', { id: idEquipo });
+      if (!eq.length) throw new Error('El equipo no existe');
+
+      const comp = await trxRows('SELECT IdComponente, Estado FROM Tab_EQ_Componentes WHERE IdComponente = @id', { id: idComponente });
+      if (!comp.length) throw new Error('El componente no existe');
+      if (comp[0].Estado !== 'DISPONIBLE') throw new Error('El componente no está disponible');
+
       const vigente = await trxRows(`
         SELECT TOP 1 IdMovEquipoComponente, IdMaeEquipo
         FROM Tab_EQ_MovEquiposComponentes
@@ -160,7 +167,7 @@ export const ComponentesRepository = {
         throw new Error('El componente ya está vinculado a otro equipo');
       }
 
-      const result = await trxRows(`
+      const insertResult = await trxRows(`
         INSERT INTO Tab_EQ_MovEquiposComponentes
           (IdMaeEquipo, IdComponente, FecAsigComponente, Obs, Estado, OrigenVinculo, Motivo, FecInstalacion, IdIntervencion)
         OUTPUT INSERTED.IdMovEquipoComponente
@@ -176,7 +183,7 @@ export const ComponentesRepository = {
 
       await trxExec(`UPDATE Tab_EQ_Componentes SET Estado = 'ASIGNADO' WHERE IdComponente = @id`, { id: idComponente });
 
-      return result[0]?.IdMovEquipoComponente;
+      return insertResult[0]?.IdMovEquipoComponente;
     });
   },
 
