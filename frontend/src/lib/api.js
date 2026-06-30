@@ -1,30 +1,35 @@
 const BASE = '/api';
 
-function getAuthHeaders() {
-  const token = localStorage.getItem('token');
-  return token ? { 'Authorization': `Bearer ${token}` } : {};
+function getToken() {
+  return localStorage.getItem('token');
 }
 
-async function request(url, options = {}) {
-  const res = await fetch(`${BASE}${url}`, {
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(), ...options.headers },
+export async function request(path, options = {}) {
+  const token = getToken();
+  const res = await fetch(`${BASE}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
     ...options,
   });
   if (res.status === 401) {
     localStorage.removeItem('token');
     window.location.href = '/login';
-    throw new Error('Sesión expirada');
-  }
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || 'Error en la solicitud');
+    return null;
   }
   if (res.status === 204) return null;
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || data.message || 'Error del servidor');
+  return data;
 }
 
 export const api = {
-  // Equipos
+  auth: {
+    login: (usuario, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ usuario, password }) }),
+    me: () => request('/auth/me'),
+  },
   equipos: {
     list: (params) => request(`/equipos?${new URLSearchParams(params)}`),
     get: (id) => request(`/equipos/${id}`),
@@ -35,12 +40,12 @@ export const api = {
     baja: (id) => request(`/equipos/${id}/baja`, { method: 'POST' }),
     timeline: (id) => request(`/equipos/${id}/timeline`),
     qr: (id) => request(`/equipos/${id}/qr`, { method: 'POST' }),
+    dashboard: () => request('/equipos/dashboard'),
     tipos: {
       list: () => request('/equipos/tipos'),
       create: (data) => request('/equipos/tipos', { method: 'POST', body: JSON.stringify(data) }),
     },
     tiposAsignables: () => request('/equipos/tipos-asignables'),
-    dashboard: () => request('/equipos/dashboard'),
     intervenciones: {
       list: (id) => request(`/equipos/${id}/intervenciones`),
       create: (id, data) => request(`/equipos/${id}/intervenciones`, { method: 'POST', body: JSON.stringify(data) }),
@@ -55,40 +60,30 @@ export const api = {
     componentes: {
       list: (id) => request(`/equipos/${id}/componentes`),
       add: (id, data) => request(`/equipos/${id}/componentes`, { method: 'POST', body: JSON.stringify(data) }),
-      remove: (id, idMov, motivo) => request(`/equipos/${id}/componentes/${idMov}`, { method: 'DELETE', body: JSON.stringify({ Motivo: motivo || null }) }),
+      remove: (id, idMov, motivo) => request(`/equipos/${id}/componentes/${idMov}`, { method: 'DELETE', body: JSON.stringify({ motivo }) }),
     },
   },
-
-  // Trabajadores
   trabajadores: {
-    search: (params) => request(`/trabajadores?${new URLSearchParams(params)}`),
+    list: (params) => request(`/trabajadores?${new URLSearchParams(params)}`),
     get: (id) => request(`/trabajadores/${id}`),
     getByDNI: (dni) => request(`/trabajadores/dni/${dni}`),
-    sync: () => request('/trabajadores/sync', { method: 'POST' }),
     areas: () => request('/trabajadores/areas'),
   },
-
-  // Asignaciones
   asignaciones: {
     list: (params) => request(`/asignaciones?${new URLSearchParams(params)}`),
     get: (id) => request(`/asignaciones/${id}`),
     create: (data) => request('/asignaciones', { method: 'POST', body: JSON.stringify(data) }),
     createBulk: (data) => request('/asignaciones/bulk', { method: 'POST', body: JSON.stringify(data) }),
     createConAccesorios: (data) => request('/asignaciones/con-accesorios', { method: 'POST', body: JSON.stringify(data) }),
-    cesarTrabajador: (id) => request(`/asignaciones/cesar-trabajador/${id}`, { method: 'POST' }),
-    cesar: (id, accesorios, extra) => {
-      const body = { ...(accesorios ? { accesorios } : {}), ...(extra || {}) };
-      return request(`/asignaciones/${id}/cesar`, { method: 'POST', body: JSON.stringify(body) });
-    },
+    cesar: (id, accesorios, extra) => request(`/asignaciones/${id}/cesar`, { method: 'POST', body: JSON.stringify({ accesorios, ...extra }) }),
+    cesarTrabajador: (idTrabajador) => request(`/asignaciones/cesar-trabajador/${idTrabajador}`, { method: 'POST' }),
     linkedAccs: (id) => request(`/asignaciones/${id}/accesorios`),
-    acta: (id) => `${BASE}/asignaciones/${id}/acta`,
+    acta: (id) => request(`/asignaciones/${id}/acta`),
     detalle: (id) => request(`/asignaciones/${id}/detalle`),
     historialEquipo: (id) => request(`/asignaciones/equipo/${id}`),
     historialTrabajador: (id) => request(`/asignaciones/trabajador/${id}`),
     activasTrabajador: (id) => request(`/asignaciones/trabajador/${id}/activas`),
   },
-
-  // Incidencias
   incidencias: {
     list: (params) => request(`/incidencias?${new URLSearchParams(params)}`),
     listByEquipo: (id) => request(`/incidencias?idEquipo=${id}`),
@@ -96,15 +91,6 @@ export const api = {
     create: (data) => request('/incidencias', { method: 'POST', body: JSON.stringify(data) }),
     cerrar: (id) => request(`/incidencias/${id}/cerrar`, { method: 'POST' }),
   },
-
-  // Auth
-  auth: {
-    login: (usuario, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ usuario, password }) }),
-    me: () => request('/auth/me'),
-
-  },
-
-  // Componentes
   componentes: {
     list: (params) => request(`/componentes?${new URLSearchParams(params)}`),
     get: (id) => request(`/componentes/${id}`),

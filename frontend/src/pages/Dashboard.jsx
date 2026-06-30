@@ -1,16 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
-import { Laptop, Users, ClipboardList, AlertTriangle, Package } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { formatDate } from '../lib/utils';
-import { EstadoBadge } from '../components/Badge';
+import { StatusBadge } from '../components/StatusBadge';
+import { StatsCard } from '../components/StatsCard';
+import { EmptyState } from '../components/EmptyState';
+import { Laptop, Package, Users, AlertTriangle, Monitor, Clock, ArrowRight } from 'lucide-react';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
-const cards = [
-  { key: 'total', label: 'Total Equipos', icon: Laptop, color: 'bg-blue-500' },
-  { key: 'disponibles', label: 'Disponibles', icon: Package, color: 'bg-green-500' },
-  { key: 'asignados', label: 'Asignados', icon: Users, color: 'bg-indigo-500' },
-  { key: 'incidencia', label: 'En Incidencia', icon: AlertTriangle, color: 'bg-red-500' },
-];
+const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#6b7280', '#8b5cf6'];
 
 export default function Dashboard() {
   const { data, isLoading } = useQuery({
@@ -25,92 +23,158 @@ export default function Dashboard() {
     refetchInterval: 30000,
   });
 
-  if (isLoading) return <div className="text-center py-12 text-gray-400">Cargando...</div>;
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="h-8 w-48 bg-muted-foreground/10 rounded animate-pulse" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-28 bg-card rounded-xl border border-border animate-pulse" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="h-80 bg-card rounded-xl border border-border animate-pulse" />
+          <div className="h-80 bg-card rounded-xl border border-border animate-pulse" />
+        </div>
+      </div>
+    );
+  }
 
   const rows = ultimasAsignaciones?.rows || [];
 
+  const statusData = [
+    { name: 'Disponibles', value: data?.disponibles ?? 0 },
+    { name: 'Asignados', value: data?.asignados ?? 0 },
+    { name: 'Incidencia', value: data?.incidencia ?? 0 },
+    { name: 'Mantenimiento', value: data?.mantenimiento ?? 0 },
+    { name: 'Baja', value: data?.baja ?? 0 },
+  ].filter(d => d.value > 0);
+
+  const tipoData = (data?.porTipo || []).map(item => ({
+    name: item.DesTipodeEquipo,
+    value: item.count,
+  }));
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+      <div>
+        <h1 className="text-2xl font-bold text-foreground tracking-tight">Dashboard</h1>
+        <p className="text-sm text-muted-foreground mt-1">Resumen general del inventario</p>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {cards.map((card) => (
-          <div key={card.key} className="bg-card rounded-xl border border-border p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">{card.label}</p>
-                <p className="text-2xl font-bold text-foreground mt-1">
-                  {data?.[card.key] ?? 0}
-                </p>
-              </div>
-              <div className={`p-3 rounded-lg ${card.color}`}>
-                <card.icon className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </div>
-        ))}
+        <StatsCard title="Total Equipos" value={data?.total ?? 0} icon={Monitor} />
+        <StatsCard title="Disponibles" value={data?.disponibles ?? 0} icon={Package} />
+        <StatsCard title="Asignados" value={data?.asignados ?? 0} icon={Users} />
+        <StatsCard title="En Incidencia" value={data?.incidencia ?? 0} icon={AlertTriangle} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Pie Chart - Equipos por Tipo */}
         <div className="bg-card rounded-xl border border-border p-5">
-          <h2 className="font-semibold text-foreground mb-4">Equipos por Tipo</h2>
-          <div className="space-y-3">
-            {data?.porTipo?.map((item) => (
-              <div key={item.DesTipodeEquipo} className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">{item.DesTipodeEquipo}</span>
-                <span className="text-sm font-semibold text-foreground">{item.count}</span>
+          <h2 className="font-semibold text-foreground mb-1">Equipos por Tipo</h2>
+          <p className="text-xs text-muted-foreground mb-4">Distribución por categoría</p>
+          {tipoData.length === 0 ? (
+            <EmptyState title="Sin datos" description="No hay equipos registrados" />
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <PieChart>
+                <Pie
+                  data={tipoData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={3}
+                  dataKey="value"
+                >
+                  {tipoData.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    borderRadius: '8px',
+                    border: '1px solid #e4e4e7',
+                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+          <div className="flex flex-wrap gap-3 mt-2">
+            {tipoData.map((item, i) => (
+              <div key={item.name} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                {item.name}: {item.value}
               </div>
             ))}
           </div>
         </div>
 
+        {/* Bar Chart - Resumen de Estado */}
         <div className="bg-card rounded-xl border border-border p-5">
-          <h2 className="font-semibold text-foreground mb-4">Resumen de Estado</h2>
-          <div className="space-y-4">
-            {[
-              { label: 'Disponibles', value: data?.disponibles ?? 0, color: 'bg-green-500' },
-              { label: 'Asignados', value: data?.asignados ?? 0, color: 'bg-blue-500' },
-              { label: 'Incidencia', value: data?.incidencia ?? 0, color: 'bg-red-500' },
-              { label: 'Baja', value: data?.baja ?? 0, color: 'bg-gray-500' },
-            ].map((item) => (
-              <div key={item.label}>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-muted-foreground">{item.label}</span>
-                  <span className="font-semibold text-foreground">{item.value}</span>
-                </div>
-                <div className="w-full bg-secondary rounded-full h-2">
-                  <div
-                    className={`${item.color} h-2 rounded-full transition-all duration-500`}
-                    style={{ width: `${data?.total ? (item.value / data.total) * 100 : 0}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+          <h2 className="font-semibold text-foreground mb-1">Resumen de Estado</h2>
+          <p className="text-xs text-muted-foreground mb-4">Cantidad por estado</p>
+          {statusData.length === 0 ? (
+            <EmptyState title="Sin datos" description="No hay equipos registrados" />
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={statusData} barSize={48}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" />
+                <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#71717a' }} />
+                <YAxis tick={{ fontSize: 12, fill: '#71717a' }} />
+                <Tooltip
+                  contentStyle={{
+                    borderRadius: '8px',
+                    border: '1px solid #e4e4e7',
+                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                  }}
+                />
+                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                  {statusData.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
-      <div className="bg-card rounded-xl border border-border p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-foreground">Últimas Asignaciones</h2>
-          <Link to="/asignaciones" className="text-sm text-primary hover:underline">Ver todas</Link>
+      {/* Últimas Asignaciones */}
+      <div className="bg-card rounded-xl border border-border">
+        <div className="flex items-center justify-between p-5 border-b border-border">
+          <div>
+            <h2 className="font-semibold text-foreground">Últimas Asignaciones</h2>
+            <p className="text-xs text-muted-foreground">Actividad reciente de asignaciones</p>
+          </div>
+          <Link
+            to="/asignaciones"
+            className="inline-flex items-center gap-1 text-sm text-primary hover:underline font-medium"
+          >
+            Ver todas <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
         </div>
         {rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">No hay asignaciones registradas</p>
+          <div className="p-5">
+            <EmptyState title="Sin asignaciones" description="No hay asignaciones registradas recientemente" />
+          </div>
         ) : (
-          <div className="space-y-2">
+          <div className="divide-y divide-border">
             {rows.map((r) => (
-              <div key={r.IdMovEquipoAsignacion} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-foreground">
-                    {r.CodEquipo} — {r.DesTipodeEquipo}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {r.TrabajadorNombre || 'Trabajador no encontrado'}
-                    {' — '}{formatDate(r.FecAsignacion)}
+              <div key={r.IdMovEquipoAsignacion} className="flex items-center justify-between px-5 py-3.5 hover:bg-accent/30 transition-colors">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-foreground">{r.CodEquipo}</span>
+                    <span className="text-xs text-muted-foreground">—</span>
+                    <span className="text-sm text-muted-foreground truncate">{r.DesTipodeEquipo}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {r.TrabajadorNombre || 'Trabajador no encontrado'} · {formatDate(r.FecAsignacion)}
                   </p>
                 </div>
-                <EstadoBadge estado={r.Estado} />
+                <StatusBadge status={r.Estado} />
               </div>
             ))}
           </div>

@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
-import { EstadoBadge } from '../components/Badge';
+import { StatusBadge } from '../components/StatusBadge';
 import DataTable from '../components/DataTable';
-import SearchInput from '../components/SearchInput';
+import { PageHeader } from '../components/PageHeader';
 import { Button } from '#components/ui/button.jsx';
 import { Input } from '#components/ui/input.jsx';
 import {
@@ -17,149 +17,29 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '#components/ui/alert-dialog.jsx';
 import ComponenteDetalleDrawer from '../components/componentes/ComponenteDetalleDrawer';
-import { Plus } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 
 const componentTypeConfig = {
-  'MEMORIA RAM': {
-    descripcion: 'Ej: Memoria RAM DDR4',
-    marca: 'Ej: Kingston',
-    modelo: 'Ej: Fury Beast',
-    serie: 'Opcional',
-    detalleLabel: 'Detalle técnico',
-    detalle: 'Ej: 16 GB DDR4 3200 MHz',
-  },
-  'DISCO SSD': {
-    descripcion: 'Ej: Disco SSD',
-    marca: 'Ej: Kingston',
-    modelo: 'Ej: A400',
-    serie: 'Opcional',
-    detalleLabel: 'Detalle técnico',
-    detalle: 'Ej: 512 GB SSD SATA / NVMe',
-  },
-  'DISCO DURO': {
-    descripcion: 'Ej: Disco duro',
-    marca: 'Ej: Seagate',
-    modelo: 'Ej: Barracuda',
-    serie: 'Opcional',
-    detalleLabel: 'Detalle técnico',
-    detalle: 'Ej: 1 TB HDD SATA',
-  },
-  CARGADOR: {
-    descripcion: 'Ej: Cargador de laptop',
-    marca: 'Ej: Lenovo',
-    modelo: 'Ej: USB-C 65W',
-    serie: 'Opcional',
-    detalleLabel: 'Detalle técnico',
-    detalle: 'Ej: 65W USB-C',
-  },
-  BATERIA: {
-    descripcion: 'Ej: Batería de laptop',
-    marca: 'Ej: Lenovo',
-    modelo: 'Ej: L19M3PF1',
-    serie: 'Opcional',
-    detalleLabel: 'Detalle técnico',
-    detalle: 'Ej: 45Wh / 3 celdas',
-  },
-  PANTALLA: {
-    descripcion: 'Ej: Pantalla de laptop',
-    marca: 'Ej: BOE',
-    modelo: 'Ej: NV156FHM',
-    serie: 'Opcional',
-    detalleLabel: 'Detalle técnico',
-    detalle: 'Ej: 15.6 pulgadas FHD',
-  },
-  'TARJETA DE VIDEO': {
-    descripcion: 'Ej: Tarjeta de video',
-    marca: 'Ej: NVIDIA',
-    modelo: 'Ej: GTX 1650',
-    serie: 'Opcional',
-    detalleLabel: 'Detalle técnico',
-    detalle: 'Ej: 4 GB GDDR6 / PCIe',
-  },
-  MOUSE: {
-    descripcion: 'Ej: Mouse',
-    marca: 'Ej: Logitech',
-    modelo: 'Ej: M90',
-    serie: 'Opcional',
-    detalleLabel: 'Detalle técnico',
-    detalle: 'Ej: USB / inalámbrico',
-  },
-  TECLADO: {
-    descripcion: 'Ej: Teclado',
-    marca: 'Ej: Logitech',
-    modelo: 'Ej: K120',
-    serie: 'Opcional',
-    detalleLabel: 'Detalle técnico',
-    detalle: 'Ej: USB / español',
-  },
-  TONER: {
-    descripcion: 'Ej: Tóner de impresora',
-    marca: 'Ej: HP',
-    modelo: 'Ej: 85A',
-    serie: 'Opcional',
-    detalleLabel: 'Detalle técnico',
-    detalle: 'Ej: Negro / CE285A',
-  },
-  TINTA: {
-    descripcion: 'Ej: Tinta de impresora',
-    marca: 'Ej: Epson',
-    modelo: 'Ej: T664',
-    serie: 'Opcional',
-    detalleLabel: 'Detalle técnico',
-    detalle: 'Ej: Negro / CMYK',
-  },
-  CARTUCHO: {
-    descripcion: 'Ej: Cartucho de impresora',
-    marca: 'Ej: HP',
-    modelo: 'Ej: 65XL',
-    serie: 'Opcional',
-    detalleLabel: 'Detalle técnico',
-    detalle: 'Ej: Negro / Alto rendimiento',
-  },
-  AUDIFONOS: {
-    descripcion: 'Ej: Audífonos',
-    marca: 'Ej: Logitech',
-    modelo: 'Ej: H390',
-    serie: 'Opcional',
-    detalleLabel: 'Detalle técnico',
-    detalle: 'Ej: USB / diadema',
-  },
-  MOCHILA: {
-    descripcion: 'Ej: Mochila',
-    marca: 'Ej: Targus',
-    modelo: 'Ej: TSB026',
-    serie: 'Opcional',
-    detalleLabel: 'Detalle técnico',
-    detalle: 'Ej: 15.6 pulgadas',
-  },
+  'MEMORIA RAM': { descripcion: 'Ej: Memoria RAM DDR4', marca: 'Ej: Kingston', modelo: 'Ej: Fury Beast', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: 16 GB DDR4 3200 MHz' },
+  'DISCO SSD': { descripcion: 'Ej: Disco SSD', marca: 'Ej: Kingston', modelo: 'Ej: A400', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: 512 GB SSD SATA / NVMe' },
+  'DISCO DURO': { descripcion: 'Ej: Disco duro', marca: 'Ej: Seagate', modelo: 'Ej: Barracuda', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: 1 TB HDD SATA' },
+  CARGADOR: { descripcion: 'Ej: Cargador de laptop', marca: 'Ej: Lenovo', modelo: 'Ej: USB-C 65W', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: 65W USB-C' },
+  BATERIA: { descripcion: 'Ej: Batería de laptop', marca: 'Ej: Lenovo', modelo: 'Ej: L19M3PF1', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: 45Wh / 3 celdas' },
+  PANTALLA: { descripcion: 'Ej: Pantalla de laptop', marca: 'Ej: BOE', modelo: 'Ej: NV156FHM', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: 15.6 pulgadas FHD' },
+  'TARJETA DE VIDEO': { descripcion: 'Ej: Tarjeta de video', marca: 'Ej: NVIDIA', modelo: 'Ej: GTX 1650', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: 4 GB GDDR6 / PCIe' },
+  MOUSE: { descripcion: 'Ej: Mouse', marca: 'Ej: Logitech', modelo: 'Ej: M90', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: USB / inalámbrico' },
+  TECLADO: { descripcion: 'Ej: Teclado', marca: 'Ej: Logitech', modelo: 'Ej: K120', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: USB / español' },
+  TONER: { descripcion: 'Ej: Tóner de impresora', marca: 'Ej: HP', modelo: 'Ej: 85A', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: Negro / CE285A' },
+  TINTA: { descripcion: 'Ej: Tinta de impresora', marca: 'Ej: Epson', modelo: 'Ej: T664', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: Negro / CMYK' },
+  CARTUCHO: { descripcion: 'Ej: Cartucho de impresora', marca: 'Ej: HP', modelo: 'Ej: 65XL', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: Negro / Alto rendimiento' },
+  AUDIFONOS: { descripcion: 'Ej: Audífonos', marca: 'Ej: Logitech', modelo: 'Ej: H390', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: USB / diadema' },
+  MOCHILA: { descripcion: 'Ej: Mochila', marca: 'Ej: Targus', modelo: 'Ej: TSB026', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: 15.6 pulgadas' },
 };
 
-const defaultTypeConfig = {
-  descripcion: 'Ej: descripción del componente',
-  marca: 'Ej: Kingston',
-  modelo: 'Ej: modelo',
-  serie: 'Opcional',
-  detalleLabel: 'Detalle técnico',
-  detalle: 'Ej: especificación principal',
-  ayuda: '',
-};
+const defaultTypeConfig = { descripcion: 'Ej: descripción del componente', marca: 'Ej: Kingston', modelo: 'Ej: modelo', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: especificación principal', ayuda: '' };
+const initialForm = { IdTipodeComponente: '', DesComponente: '', Marca: '', Modelo: '', Serie: '', Capacidad: '', Lote: '', Obs: '' };
 
-const initialForm = {
-  IdTipodeComponente: '',
-  DesComponente: '',
-  Marca: '',
-  Modelo: '',
-  Serie: '',
-  Capacidad: '',
-  Lote: '',
-  Obs: '',
-};
-
-const formatCategoria = (cat) => ({
-  REPUESTO_TECNICO: 'Repuesto técnico',
-  ACCESORIO: 'Accesorio',
-}[cat] || 'Sin categoría');
-
+const formatCategoria = (cat) => ({ REPUESTO_TECNICO: 'Repuesto técnico', ACCESORIO: 'Accesorio' }[cat] || 'Sin categoría');
 const CATEGORIA_OPTS = [
   { value: 'REPUESTO_TECNICO', label: 'Repuesto técnico' },
   { value: 'ACCESORIO', label: 'Accesorio' },
@@ -168,61 +48,16 @@ const CATEGORIA_OPTS = [
 function CategoriaBadge({ categoria }) {
   const cat = String(categoria ?? '');
   const colors = {
-    REPUESTO_TECNICO: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-    ACCESORIO: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-    CONSUMIBLE: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
+    REPUESTO_TECNICO: 'bg-blue-50 text-blue-700 ring-blue-600/20',
+    ACCESORIO: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+    CONSUMIBLE: 'bg-amber-50 text-amber-700 ring-amber-600/20',
   };
-  const label = {
-    REPUESTO_TECNICO: 'Rep. Técnico',
-    ACCESORIO: 'Accesorio',
-    CONSUMIBLE: 'Consumible',
-  };
+  const label = { REPUESTO_TECNICO: 'Rep. Técnico', ACCESORIO: 'Accesorio', CONSUMIBLE: 'Consumible' };
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colors[cat] || 'bg-gray-100 text-gray-800'}`}>
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${colors[cat] || 'bg-gray-50 text-gray-600 ring-gray-500/20'}`}>
       {label[cat] || cat || 'Otro'}
     </span>
   );
-}
-
-const columns = [
-  { key: 'CodComponente', label: 'Código' },
-  { key: 'DesComponente', label: 'Descripción' },
-  { key: 'DesTipodeComponente', label: 'Tipo' },
-  { key: 'Categoria', label: 'Categoría', render: (r) => <CategoriaBadge categoria={r.Categoria} /> },
-  { key: 'Marca', label: 'Marca' },
-  { key: 'Modelo', label: 'Modelo' },
-  { key: 'Serie', label: 'Serie' },
-  { key: 'Estado', label: 'Estado', render: (r) => <EstadoBadge estado={r.Estado} /> },
-];
-
-const normalizarCategoria = (cat) => {
-  const value = String(cat || '')
-    .trim()
-    .toUpperCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, '_');
-
-  if (value === 'REPUESTO_TECNICO') return 'REPUESTO_TECNICO';
-  if (value === 'ACCESORIO') return 'ACCESORIO';
-  if (value === 'CONSUMIBLE') return 'CONSUMIBLE';
-
-  return value;
-};
-
-function normalizeTypeName(value) {
-  return (value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toUpperCase()
-    .trim();
-}
-
-function buildAutoDescription(tipoNombre, marca, modelo, detalle) {
-  return [tipoNombre, marca, modelo, detalle]
-    .map((value) => value?.trim())
-    .filter(Boolean)
-    .join(' ');
 }
 
 const CATEGORIA_TABS = [
@@ -240,6 +75,22 @@ const ESTADO_FILTERS = [
   { value: 'INACTIVO', label: 'Inactivo' },
 ];
 
+function normalizeTypeName(value) {
+  return (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+}
+
+function buildAutoDescription(tipoNombre, marca, modelo, detalle) {
+  return [tipoNombre, marca, modelo, detalle].map((v) => v?.trim()).filter(Boolean).join(' ');
+}
+
+function normalizarCategoria(cat) {
+  const value = String(cat || '').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_');
+  if (value === 'REPUESTO_TECNICO') return 'REPUESTO_TECNICO';
+  if (value === 'ACCESORIO') return 'ACCESORIO';
+  if (value === 'CONSUMIBLE') return 'CONSUMIBLE';
+  return value;
+}
+
 export default function Componentes() {
   const [search, setSearch] = useState('');
   const [categoria, setCategoria] = useState('');
@@ -256,7 +107,7 @@ export default function Componentes() {
   if (categoria) params.categoria = categoria;
   if (estadoFilter) params.estado = estadoFilter;
 
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['componentes', params],
     queryFn: () => api.componentes.list(params),
   });
@@ -275,23 +126,13 @@ export default function Componentes() {
   const tiposFiltrados = useMemo(() => {
     if (!categoriaNuevo || !Array.isArray(tipos)) return [];
     const catActual = normalizarCategoria(categoriaNuevo);
-    return tipos.filter((t) => {
-      const catTipo = normalizarCategoria(t.Categoria);
-      return catTipo === catActual;
-    });
+    return tipos.filter((t) => normalizarCategoria(t.Categoria) === catActual);
   }, [categoriaNuevo, tipos]);
-
 
   const selectedTipo = tipos?.find((t) => String(t.IdTipodeComponente) === String(form.IdTipodeComponente)) || null;
   const selectedTypeName = normalizeTypeName(selectedTipo?.DesTipodeComponente || '');
   const typeConfig = componentTypeConfig[selectedTypeName] || defaultTypeConfig;
-  const autoDescription = buildAutoDescription(
-    selectedTipo?.DesTipodeComponente,
-    form.Marca,
-    form.Modelo,
-    form.Capacidad
-  );
-
+  const autoDescription = buildAutoDescription(selectedTipo?.DesTipodeComponente, form.Marca, form.Modelo, form.Capacidad);
   const categoriaLabel = categoriaNuevo ? formatCategoria(categoriaNuevo) : '';
 
   const createMutation = useMutation({
@@ -333,39 +174,28 @@ export default function Componentes() {
     setShowDetalle(true);
   };
 
-  const handleBaja = (id) => {
-    setBajaId(id);
-  };
-
-  const handleBajaConfirm = () => {
-    if (bajaId) bajaMutation.mutate(bajaId);
-  };
-
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-foreground">Componentes / Accesorios</h1>
+    <div className="space-y-6">
+      <PageHeader title="Componentes / Accesorios" description="Gestión de repuestos y accesorios">
         <Button onClick={() => { setForm({ ...initialForm }); setCategoriaNuevo(''); setShowModal(true); }}>
           <Plus className="w-4 h-4" /> Nuevo Componente
         </Button>
-      </div>
+      </PageHeader>
 
       <div className="flex flex-col sm:flex-row gap-3">
-        <div className="flex-1">
-          <SearchInput
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          <input
             value={search}
-            onChange={setSearch}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por código, descripción, marca, modelo o serie..."
+            className="h-8 w-full rounded-lg border border-input bg-transparent pl-9 pr-2.5 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground"
           />
         </div>
         <Select value={estadoFilter} onValueChange={setEstadoFilter}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Estado" />
-          </SelectTrigger>
+          <SelectTrigger className="w-[140px]"><SelectValue placeholder="Estado" /></SelectTrigger>
           <SelectContent>
-            {ESTADO_FILTERS.map((f) => (
-              <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
-            ))}
+            {ESTADO_FILTERS.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -378,7 +208,7 @@ export default function Componentes() {
             className={`px-3 py-1.5 text-sm rounded-t-md transition-colors ${
               categoria === tab.value
                 ? 'bg-primary text-primary-foreground font-medium'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
             }`}
           >
             {tab.label}
@@ -386,7 +216,23 @@ export default function Componentes() {
         ))}
       </div>
 
-      <DataTable columns={columns} data={data} onRowClick={handleRowClick} />
+      <DataTable
+        columns={[
+          { key: 'CodComponente', label: 'Código' },
+          { key: 'DesComponente', label: 'Descripción' },
+          { key: 'DesTipodeComponente', label: 'Tipo' },
+          { key: 'Categoria', label: 'Categoría', render: (r) => <CategoriaBadge categoria={r.Categoria} /> },
+          { key: 'Marca', label: 'Marca' },
+          { key: 'Modelo', label: 'Modelo' },
+          { key: 'Serie', label: 'Serie' },
+          { key: 'Estado', label: 'Estado', render: (r) => <StatusBadge status={r.Estado} /> },
+        ]}
+        data={data}
+        onRowClick={handleRowClick}
+        searchable={false}
+        loading={isLoading}
+        emptyMessage="No se encontraron componentes"
+      />
 
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="sm:max-w-2xl">
@@ -397,29 +243,17 @@ export default function Componentes() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Categoría <span className="text-destructive">*</span></label>
-              <Select
-                value={categoriaNuevo}
-                onValueChange={(v) => {
-                  setCategoriaNuevo(v);
-                  setForm((prev) => ({ ...prev, IdTipodeComponente: '' }));
-                }}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Seleccionar categoría">
-                    {categoriaLabel || null}
-                  </SelectValue>
-                </SelectTrigger>
+              <label className="text-sm font-medium text-foreground">Categoría <span className="text-destructive">*</span></label>
+              <Select value={categoriaNuevo} onValueChange={(v) => { setCategoriaNuevo(v); setForm((prev) => ({ ...prev, IdTipodeComponente: '' })); }}>
+                <SelectTrigger className="w-full"><SelectValue placeholder="Seleccionar categoría">{categoriaLabel || null}</SelectValue></SelectTrigger>
                 <SelectContent>
-                  {CATEGORIA_OPTS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
+                  {CATEGORIA_OPTS.map((opt) => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Tipo de componente/accesorio <span className="text-destructive">*</span></label>
+              <label className="text-sm font-medium text-foreground">Tipo de componente <span className="text-destructive">*</span></label>
               <Select
                 value={form.IdTipodeComponente ? String(form.IdTipodeComponente) : ''}
                 onValueChange={(v) => setForm((prev) => ({ ...prev, IdTipodeComponente: Number(v) }))}
@@ -432,90 +266,59 @@ export default function Componentes() {
                 </SelectTrigger>
                 <SelectContent className="max-h-64">
                   {tiposFiltrados.map((t) => (
-                    <SelectItem key={t.IdTipodeComponente} value={String(t.IdTipodeComponente)}>
-                      {t.DesTipodeComponente}
-                    </SelectItem>
+                    <SelectItem key={t.IdTipodeComponente} value={String(t.IdTipodeComponente)}>{t.DesTipodeComponente}</SelectItem>
                   ))}
                   {tiposFiltrados.length === 0 && categoriaNuevo && (
-                    <div className="px-2 py-4 text-xs text-muted-foreground text-center">
-                      No hay tipos disponibles para esta categoría
-                    </div>
+                    <div className="px-2 py-4 text-xs text-muted-foreground text-center">No hay tipos disponibles para esta categoría</div>
                   )}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Nombre / descripción corta</label>
-              <Input
-                value={form.DesComponente}
-                onChange={(e) => setForm({ ...form, DesComponente: e.target.value })}
-                placeholder={typeConfig.descripcion}
-              />
+              <label className="text-sm font-medium text-foreground">Nombre / descripción corta</label>
+              <Input value={form.DesComponente} onChange={(e) => setForm({ ...form, DesComponente: e.target.value })} placeholder={typeConfig.descripcion} />
               <p className="text-xs text-muted-foreground">Se generará automáticamente si lo dejas vacío.</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Marca</label>
-                <Input
-                  value={form.Marca}
-                  onChange={(e) => setForm({ ...form, Marca: e.target.value })}
-                  placeholder={typeConfig.marca}
-                />
+                <label className="text-sm font-medium text-foreground">Marca</label>
+                <Input value={form.Marca} onChange={(e) => setForm({ ...form, Marca: e.target.value })} placeholder={typeConfig.marca} />
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Modelo</label>
-                <Input
-                  value={form.Modelo}
-                  onChange={(e) => setForm({ ...form, Modelo: e.target.value })}
-                  placeholder={typeConfig.modelo}
-                />
+                <label className="text-sm font-medium text-foreground">Modelo</label>
+                <Input value={form.Modelo} onChange={(e) => setForm({ ...form, Modelo: e.target.value })} placeholder={typeConfig.modelo} />
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Serie</label>
-                <Input
-                  value={form.Serie}
-                  onChange={(e) => setForm({ ...form, Serie: e.target.value })}
-                  placeholder={typeConfig.serie}
-                />
+                <label className="text-sm font-medium text-foreground">Serie</label>
+                <Input value={form.Serie} onChange={(e) => setForm({ ...form, Serie: e.target.value })} placeholder={typeConfig.serie} />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">{typeConfig.detalleLabel}</label>
-                <Input
-                  value={form.Capacidad}
-                  onChange={(e) => setForm({ ...form, Capacidad: e.target.value })}
-                  placeholder={typeConfig.detalle}
-                />
+                <label className="text-sm font-medium text-foreground">{typeConfig.detalleLabel}</label>
+                <Input value={form.Capacidad} onChange={(e) => setForm({ ...form, Capacidad: e.target.value })} placeholder={typeConfig.detalle} />
                 {typeConfig.ayuda ? (
                   <p className="text-xs text-muted-foreground">{typeConfig.ayuda}</p>
                 ) : autoDescription ? (
                   <p className="text-xs text-muted-foreground">Vista previa automática: {autoDescription}</p>
-                ) : !selectedTipo ? (
+                ) : (
                   <p className="text-xs text-muted-foreground">Selecciona un tipo para generar vista previa</p>
-                ) : null}
+                )}
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Lote</label>
-                <Input
-                  value={form.Lote}
-                  onChange={(e) => setForm({ ...form, Lote: e.target.value })}
-                  placeholder="Opcional"
-                />
+                <label className="text-sm font-medium text-foreground">Lote</label>
+                <Input value={form.Lote} onChange={(e) => setForm({ ...form, Lote: e.target.value })} placeholder="Opcional" />
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Observaciones</label>
-              <textarea
-                value={form.Obs}
-                onChange={(e) => setForm({ ...form, Obs: e.target.value })}
-                className="w-full min-h-[72px] rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-sm"
-                placeholder="Opcional"
-              />
+              <label className="text-sm font-medium text-foreground">Observaciones</label>
+              <textarea value={form.Obs} onChange={(e) => setForm({ ...form, Obs: e.target.value })}
+                className="w-full min-h-[72px] rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground"
+                placeholder="Opcional" />
             </div>
 
             <DialogFooter>
@@ -534,7 +337,7 @@ export default function Componentes() {
         detalle={detalle}
         loading={detalleLoading}
         error={!!detalleError}
-        onBaja={handleBaja}
+        onBaja={(id) => setBajaId(id)}
       />
 
       <AlertDialog open={!!bajaId} onOpenChange={(v) => { if (!v) setBajaId(null); }}>
@@ -548,7 +351,7 @@ export default function Componentes() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBajaConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction onClick={() => { if (bajaId) bajaMutation.mutate(bajaId); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {bajaMutation.isPending ? 'Procesando...' : 'Sí, dar de baja'}
             </AlertDialogAction>
           </AlertDialogFooter>

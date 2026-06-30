@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
-import { EstadoBadge, IncidenciaBadge } from '../components/Badge';
+import { StatusBadge } from '../components/StatusBadge';
 import DataTable from '../components/DataTable';
-import SearchInput from '../components/SearchInput';
+import { PageHeader } from '../components/PageHeader';
 import { Button } from '#components/ui/button.jsx';
 import { Input } from '#components/ui/input.jsx';
 import {
@@ -12,26 +12,34 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '#components/ui/dialog.jsx';
-import { Plus, CheckCircle } from 'lucide-react';
+import { Plus, CheckCircle, Search } from 'lucide-react';
 import { formatDate } from '../lib/utils';
 import Swal from 'sweetalert2';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
 
-const columns = [
-  { key: 'CodEquipo', label: 'Equipo' },
-  { key: 'DesTipodeEquipo', label: 'Tipo' },
-  { key: 'Trabajador', label: 'Trabajador', render: (r) => r.Trabajador || '-' },
-  {
-    key: 'TipoIncidencia',
-    label: 'Tipo',
-    render: (r) => <IncidenciaBadge tipo={r.TipoIncidencia} />,
-  },
-  { key: 'FecIncidencia', label: 'Fecha', render: (r) => formatDate(r.FecIncidencia) },
-  {
-    key: 'Estado',
-    label: 'Estado',
-    render: (r) => <EstadoBadge estado={r.Estado} />,
-  },
-];
+const incidenciaSchema = z.object({
+  TipoIncidencia: z.string().min(1, 'Selecciona un tipo'),
+  Descripcion: z.string().min(1, 'La descripción es obligatoria'),
+  FecIncidencia: z.string().optional(),
+});
+
+const tipoStyles = {
+  ROBO: 'bg-red-50 text-red-700 ring-red-600/20',
+  PERDIDA: 'bg-amber-50 text-amber-700 ring-amber-600/20',
+  DAÑO: 'bg-orange-50 text-orange-700 ring-orange-600/20',
+  DEVOLUCION: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+};
+
+function TipoBadge({ tipo }) {
+  const style = tipoStyles[tipo] || 'bg-gray-50 text-gray-600 ring-gray-500/20';
+  return (
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${style}`}>
+      {tipo}
+    </span>
+  );
+}
 
 export default function Incidencias() {
   const [search, setSearch] = useState('');
@@ -49,6 +57,7 @@ export default function Incidencias() {
       queryClient.invalidateQueries({ queryKey: ['incidencias'] });
       queryClient.invalidateQueries({ queryKey: ['equipos'] });
       queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
+      Swal.fire({ icon: 'success', title: 'Incidencia cerrada', timer: 1500, showConfirmButton: false });
     },
   });
 
@@ -57,37 +66,53 @@ export default function Incidencias() {
       title: '¿Cerrar incidencia?',
       text: `Se cerrará la incidencia de tipo ${row.TipoIncidencia} para el equipo ${row.CodEquipo}.`,
       icon: 'question', showCancelButton: true, confirmButtonText: 'Cerrar', cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#10b981',
     }).then((r) => { if (r.isConfirmed) cerrarMutation.mutate(row.IdIncidencia); });
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-foreground">Incidencias</h1>
+    <div className="space-y-6">
+      <PageHeader title="Incidencias" description="Registro de incidentes de equipos">
         <Button onClick={() => setShowModal(true)}>
           <Plus className="w-4 h-4" /> Nueva Incidencia
         </Button>
-      </div>
+      </PageHeader>
 
-      <SearchInput value={search} onChange={setSearch} placeholder="Buscar por equipo, descripción o trabajador..." />
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por equipo, descripción o trabajador..."
+          className="h-8 w-full rounded-lg border border-input bg-transparent pl-9 pr-2.5 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground"
+        />
+      </div>
 
       <DataTable
         columns={[
-          ...columns,
+          { key: 'CodEquipo', label: 'Equipo' },
+          { key: 'DesTipodeEquipo', label: 'Tipo' },
+          { key: 'Trabajador', label: 'Trabajador', render: (r) => r.Trabajador || '-' },
+          { key: 'TipoIncidencia', label: 'Tipo', render: (r) => <TipoBadge tipo={r.TipoIncidencia} /> },
+          { key: 'FecIncidencia', label: 'Fecha', render: (r) => formatDate(r.FecIncidencia) },
+          { key: 'Estado', label: 'Estado', render: (r) => <StatusBadge status={r.Estado} /> },
           {
             key: 'acciones',
-            label: 'Acciones',
+            label: '',
             sortable: false,
             render: (row) => (
               row.Estado === 'ABIERTO' && (
                 <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); confirmCerrar(row); }}>
-                  <CheckCircle className="w-3 h-3" /> Cerrar
+                  <CheckCircle className="w-3.5 h-3.5" /> Cerrar
                 </Button>
               )
             ),
           },
         ]}
         data={data}
+        searchable={false}
+        loading={isLoading}
+        emptyMessage="No hay incidencias registradas"
       />
 
       <Dialog open={showModal} onOpenChange={setShowModal}>
@@ -106,7 +131,11 @@ export default function Incidencias() {
 function IncidenciaForm({ onSuccess }) {
   const [searchEquipo, setSearchEquipo] = useState('');
   const [selectedEquipo, setSelectedEquipo] = useState(null);
-  const [form, setForm] = useState({ TipoIncidencia: 'DAÑO', Descripcion: '', FecIncidencia: new Date().toISOString().split('T')[0] });
+
+  const form = useForm({
+    resolver: zodResolver(incidenciaSchema),
+    defaultValues: { TipoIncidencia: 'DAÑO', Descripcion: '', FecIncidencia: new Date().toISOString().split('T')[0] },
+  });
 
   const { data: equipos } = useQuery({
     queryKey: ['equipos-search-incidencia', searchEquipo],
@@ -122,34 +151,37 @@ function IncidenciaForm({ onSuccess }) {
 
   const equiposList = equipos?.rows || equipos || [];
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!selectedEquipo) {
-      Swal.fire({ icon: 'warning', title: 'Selecciona un equipo' });
-      return;
-    }
-    if (!form.Descripcion.trim()) {
-      Swal.fire({ icon: 'warning', title: 'La descripción es obligatoria' });
-      return;
-    }
-    createMutation.mutate({
-      IdMaeEquipo: selectedEquipo.IdMaeEquipo,
-      ...form,
-    });
-  };
-
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={form.handleSubmit((data) => {
+      if (!selectedEquipo) {
+        Swal.fire({ icon: 'warning', title: 'Selecciona un equipo' });
+        return;
+      }
+      createMutation.mutate({
+        IdMaeEquipo: selectedEquipo.IdMaeEquipo,
+        ...data,
+      });
+    })} className="space-y-4">
       <div className="space-y-1.5">
-        <label className="text-sm font-medium">Equipo <span className="text-destructive">*</span></label>
-        <Input value={searchEquipo} onChange={(e) => setSearchEquipo(e.target.value)}
-          placeholder="Buscar equipo por código o nombre..." />
+        <label className="text-sm font-medium text-foreground">Equipo <span className="text-destructive">*</span></label>
+        <Input
+          value={searchEquipo}
+          onChange={(e) => { setSearchEquipo(e.target.value); if (!e.target.value) setSelectedEquipo(null); }}
+          placeholder="Buscar equipo por código o nombre..."
+        />
         {equiposList.length > 0 && (
-          <div className="mt-1 max-h-40 overflow-y-auto border rounded-lg">
+          <div className="mt-1 max-h-40 overflow-y-auto border border-border rounded-lg divide-y divide-border">
             {equiposList.map((e) => (
-              <div key={e.IdMaeEquipo} onClick={() => { setSelectedEquipo(e); setSearchEquipo(`${e.CodEquipo} - ${e.DesTipodeEquipo}`); }}
-                className={`px-3 py-2 text-sm cursor-pointer hover:bg-muted ${selectedEquipo?.IdMaeEquipo === e.IdMaeEquipo ? 'bg-accent font-medium' : ''}`}>
-                {e.CodEquipo} - {e.DesTipodeEquipo}
+              <div
+                key={e.IdMaeEquipo}
+                onClick={() => { setSelectedEquipo(e); setSearchEquipo(`${e.CodEquipo} - ${e.DesTipodeEquipo}`); }}
+                className={`px-3 py-2 text-sm cursor-pointer transition-colors ${
+                  selectedEquipo?.IdMaeEquipo === e.IdMaeEquipo
+                    ? 'bg-primary/10 text-primary font-medium'
+                    : 'hover:bg-accent'
+                }`}
+              >
+                {e.CodEquipo} — {e.DesTipodeEquipo}
               </div>
             ))}
           </div>
@@ -158,8 +190,8 @@ function IncidenciaForm({ onSuccess }) {
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <label className="text-sm font-medium">Tipo de Incidencia</label>
-          <Select value={form.TipoIncidencia} onValueChange={(v) => setForm({ ...form, TipoIncidencia: v })}>
+          <label className="text-sm font-medium text-foreground">Tipo de Incidencia</label>
+          <Select value={form.watch('TipoIncidencia')} onValueChange={(v) => form.setValue('TipoIncidencia', v)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="DAÑO">Daño</SelectItem>
@@ -170,15 +202,21 @@ function IncidenciaForm({ onSuccess }) {
           </Select>
         </div>
         <div className="space-y-1.5">
-          <label className="text-sm font-medium">Fecha</label>
-          <Input type="date" value={form.FecIncidencia} onChange={(e) => setForm({ ...form, FecIncidencia: e.target.value })} />
+          <label className="text-sm font-medium text-foreground">Fecha</label>
+          <Input type="date" {...form.register('FecIncidencia')} />
         </div>
       </div>
 
       <div className="space-y-1.5">
-        <label className="text-sm font-medium">Descripción <span className="text-destructive">*</span></label>
-        <textarea value={form.Descripcion} onChange={(e) => setForm({ ...form, Descripcion: e.target.value })}
-          className="w-full min-h-[80px] rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm" required />
+        <label className="text-sm font-medium text-foreground">Descripción <span className="text-destructive">*</span></label>
+        <textarea
+          {...form.register('Descripcion')}
+          className="w-full min-h-[80px] rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground"
+          placeholder="Describe la incidencia..."
+        />
+        {form.formState.errors.Descripcion && (
+          <p className="text-xs text-destructive">{form.formState.errors.Descripcion.message}</p>
+        )}
       </div>
 
       <DialogFooter>
