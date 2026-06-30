@@ -109,10 +109,14 @@ export const ComponentesRepository = {
 
   async createTipo(data) {
     const result = await query(DB, `
-      INSERT INTO Tab_EQ_TipodeComponentes (CodTipodeComponente, DesTipodeComponente, Estado)
+      INSERT INTO Tab_EQ_TipodeComponentes (CodTipodeComponente, DesTipodeComponente, Categoria, Estado)
       OUTPUT INSERTED.IdTipodeComponente
-      VALUES (@cod, @desc, 'ACTIVO')
-    `, { cod: data.CodTipodeComponente || 'GEN', desc: data.DesTipodeComponente });
+      VALUES (@cod, @desc, @categoria, 'ACTIVO')
+    `, {
+      cod: data.CodTipodeComponente || 'GEN',
+      desc: data.DesTipodeComponente,
+      categoria: data.Categoria || null,
+    });
     return result[0]?.IdTipodeComponente;
   },
 

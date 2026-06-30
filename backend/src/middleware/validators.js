@@ -34,8 +34,8 @@ export const equipoEstadoSchema = z.object({
 });
 
 export const equipoCreateTipoSchema = z.object({
-  DesTipo: z.string().min(1, 'Nombre del tipo requerido').max(100),
-  IdTipoEquipoRel: z.number().int().positive().optional(),
+  DesTipodeEquipo: z.string().min(1, 'Nombre del tipo requerido').max(100),
+  CodTipodeEquipo: z.string().optional(),
 });
 
 export const equipoAgregarComponenteSchema = z.object({
@@ -60,7 +60,8 @@ export const componenteCreateSchema = z.object({
 export const componenteUpdateSchema = componenteCreateSchema.partial();
 
 export const componenteCreateTipoSchema = z.object({
-  DesComponente: z.string().min(1, 'Nombre del tipo requerido'),
+  DesTipodeComponente: z.string().min(1, 'Nombre del tipo requerido'),
+  CodTipodeComponente: z.string().optional(),
   Categoria: z.enum(['REPUESTO_TECNICO', 'ACCESORIO', 'CONSUMIBLE']).optional(),
 });
 
