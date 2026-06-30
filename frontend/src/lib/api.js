@@ -64,10 +64,11 @@ export const api = {
     },
   },
   trabajadores: {
-    list: (params) => request(`/trabajadores?${new URLSearchParams(params)}`),
+    search: (params) => request(`/trabajadores?${new URLSearchParams(params)}`),
     get: (id) => request(`/trabajadores/${id}`),
     getByDNI: (dni) => request(`/trabajadores/dni/${dni}`),
     areas: () => request('/trabajadores/areas'),
+    sync: () => request('/trabajadores/sync', { method: 'POST' }),
   },
   asignaciones: {
     list: (params) => request(`/asignaciones?${new URLSearchParams(params)}`),

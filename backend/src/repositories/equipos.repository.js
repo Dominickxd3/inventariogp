@@ -261,32 +261,29 @@ export const EquiposRepository = {
           a.FecAsignacion,
           'ASIGNACION',
           ISNULL(CONCAT('Asignado a ', tr.Trabajador), CONCAT('Asignado a ID: ', a.IdReferente)),
-          u.User_Fullname,
+          NULL,
           a.FecAsignacion
         FROM Tab_EQ_MovEquiposAsignaciones a
         LEFT JOIN Tab_EQ_Trabajadores tr ON a.IdReferente = tr.IdTrabajador
-        LEFT JOIN Tab_SYS_Usuarios u ON a.IdUsuarioCrea = u.IdUsuario
         WHERE a.IdMaeEquipo = @id
         UNION ALL
         SELECT
           a.FecCese,
           'CESE',
           ISNULL(CONCAT('Cese de asignación: ', tr.Trabajador), CONCAT('Cese de asignación ID: ', a.IdReferente)),
-          u.User_Fullname,
+          NULL,
           a.FecCese
         FROM Tab_EQ_MovEquiposAsignaciones a
         LEFT JOIN Tab_EQ_Trabajadores tr ON a.IdReferente = tr.IdTrabajador
-        LEFT JOIN Tab_SYS_Usuarios u ON a.IdUsuarioModifica = u.IdUsuario
         WHERE a.IdMaeEquipo = @id AND a.FecCese IS NOT NULL
         UNION ALL
         SELECT
           i.FecIncidencia,
           'INCIDENCIA',
           CONCAT(i.TipoIncidencia, ': ', i.Descripcion),
-          u.User_Fullname,
+          NULL,
           i.FecIncidencia
         FROM Tab_EQ_Incidencias i
-        LEFT JOIN Tab_SYS_Usuarios u ON i.IdUsuario = u.IdUsuario
         WHERE i.IdMaeEquipo = @id
         UNION ALL
         SELECT
@@ -300,24 +297,24 @@ export const EquiposRepository = {
         WHERE iv.IdMaeEquipo = @id
         UNION ALL
         SELECT
-          mc.FecCreacion,
+          mc.FecAsigComponente,
           'COMPONENTE',
-          CONCAT('Componente ', mc.CodComponente, ' vinculado'),
-          u.User_Fullname,
-          mc.FecCreacion
+          CONCAT('Componente ', ISNULL(c.CodComponente, '#'), ' vinculado'),
+          NULL,
+          mc.FecAsigComponente
         FROM Tab_EQ_MovEquiposComponentes mc
-        LEFT JOIN Tab_SYS_Usuarios u ON mc.IdUsuarioCrea = u.IdUsuario
-        WHERE mc.IdMaeEquipo = @id AND mc.FecBaja IS NULL
+        LEFT JOIN Tab_EQ_Componentes c ON mc.IdComponente = c.IdComponente
+        WHERE mc.IdMaeEquipo = @id AND mc.Estado = 'VIGENTE'
         UNION ALL
         SELECT
-          mc.FecBaja,
+          mc.FecBajaComponente,
           'COMPONENTE',
-          CONCAT('Componente ', mc.CodComponente, ' desvinculado'),
-          u.User_Fullname,
-          mc.FecBaja
+          CONCAT('Componente ', ISNULL(c.CodComponente, '#'), ' desvinculado'),
+          NULL,
+          mc.FecBajaComponente
         FROM Tab_EQ_MovEquiposComponentes mc
-        LEFT JOIN Tab_SYS_Usuarios u ON mc.IdUsuarioModifica = u.IdUsuario
-        WHERE mc.IdMaeEquipo = @id AND mc.FecBaja IS NOT NULL
+        LEFT JOIN Tab_EQ_Componentes c ON mc.IdComponente = c.IdComponente
+        WHERE mc.IdMaeEquipo = @id AND mc.FecBajaComponente IS NOT NULL
       ) t
       ORDER BY Orden DESC
     `, { id: idEquipo });

@@ -235,8 +235,8 @@ export default function Equipos() {
           <form onSubmit={form.handleSubmit((data) => {
             createRapidoMutation.mutate({
               IdTipodeEquipo: Number(data.IdTipodeEquipo),
-              CodBarra: data.CodBarra?.trim() || null,
-              Obs: data.Obs?.trim() || null,
+              ...(data.CodBarra?.trim() ? { CodBarra: data.CodBarra.trim() } : {}),
+              ...(data.Obs?.trim() ? { Obs: data.Obs.trim() } : {}),
             });
           })} className="space-y-4">
             <div className="space-y-1.5">
@@ -245,7 +245,12 @@ export default function Equipos() {
               </label>
               <Select value={form.watch('IdTipodeEquipo')} onValueChange={(v) => form.setValue('IdTipodeEquipo', v)}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Seleccionar tipo de equipo..." />
+                  <SelectValue placeholder="Seleccionar tipo de equipo...">
+                    {(() => {
+                      const id = form.watch('IdTipodeEquipo');
+                      return tiposAsignables?.find(t => String(t.IdTipodeEquipo) === id)?.DesTipodeEquipo;
+                    })()}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {tiposAsignables?.map((t) => (
