@@ -4,6 +4,9 @@ import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 
 const router = Router();
 
+// Todas las rutas requieren autenticación
+router.use(authMiddleware);
+
 router.get('/', async (req, res, next) => {
   try {
     const trabajadores = await TrabajadoresRepository.search(req.query);

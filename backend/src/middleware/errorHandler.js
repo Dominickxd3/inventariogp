@@ -2,8 +2,6 @@ const SQL_PATTERNS = [
   'Invalid column name', 'Invalid object name', 'Invalid table name',
   'Cannot insert duplicate key', 'Violation of PRIMARY KEY',
   'Could not find', 'Incorrect syntax near', 'SQL',
-  'intermediate value is not iterable', 'Cannot read properties of undefined',
-  'Cannot destructure property', 'is not iterable',
 ];
 
 function esErrorSQL(err) {
@@ -16,13 +14,23 @@ function esErrorSQL(err) {
 }
 
 export function errorHandler(err, req, res, _next) {
-  console.error(`[ERROR] ${err.message}`);
-  if (err.stack) console.error(err.stack);
+  const isDev = process.env.NODE_ENV !== 'production';
 
+  // Siempre loguear el error internamente
+  console.error(`[ERROR] ${err.message}`, isDev ? err.stack : '');
+
+  // Errores SQL: nunca exponer detalles
   if (esErrorSQL(err)) {
     return res.status(500).json({ error: 'No se pudo completar la operación.' });
   }
 
-  const statusCode = err.statusCode || err.status || (err.message?.includes('no encontrado') ? 404 : 500);
-  res.status(statusCode).json({ error: err.message || 'Error interno del servidor' });
+  const statusCode = err.statusCode || err.status || 500;
+  const response = { error: err.message || 'Error interno del servidor' };
+
+  // En producción, los errores 500 no exponen el mensaje real
+  if (!isDev && statusCode === 500) {
+    response.error = 'Error interno del servidor';
+  }
+
+  res.status(statusCode).json(response);
 }

@@ -3,3 +3,12 @@ node_modules/
 *.log
 dist/
 .vite/
+*.xlsx
+*.csv
+*.pdf
+*.docx
+*.pptx
+datos/
+data/
+uploads/
+temp/

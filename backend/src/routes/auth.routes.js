@@ -1,13 +1,16 @@
 import { Router } from 'express';
 import { AuthService } from '../services/auth.service.js';
+import { UsuariosRepository } from '../repositories/usuarios.repository.js';
+import { AuditRepository } from '../repositories/audit.repository.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
+import { loginSchema } from '../middleware/validators.js';
 
 const router = Router();
 
-router.post('/login', async (req, res, next) => {
+router.post('/login', validate(loginSchema), async (req, res, next) => {
   try {
     const { usuario, password } = req.body;
-    if (!usuario || !password) return res.status(400).json({ error: 'Usuario y contraseña requeridos' });
     const result = await AuthService.login(usuario, password, req);
     res.json(result);
   } catch (e) { next(e); }
@@ -15,7 +18,6 @@ router.post('/login', async (req, res, next) => {
 
 router.get('/me', authMiddleware, async (req, res, next) => {
   try {
-    const { UsuariosRepository } = await import('../repositories/usuarios.repository.js');
     const usuario = await UsuariosRepository.getById(req.usuario.id);
     if (!usuario) return res.status(401).json({ error: 'Usuario no encontrado' });
     res.json({
@@ -31,7 +33,6 @@ router.get('/me', authMiddleware, async (req, res, next) => {
 router.get('/audit', authMiddleware, roleMiddleware('ADMIN'), async (req, res, next) => {
   try {
     const { usuario, limite } = req.query;
-    const { AuditRepository } = await import('../repositories/audit.repository.js');
     const result = usuario
       ? await AuditRepository.intentosPorUsuario(usuario, parseInt(limite) || 20)
       : await AuditRepository.ultimosIntentos(parseInt(limite) || 50);

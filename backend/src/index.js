@@ -1,9 +1,12 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import morgan from 'morgan';
 import { config } from './config/index.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { closeAll } from './config/db.js';
+import { loginLimiter } from './middleware/rateLimiter.js';
 
 import equiposRoutes from './routes/equipos.routes.js';
 import trabajadoresRoutes from './routes/trabajadores.routes.js';
@@ -14,9 +17,29 @@ import authRoutes from './routes/auth.routes.js';
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
-app.use(morgan('dev'));
+// Security headers
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'same-origin' },
+  contentSecurityPolicy: false, // Desactivado para que Vite/HMR funcione en dev
+}));
+
+// CORS restringido
+app.use(cors({
+  origin: config.cors.origins,
+  credentials: true,
+}));
+
+app.use(express.json({ limit: '1mb' }));
+
+// Logging sanitizado (no loguear bodies en producción)
+app.use(morgan(config.env === 'production' ? 'combined' : 'dev'));
+
+// Rate limiting global opcional (100 req/15min por IP)
+// import { rateLimit } from 'express-rate-limit';
+// app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
+
+// Rate limit específico para login
+app.use('/api/auth/login', loginLimiter);
 
 app.use('/api/equipos', equiposRoutes);
 app.use('/api/trabajadores', trabajadoresRoutes);
@@ -32,12 +55,11 @@ app.get('/api/health', (_req, res) => {
 app.use(errorHandler);
 
 const server = app.listen(config.port, () => {
-  console.log(`🚀 InventarioGP API corriendo en http://localhost:${config.port}`);
-  console.log(`📡 Conectado a SQL Server: ${config.db.server}`);
+  console.log(`InventarioGP API corriendo en puerto ${config.port} [${config.env}]`);
 });
 
 process.on('SIGINT', async () => {
-  console.log('\n🛑 Cerrando conexiones...');
+  console.log('Cerrando conexiones...');
   await closeAll();
   server.close();
   process.exit(0);
