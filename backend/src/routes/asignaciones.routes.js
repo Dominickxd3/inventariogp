@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { AsignacionesService } from '../services/asignaciones.service.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
+import { asignacionCreateSchema, asignacionCesarSchema } from '../middleware/validators.js';
 
 const router = Router();
 
@@ -28,7 +30,7 @@ router.get('/:id', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/', roleMiddleware('ADMIN', 'TECNICO'), async (req, res, next) => {
+router.post('/', roleMiddleware('ADMIN', 'TECNICO'), validate(asignacionCreateSchema), async (req, res, next) => {
   try {
     const data = { ...req.body, IdUsuario: req.usuario.id };
     const id = await AsignacionesService.asignar(data);
@@ -53,7 +55,7 @@ router.post('/con-accesorios', roleMiddleware('ADMIN', 'TECNICO'), async (req, r
   } catch (e) { next(e); }
 });
 
-router.post('/:id/cesar', roleMiddleware('ADMIN', 'TECNICO'), async (req, res, next) => {
+router.post('/:id/cesar', roleMiddleware('ADMIN', 'TECNICO'), validate(asignacionCesarSchema), async (req, res, next) => {
   try {
     await AsignacionesService.cesar(parseInt(req.params.id), req.usuario.id, req.body?.accesorios, req.body);
     res.json({ message: 'Asignación finalizada' });

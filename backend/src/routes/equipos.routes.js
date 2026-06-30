@@ -2,6 +2,14 @@ import { Router } from 'express';
 import { EquiposService } from '../services/equipos.service.js';
 import { IncidenciasService } from '../services/incidencias.service.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
+import {
+  equipoCreateSchema,
+  equipoUpdateSchema,
+  equipoEstadoSchema,
+  equipoCreateTipoSchema,
+  equipoAgregarComponenteSchema,
+} from '../middleware/validators.js';
 
 const router = Router();
 
@@ -58,14 +66,14 @@ router.get('/:id/timeline', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/', roleMiddleware('ADMIN', 'TECNICO'), async (req, res, next) => {
+router.post('/', roleMiddleware('ADMIN', 'TECNICO'), validate(equipoCreateSchema), async (req, res, next) => {
   try {
     const equipo = await EquiposService.create(req.body);
     res.status(201).json(equipo);
   } catch (e) { next(e); }
 });
 
-router.post('/rapido', roleMiddleware('ADMIN', 'TECNICO'), async (req, res, next) => {
+router.post('/rapido', roleMiddleware('ADMIN', 'TECNICO'), validate(equipoCreateSchema), async (req, res, next) => {
   try {
     const equipo = await EquiposService.createQuick({
       ...req.body,
@@ -75,7 +83,7 @@ router.post('/rapido', roleMiddleware('ADMIN', 'TECNICO'), async (req, res, next
   } catch (e) { next(e); }
 });
 
-router.put('/:id', roleMiddleware('ADMIN', 'TECNICO'), async (req, res, next) => {
+router.put('/:id', roleMiddleware('ADMIN', 'TECNICO'), validate(equipoUpdateSchema), async (req, res, next) => {
   try {
     const equipo = await EquiposService.update(parseInt(req.params.id), req.body);
     res.json(equipo);
@@ -97,7 +105,7 @@ router.post('/:id/qr', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/tipos', roleMiddleware('ADMIN'), async (req, res, next) => {
+router.post('/tipos', roleMiddleware('ADMIN'), validate(equipoCreateTipoSchema), async (req, res, next) => {
   try {
     const id = await EquiposService.createTipo(req.body);
     res.status(201).json({ id });
@@ -129,7 +137,7 @@ router.get('/:id/componentes', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/:id/componentes', authMiddleware, roleMiddleware('ADMIN', 'TECNICO'), async (req, res, next) => {
+router.post('/:id/componentes', authMiddleware, roleMiddleware('ADMIN', 'TECNICO'), validate(equipoAgregarComponenteSchema), async (req, res, next) => {
   try {
     const id = await EquiposService.agregarComponenteAEquipo(
       parseInt(req.params.id),
@@ -157,7 +165,7 @@ router.delete('/:id/componentes/:idMovComponente', authMiddleware, roleMiddlewar
   } catch (e) { next(e); }
 });
 
-router.post('/:id/estado', roleMiddleware('ADMIN'), async (req, res, next) => {
+router.post('/:id/estado', roleMiddleware('ADMIN'), validate(equipoEstadoSchema), async (req, res, next) => {
   try {
     const equipo = await EquiposService.cambiarEstado(
       parseInt(req.params.id),

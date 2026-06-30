@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { IncidenciasService } from '../services/incidencias.service.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
+import { incidenciaCreateSchema } from '../middleware/validators.js';
 
 const router = Router();
 
@@ -26,7 +28,7 @@ router.get('/:id', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/', authMiddleware, roleMiddleware('ADMIN', 'TECNICO'), async (req, res, next) => {
+router.post('/', authMiddleware, roleMiddleware('ADMIN', 'TECNICO'), validate(incidenciaCreateSchema), async (req, res, next) => {
   try {
     const data = { ...req.body, IdUsuario: req.usuario.id };
     const id = await IncidenciasService.create(data);

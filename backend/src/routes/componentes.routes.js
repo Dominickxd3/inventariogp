@@ -1,6 +1,12 @@
 import { Router } from 'express';
 import { ComponentesService } from '../services/componentes.service.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
+import {
+  componenteCreateSchema,
+  componenteUpdateSchema,
+  componenteCreateTipoSchema,
+} from '../middleware/validators.js';
 
 const router = Router();
 
@@ -60,28 +66,28 @@ router.get('/:id', authMiddleware, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/', authMiddleware, roleMiddleware('ADMIN', 'TECNICO'), async (req, res, next) => {
+router.post('/', authMiddleware, roleMiddleware('ADMIN', 'TECNICO'), validate(componenteCreateSchema), async (req, res, next) => {
   try {
     const id = await ComponentesService.create(req.body);
     res.status(201).json({ id });
   } catch (e) { next(e); }
 });
 
-router.post('/rapido', authMiddleware, roleMiddleware('ADMIN', 'TECNICO'), async (req, res, next) => {
+router.post('/rapido', authMiddleware, roleMiddleware('ADMIN', 'TECNICO'), validate(componenteCreateSchema), async (req, res, next) => {
   try {
     const id = await ComponentesService.createQuick(req.body);
     res.status(201).json({ id });
   } catch (e) { next(e); }
 });
 
-router.put('/:id', authMiddleware, roleMiddleware('ADMIN', 'TECNICO'), async (req, res, next) => {
+router.put('/:id', authMiddleware, roleMiddleware('ADMIN', 'TECNICO'), validate(componenteUpdateSchema), async (req, res, next) => {
   try {
     await ComponentesService.update(parseInt(req.params.id), req.body);
     res.json({ message: 'Componente actualizado' });
   } catch (e) { next(e); }
 });
 
-router.post('/tipos', authMiddleware, roleMiddleware('ADMIN'), async (req, res, next) => {
+router.post('/tipos', authMiddleware, roleMiddleware('ADMIN'), validate(componenteCreateTipoSchema), async (req, res, next) => {
   try {
     const id = await ComponentesService.createTipo(req.body);
     res.status(201).json({ id });
