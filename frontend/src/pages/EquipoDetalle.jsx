@@ -12,7 +12,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '#components/ui/card.jsx';
 import { Skeleton } from '#components/ui/skeleton.jsx';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '#components/ui/dialog.jsx';
 import { useState, useMemo } from 'react';
 import ComponentSearchSelect from '../components/ComponentSearchSelect';
@@ -45,6 +45,11 @@ export default function EquipoDetalle() {
     ComponentesBaja: [],
   };
   const [intervForm, setIntervForm] = useState({ ...initialIntervForm });
+  const [cesarOpen, setCesarOpen] = useState(false);
+  const [cesarMotivo, setCesarMotivo] = useState('');
+  const [cesarObs, setCesarObs] = useState('');
+  const [incidenciaOpen, setIncidenciaOpen] = useState(false);
+  const [incidenciaForm, setIncidenciaForm] = useState({ TipoIncidencia: 'DAÑO', Descripcion: '', Prioridad: '', Obs: '' });
 
   const { data: equipo, isLoading } = useQuery({
     queryKey: ['equipo', id],
@@ -147,6 +152,37 @@ export default function EquipoDetalle() {
       refetchComp();
       queryClient.invalidateQueries({ queryKey: ['equipo', id] });
       Swal.fire({ icon: 'success', title: 'Componente quitado', timer: 1500, showConfirmButton: false });
+    },
+    onError: (err) => Swal.fire({ icon: 'error', title: 'Error', text: err.message }),
+  });
+
+  const cesarMutation = useMutation({
+    mutationFn: ({ idAsig, Motivo, Obs }) => api.asignaciones.cesar(idAsig, [], { Motivo, Obs }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['equipo', id] });
+      queryClient.invalidateQueries({ queryKey: ['historial-equipo', id] });
+      queryClient.invalidateQueries({ queryKey: ['timeline-equipo', id] });
+      queryClient.invalidateQueries({ queryKey: ['equipos'] });
+      queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
+      setCesarOpen(false);
+      setCesarMotivo('');
+      setCesarObs('');
+      Swal.fire({ icon: 'success', title: 'Asignación finalizada', timer: 1500, showConfirmButton: false });
+    },
+    onError: (err) => Swal.fire({ icon: 'error', title: 'Error', text: err.message }),
+  });
+
+  const createIncidenciaMutation = useMutation({
+    mutationFn: (data) => api.incidencias.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['incidencias-equipo', id] });
+      queryClient.invalidateQueries({ queryKey: ['equipo', id] });
+      queryClient.invalidateQueries({ queryKey: ['timeline-equipo', id] });
+      queryClient.invalidateQueries({ queryKey: ['equipos'] });
+      queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
+      setIncidenciaOpen(false);
+      setIncidenciaForm({ TipoIncidencia: 'DAÑO', Descripcion: '', Prioridad: '', Obs: '' });
+      Swal.fire({ icon: 'success', title: 'Incidencia registrada', timer: 1500, showConfirmButton: false });
     },
     onError: (err) => Swal.fire({ icon: 'error', title: 'Error', text: err.message }),
   });
@@ -304,7 +340,14 @@ export default function EquipoDetalle() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Tipo de Equipo</label>
                   <Select value={form.IdTipodeEquipo} onValueChange={(v) => setForm({ ...form, IdTipodeEquipo: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Seleccionar tipo...">
+                        {(() => {
+                          const id = form.IdTipodeEquipo;
+                          return tipos?.find(t => String(t.IdTipodeEquipo) === id)?.DesTipodeEquipo;
+                        })()}
+                      </SelectValue>
+                    </SelectTrigger>
                     <SelectContent>
                       {tipos?.map((t) => (
                         <SelectItem key={t.IdTipodeEquipo} value={String(t.IdTipodeEquipo)}>{t.DesTipodeEquipo}</SelectItem>
@@ -550,9 +593,16 @@ export default function EquipoDetalle() {
 
       <Card className={esBaja ? 'opacity-60' : ''}>
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4" />
-            <CardTitle>Incidencias</CardTitle>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              <CardTitle>Incidencias</CardTitle>
+            </div>
+            {!esBaja && (
+              <Button variant="outline" size="sm" onClick={() => setIncidenciaOpen(true)}>
+                <Plus className="w-3.5 h-3.5" /> Nueva Incidencia
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -624,7 +674,16 @@ export default function EquipoDetalle() {
 
       {equipo.asignacion && (
         <Card className={esBaja ? 'opacity-60' : ''}>
-          <CardHeader><CardTitle>Asignación Actual</CardTitle></CardHeader>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Asignación Actual</CardTitle>
+              {!esBaja && (
+                <Button variant="outline" size="sm" onClick={() => setCesarOpen(true)}>
+                  <X className="w-3.5 h-3.5" /> Cesar asignación
+                </Button>
+              )}
+            </div>
+          </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
@@ -1086,6 +1145,154 @@ export default function EquipoDetalle() {
               )}
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cesar asignación confirmación */}
+      <Dialog open={cesarOpen} onOpenChange={(v) => { setCesarOpen(v); if (!v) { setCesarMotivo(''); setCesarObs(''); } }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Finalizar asignación</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de cesar la asignación de <strong>{equipo.asignacion?.TrabajadorNombre || 'este trabajador'}</strong>?
+              <span className="block mt-2 text-sm text-muted-foreground">
+                El equipo pasará a estado DISPONIBLE y se registrará en el historial.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Motivo <span className="text-destructive">*</span></label>
+              <textarea
+                value={cesarMotivo}
+                onChange={(e) => setCesarMotivo(e.target.value)}
+                className="w-full min-h-[60px] rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground"
+                placeholder="Ej: Renuncia, cambio de área, equipo reemplazado..."
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Observación <span className="text-muted-foreground text-xs">(opcional)</span></label>
+              <textarea
+                value={cesarObs}
+                onChange={(e) => setCesarObs(e.target.value)}
+                className="w-full min-h-[60px] rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground"
+                placeholder="Detalles adicionales..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setCesarOpen(false); setCesarMotivo(''); setCesarObs(''); }}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (!cesarMotivo.trim()) {
+                  Swal.fire({ icon: 'warning', title: 'Motivo requerido', text: 'Ingresa el motivo del cese' });
+                  return;
+                }
+                if (!equipo?.asignacion?.IdMovEquipoAsignacion) {
+                  Swal.fire({ icon: 'error', title: 'Error', text: 'No hay asignación vigente para cesar' });
+                  return;
+                }
+                cesarMutation.mutate({
+                  idAsig: equipo.asignacion.IdMovEquipoAsignacion,
+                  Motivo: cesarMotivo.trim(),
+                  Obs: cesarObs.trim(),
+                });
+              }}
+              disabled={cesarMutation.isPending}
+            >
+              {cesarMutation.isPending ? 'Finalizando...' : 'Finalizar asignación'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Nueva incidencia */}
+      <Dialog open={incidenciaOpen} onOpenChange={(v) => { setIncidenciaOpen(v); if (!v) setIncidenciaForm({ TipoIncidencia: 'DAÑO', Descripcion: '', Prioridad: '', Obs: '' }); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nueva Incidencia</DialogTitle>
+            <DialogDescription>
+              Reporta un incidente para el equipo <strong>{equipo?.CodEquipo}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Tipo de Incidencia <span className="text-destructive">*</span></label>
+              <Select
+                value={incidenciaForm.TipoIncidencia}
+                onValueChange={(v) => setIncidenciaForm({ ...incidenciaForm, TipoIncidencia: v })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DAÑO">Daño</SelectItem>
+                  <SelectItem value="ROBO">Robo</SelectItem>
+                  <SelectItem value="PERDIDA">Pérdida</SelectItem>
+                  <SelectItem value="DEVOLUCION">Devolución</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Descripción <span className="text-destructive">*</span></label>
+              <textarea
+                value={incidenciaForm.Descripcion}
+                onChange={(e) => setIncidenciaForm({ ...incidenciaForm, Descripcion: e.target.value })}
+                className="w-full min-h-[80px] rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground"
+                placeholder="Describe el incidente..."
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Prioridad</label>
+                <Select
+                  value={incidenciaForm.Prioridad}
+                  onValueChange={(v) => setIncidenciaForm({ ...incidenciaForm, Prioridad: v })}
+                >
+                  <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="BAJA">Baja</SelectItem>
+                    <SelectItem value="MEDIA">Media</SelectItem>
+                    <SelectItem value="ALTA">Alta</SelectItem>
+                    <SelectItem value="CRITICA">Crítica</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Observación</label>
+                <input
+                  value={incidenciaForm.Obs}
+                  onChange={(e) => setIncidenciaForm({ ...incidenciaForm, Obs: e.target.value })}
+                  placeholder="Observación opcional..."
+                  className="w-full h-9 rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIncidenciaOpen(false); setIncidenciaForm({ TipoIncidencia: 'DAÑO', Descripcion: '', Prioridad: '', Obs: '' }); }}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                if (!incidenciaForm.Descripcion.trim()) {
+                  Swal.fire({ icon: 'warning', title: 'Descripción requerida', text: 'Describe la incidencia' });
+                  return;
+                }
+                createIncidenciaMutation.mutate({
+                  IdMaeEquipo: Number(id),
+                  TipoIncidencia: incidenciaForm.TipoIncidencia,
+                  Descripcion: incidenciaForm.Descripcion.trim(),
+                  Prioridad: incidenciaForm.Prioridad || undefined,
+                  Obs: incidenciaForm.Obs.trim() || undefined,
+                });
+              }}
+              disabled={createIncidenciaMutation.isPending}
+            >
+              {createIncidenciaMutation.isPending ? 'Registrando...' : 'Registrar Incidencia'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

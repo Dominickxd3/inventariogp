@@ -50,6 +50,7 @@ export default function Equipos() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [showQROpen, setShowQROpen] = useState(false);
   const [qrData, setQrData] = useState(null);
+  const [bajaMotivo, setBajaMotivo] = useState('');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -81,12 +82,13 @@ export default function Equipos() {
   });
 
   const bajaMutation = useMutation({
-    mutationFn: api.equipos.baja,
+    mutationFn: ({ id, motivo }) => api.equipos.baja(id, motivo),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipos'] });
       queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
       setShowDeleteOpen(false);
       setDeleteTarget(null);
+      setBajaMotivo('');
       Swal.fire({ icon: 'success', title: 'Equipo dado de baja', timer: 2000, showConfirmButton: false });
     },
     onError: (err) => Swal.fire({ icon: 'error', title: 'Error', text: err.message }),
@@ -316,24 +318,45 @@ export default function Equipos() {
       </Dialog>
 
       {/* Baja Dialog */}
-      <Dialog open={showDeleteOpen} onOpenChange={(v) => { setShowDeleteOpen(v); if (!v) setDeleteTarget(null); }}>
+      <Dialog open={showDeleteOpen} onOpenChange={(v) => { setShowDeleteOpen(v); if (!v) { setDeleteTarget(null); setBajaMotivo(''); } }}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Confirmar baja</DialogTitle>
             <DialogDescription>
               ¿Estás seguro de dar de baja el equipo <strong>{deleteTarget?.CodEquipo}</strong>?
-              <span className="block mt-2 text-sm text-muted-foreground">
-                El equipo quedará en estado BAJA y no podrá ser asignado ni editado.
-              </span>
             </DialogDescription>
           </DialogHeader>
+          <div className="space-y-3 py-2">
+            {deleteTarget && (
+              <div className="text-sm space-y-1.5 rounded-lg bg-muted/50 p-3 border">
+                <div className="flex justify-between"><span className="text-muted-foreground">Tipo:</span><span className="font-medium">{deleteTarget.DesTipodeEquipo}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Estado:</span><StatusBadge status={deleteTarget.Estado} /></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Serie:</span><span className="font-medium">{deleteTarget.CodBarra || '-'}</span></div>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Motivo de baja <span className="text-destructive">*</span></label>
+              <textarea
+                value={bajaMotivo}
+                onChange={(e) => setBajaMotivo(e.target.value)}
+                className="w-full min-h-[80px] rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground"
+                placeholder="Indica el motivo (obsoleto, dañado, pérdida, renovación, etc.)"
+              />
+            </div>
+          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowDeleteOpen(false); setDeleteTarget(null); }}>
+            <Button variant="outline" onClick={() => { setShowDeleteOpen(false); setDeleteTarget(null); setBajaMotivo(''); }}>
               Cancelar
             </Button>
             <Button
               variant="destructive"
-              onClick={() => bajaMutation.mutate(deleteTarget.IdMaeEquipo)}
+              onClick={() => {
+                if (!bajaMotivo.trim()) {
+                  Swal.fire({ icon: 'warning', title: 'Motivo requerido', text: 'Ingresa el motivo de la baja' });
+                  return;
+                }
+                bajaMutation.mutate({ id: deleteTarget.IdMaeEquipo, motivo: bajaMotivo.trim() });
+              }}
               disabled={bajaMutation.isPending}
             >
               {bajaMutation.isPending ? 'Dando de baja...' : 'Dar de baja'}

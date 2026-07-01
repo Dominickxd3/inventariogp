@@ -2,6 +2,7 @@ import { AsignacionesRepository } from '../repositories/asignaciones.repository.
 import { EquiposRepository } from '../repositories/equipos.repository.js';
 import { ComponentesRepository } from '../repositories/componentes.repository.js';
 import { TrabajadoresRepository } from '../repositories/trabajadores.repository.js';
+import { IncidenciasRepository } from '../repositories/incidencias.repository.js';
 import { withTransaction, createRequest, query } from '../config/db.js';
 
 const DB = 'InventarioGP';
@@ -29,7 +30,19 @@ async function validarTrabajador(idReferente) {
 async function validarEquipoDisponible(idEquipo) {
   const equipo = await EquiposRepository.getById(idEquipo);
   if (!equipo) throw new Error('Equipo no encontrado');
-  if (equipo.Estado !== 'DISPONIBLE') throw new Error(`El equipo ${equipo.CodEquipo} no está disponible`);
+  if (equipo.Estado !== 'DISPONIBLE') {
+    const msgs = {
+      BAJA: 'está dado de baja',
+      MANTENIMIENTO: 'está en mantenimiento',
+      INCIDENCIA: 'tiene una incidencia abierta',
+      ASIGNADO: 'ya está asignado',
+    };
+    throw new Error(`El equipo ${equipo.CodEquipo} ${msgs[equipo.Estado] || `no está disponible (estado: ${equipo.Estado})`}`);
+  }
+  const incidencias = await IncidenciasRepository.getByEquipo(idEquipo);
+  if (incidencias.some(i => i.Estado === 'ABIERTO')) {
+    throw new Error(`El equipo ${equipo.CodEquipo} está disponible pero tiene una incidencia abierta`);
+  }
   return equipo;
 }
 
@@ -43,30 +56,36 @@ export const AsignacionesService = {
   },
 
   async asignar(data) {
-    const equipo = await validarEquipoDisponible(data.IdMaeEquipo);
-    await validarTrabajador(data.IdReferente);
+    // Normalize field names: Zod schema uses IdEquipo/IdTrabajador, service uses IdMaeEquipo/IdReferente
+    const idEquipo = data.IdMaeEquipo ?? data.IdEquipo;
+    const idTrabajador = data.IdReferente ?? data.IdTrabajador;
+    if (!idEquipo) throw new Error('El equipo es obligatorio');
+    if (!idTrabajador) throw new Error('El trabajador es obligatorio');
+
+    const equipo = await validarEquipoDisponible(idEquipo);
+    await validarTrabajador(idTrabajador);
 
     return withTransaction(DB, async (trx) => {
       const rows = await trxRows(trx, `
         INSERT INTO Tab_EQ_MovEquiposAsignaciones (IdMaeEquipo, IdReferente, FecAsignacion, Obs, Estado)
         OUTPUT INSERTED.IdMovEquipoAsignacion
         VALUES (@idEquipo, @idTrabajador, @fec, @obs, 'VIGENTE')
-      `, { idEquipo: data.IdMaeEquipo, idTrabajador: data.IdReferente, fec: fec(), obs: data.Obs || null });
+      `, { idEquipo, idTrabajador, fec: fec(), obs: data.Obs || null });
       const idAsig = rows[0].IdMovEquipoAsignacion;
 
-      await trxExec(trx, `UPDATE Tab_EQ_MaeEquipos SET Estado = 'ASIGNADO' WHERE IdMaeEquipo = @id`, { id: data.IdMaeEquipo });
+      await trxExec(trx, `UPDATE Tab_EQ_MaeEquipos SET Estado = 'ASIGNADO' WHERE IdMaeEquipo = @id`, { id: idEquipo });
 
       await trxExec(trx, `
         INSERT INTO Tab_EQ_MovEstadosEquipos (IdMaeEquipo, EstadoAnterior, EstadoNuevo, IdUsuario, Obs)
         VALUES (@idEquipo, @estadoAnt, 'ASIGNADO', @idUsuario, 'Equipo asignado')
-      `, { idEquipo: data.IdMaeEquipo, estadoAnt: equipo.Estado, idUsuario: data.IdUsuario || null });
+      `, { idEquipo, estadoAnt: equipo.Estado, idUsuario: data.IdUsuario || null });
 
       if (data.componentes?.length) {
         for (const comp of data.componentes) {
           await trxExec(trx, `
             INSERT INTO Tab_EQ_MovEquiposComponentes (IdMaeEquipo, IdComponente, Obs, Estado)
             VALUES (@idEquipo, @idComponente, @obs, 'VIGENTE')
-          `, { idEquipo: data.IdMaeEquipo, idComponente: comp.IdComponente, obs: comp.Obs || null });
+          `, { idEquipo, idComponente: comp.IdComponente, obs: comp.Obs || null });
           await trxExec(trx, `UPDATE Tab_EQ_Componentes SET Estado = 'ASIGNADO' WHERE IdComponente = @id`, { id: comp.IdComponente });
         }
       }

@@ -92,7 +92,8 @@ router.put('/:id', roleMiddleware('ADMIN', 'TECNICO'), validate(equipoUpdateSche
 
 router.post('/:id/baja', roleMiddleware('ADMIN'), async (req, res, next) => {
   try {
-    const equipo = await EquiposService.bajaEquipo(parseInt(req.params.id), req.usuario?.id);
+    if (!req.body?.motivo?.trim()) throw Object.assign(new Error('El motivo de baja es obligatorio'), { statusCode: 400 });
+    const equipo = await EquiposService.bajaEquipo(parseInt(req.params.id), req.usuario?.id, req.body.motivo.trim());
     res.json(equipo);
   } catch (e) { next(e); }
 });

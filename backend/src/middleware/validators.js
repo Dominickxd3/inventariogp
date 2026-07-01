@@ -79,7 +79,7 @@ export const asignacionCesarSchema = z.object({
 }).passthrough();
 
 export const incidenciaCreateSchema = z.object({
-  IdEquipo: z.number().int().positive('Equipo requerido'),
+  IdMaeEquipo: z.number().int().positive('Equipo requerido'),
   TipoIncidencia: z.string().min(1, 'Tipo de incidencia requerido'),
   Descripcion: z.string().min(1, 'Descripción requerida'),
   Prioridad: z.string().optional(),

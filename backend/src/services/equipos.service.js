@@ -81,7 +81,10 @@ export const EquiposService = {
     const existente = await EquiposRepository.getByCodEquipo(data.CodEquipo);
     if (existente) throw businessError(`Ya existe un equipo con el código ${data.CodEquipo}`);
 
-    if (!data.CodBarra) {
+    if (data.CodBarra) {
+      const existenteBarra = await EquiposRepository.getByCodigo(data.CodBarra);
+      if (existenteBarra) throw businessError(`Ya existe un equipo con el código de barra ${data.CodBarra}`);
+    } else {
       data.CodBarra = `QR-${data.CodEquipo}-${Date.now().toString(36).toUpperCase()}`;
     }
     const id = await EquiposRepository.create(data);
@@ -95,6 +98,11 @@ export const EquiposService = {
     if (!equipo) throw businessError('Equipo no encontrado', 404);
     validarNoBaja(equipo);
 
+    if (data.CodBarra?.trim() && data.CodBarra.trim() !== (equipo.CodBarra || '')) {
+      const existenteBarra = await EquiposRepository.getByCodigo(data.CodBarra.trim());
+      if (existenteBarra) throw businessError(`Ya existe un equipo con el código de barra ${data.CodBarra}`);
+    }
+
     const safeData = { ...data };
     delete safeData.CodEquipo;
     delete safeData.Estado;
@@ -102,14 +110,15 @@ export const EquiposService = {
     return this.getById(id);
   },
 
-  async bajaEquipo(id, idUsuario) {
+  async bajaEquipo(id, idUsuario, motivo) {
     const equipo = await EquiposRepository.getById(id);
     if (!equipo) throw businessError('Equipo no encontrado', 404);
     if (equipo.Estado === 'BAJA') throw businessError('El equipo ya está dado de baja');
+    if (equipo.Estado === 'ASIGNADO') throw businessError('No se puede dar de baja un equipo con asignación activa');
     const activa = await AsignacionesRepository.getActivaByEquipo(id);
     if (activa) throw businessError('No se puede dar de baja un equipo con asignación activa');
     await EquiposRepository.updateEstado(id, 'BAJA');
-    await EquiposRepository.registrarCambioEstado(id, equipo.Estado, 'BAJA', idUsuario, 'Baja lógica del equipo');
+    await EquiposRepository.registrarCambioEstado(id, equipo.Estado, 'BAJA', idUsuario, `Baja: ${motivo}`);
     return this.getById(id);
   },
 
