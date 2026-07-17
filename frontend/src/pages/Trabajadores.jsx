@@ -1,19 +1,17 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import Swal from 'sweetalert2';
 import DataTable from '../components/DataTable';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '#components/ui/button.jsx';
+import { Input } from '#components/ui/input.jsx';
 import { Card, CardContent } from '#components/ui/card.jsx';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '#components/ui/dialog.jsx';
 import { Skeleton } from '#components/ui/skeleton.jsx';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '#components/ui/select.jsx';
-import { RefreshCw, Search, Eye, Monitor, Users, UserX, UserCheck } from 'lucide-react';
+import { RefreshCw, Search, Eye, Monitor, Users, UserX, UserCheck, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatDate } from '../lib/utils';
 
@@ -30,17 +28,37 @@ export default function Trabajadores() {
   const [pageSize] = useState(50);
   const [syncing, setSyncing] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
+  const [areaDialogOpen, setAreaDialogOpen] = useState(false);
+  const [areaSearch, setAreaSearch] = useState('');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-
-  const { data, isLoading } = useQuery({
-    queryKey: ['trabajadores', search, areaFiltro, page, pageSize],
-    queryFn: () => api.trabajadores.search({ search, area: areaFiltro, page, pageSize }),
-  });
 
   const { data: areas } = useQuery({
     queryKey: ['trabajadores-areas'],
     queryFn: api.trabajadores.areas,
+  });
+
+  const areasList = useMemo(() => {
+    if (!areas) return [];
+    return areas
+      .map(a => a.Area)
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b));
+  }, [areas]);
+
+  const areasFiltradas = useMemo(() => {
+    if (!areaSearch.trim()) return areasList;
+    const s = areaSearch.toLowerCase();
+    return areasList.filter(a => a.toLowerCase().includes(s));
+  }, [areasList, areaSearch]);
+
+  function tieneAnio(area) {
+    return /\b(19|20)\d{2}\b/.test(area);
+  }
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['trabajadores', search, areaFiltro, page, pageSize],
+    queryFn: () => api.trabajadores.search({ search, area: areaFiltro, page, pageSize }),
   });
 
   const { data: stats } = useQuery({
@@ -108,19 +126,56 @@ export default function Trabajadores() {
             className="h-8 w-64 rounded-lg border border-input bg-transparent pl-9 pr-2.5 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground"
           />
         </div>
-        <Select value={areaFiltro} onValueChange={(v) => { setAreaFiltro(v); setPage(1); }}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="Todas las áreas">
-              {areaFiltro || null}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">Todas las áreas</SelectItem>
-            {areas?.map((a) => (
-              <SelectItem key={a.Area} value={a.Area}>{a.Area}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Button
+          variant="outline"
+          className="w-72 justify-start text-left font-normal gap-2"
+          onClick={() => setAreaDialogOpen(true)}
+        >
+          <Search className="w-4 h-4 shrink-0 text-muted-foreground" />
+          <span className="flex-1 truncate">{areaFiltro || 'Todas las áreas'}</span>
+          {areaFiltro && (
+            <X className="w-4 h-4 shrink-0 text-muted-foreground hover:text-foreground"
+              onClick={(e) => { e.stopPropagation(); setAreaFiltro(''); setPage(1); }} />
+          )}
+        </Button>
+
+        <Dialog open={areaDialogOpen} onOpenChange={(v) => { setAreaDialogOpen(v); if (!v) setAreaSearch(''); }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Filtrar por área</DialogTitle>
+            </DialogHeader>
+            <div className="relative mb-2">
+              <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
+              <Input value={areaSearch} onChange={(e) => setAreaSearch(e.target.value)}
+                placeholder="Buscar área..." className="pl-8" autoFocus />
+            </div>
+            <div className="max-h-72 overflow-y-auto space-y-1">
+              <div onClick={() => { setAreaFiltro(''); setAreaDialogOpen(false); setAreaSearch(''); }}
+                className={`p-3 rounded-lg cursor-pointer text-sm border transition-colors ${!areaFiltro ? 'bg-primary/10 border-primary' : 'hover:bg-muted border-transparent'}`}>
+                Todas las áreas
+              </div>
+              {areasFiltradas.map((area) => (
+                <div key={area} onClick={() => { setAreaFiltro(area); setAreaDialogOpen(false); setAreaSearch(''); setPage(1); }}
+                  title={area}
+                  className={`p-3 rounded-lg cursor-pointer text-sm border transition-colors ${areaFiltro === area ? 'bg-primary/10 border-primary' : 'hover:bg-muted border-transparent'}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate">{area}</span>
+                    {tieneAnio(area) && (
+                      <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20">
+                        Histórico
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {areasFiltradas.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  {areaSearch ? 'Sin resultados' : 'No hay áreas registradas'}
+                </p>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <DataTable
