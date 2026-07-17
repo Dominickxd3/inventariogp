@@ -109,12 +109,12 @@ export default function Trabajadores() {
           />
         </div>
         <Select value={areaFiltro} onValueChange={(v) => { setAreaFiltro(v); setPage(1); }}>
-          <SelectTrigger className="w-full sm:min-w-[26rem]" title={areaFiltro || 'Todas las áreas'}>
+          <SelectTrigger className="w-80" title={areaFiltro || 'Todas las áreas'}>
             <SelectValue placeholder="Todas las áreas" className="line-clamp-none">
               {areaFiltro || null}
             </SelectValue>
           </SelectTrigger>
-          <SelectContent className="min-w-[26rem]">
+          <SelectContent className="w-80">
             <SelectItem value="">Todas las áreas</SelectItem>
             {areas?.map((a) => (
               <SelectItem key={a.Area} value={a.Area}>{a.Area}</SelectItem>
