@@ -15,7 +15,7 @@ import {
   DialogFooter,
 } from '#components/ui/dialog.jsx';
 import { Skeleton } from '#components/ui/skeleton.jsx';
-import { Plus, QrCode, Eye, Archive, Monitor, CheckCircle, Clock, AlertTriangle, Search } from 'lucide-react';
+import { Plus, QrCode, Eye, Archive, Monitor, CheckCircle, Clock, AlertTriangle, Search, Download, Copy, Check } from 'lucide-react';
 import { formatDate } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -51,6 +51,7 @@ export default function Equipos() {
   const [showQROpen, setShowQROpen] = useState(false);
   const [qrData, setQrData] = useState(null);
   const [bajaMotivo, setBajaMotivo] = useState('');
+  const [qrCopied, setQrCopied] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -173,17 +174,28 @@ export default function Equipos() {
             className="h-8 w-64 rounded-lg border border-input bg-transparent pl-9 pr-2.5 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground"
           />
         </div>
-        <Select value={estadoFiltro} onValueChange={(v) => { setEstadoFiltro(v); setPage(1); }}>
-          <SelectTrigger className="w-40"><SelectValue placeholder="Todos los estados" /></SelectTrigger>
+        <Select value={estadoFiltro || 'Todos'} onValueChange={(v) => { setEstadoFiltro(v === 'Todos' ? '' : v); setPage(1); }}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="Todos los estados">
+              {estadoFiltro ? estadoFiltro : null}
+            </SelectValue>
+          </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Todos los estados</SelectItem>
+            <SelectItem value="Todos">Todos los estados</SelectItem>
             {ESTADOS.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={idTipoFiltro} onValueChange={(v) => { setIdTipoFiltro(v); setPage(1); }}>
-          <SelectTrigger className="w-44"><SelectValue placeholder="Todos los tipos" /></SelectTrigger>
+        <Select value={idTipoFiltro || 'Todos'} onValueChange={(v) => { setIdTipoFiltro(v === 'Todos' ? '' : v); setPage(1); }}>
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="Todos los tipos">
+              {(() => {
+                if (!idTipoFiltro) return null;
+                return tipos?.find(t => String(t.IdTipodeEquipo) === idTipoFiltro)?.DesTipodeEquipo;
+              })()}
+            </SelectValue>
+          </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Todos los tipos</SelectItem>
+            <SelectItem value="Todos">Todos los tipos</SelectItem>
             {tipos?.map((t) => (
               <SelectItem key={t.IdTipodeEquipo} value={String(t.IdTipodeEquipo)}>{t.DesTipodeEquipo}</SelectItem>
             ))}
@@ -370,13 +382,42 @@ export default function Equipos() {
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Código QR</DialogTitle>
+            <DialogDescription>Escanea con tu celular para acceder a la ficha del equipo</DialogDescription>
           </DialogHeader>
           {qrData && (
             <div className="text-center space-y-4 py-2">
-              <img src={qrData.qr} alt="QR" className="mx-auto rounded-lg" />
-              <p className="text-sm text-muted-foreground">Escanea para ver información del equipo</p>
-              <a href={qrData.url} target="_blank" rel="noopener noreferrer"
-                className="text-xs text-primary underline break-all block">{qrData.url}</a>
+              <div className="bg-white rounded-xl p-4 inline-block mx-auto shadow-sm border border-border/50">
+                <img src={qrData.qr} alt="QR" className="mx-auto" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Enlace directo</p>
+                <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2">
+                  <code className="flex-1 text-xs text-left break-all">{qrData.url}</code>
+                  <Button variant="ghost" size="icon-sm" onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}${qrData.url}`);
+                    setQrCopied(true);
+                    setTimeout(() => setQrCopied(false), 2000);
+                  }}>
+                    {qrCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  </Button>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => {
+                  const a = document.createElement('a');
+                  a.href = qrData.qr;
+                  a.download = `QR-${qrData.equipo?.CodEquipo || 'equipo'}.png`;
+                  a.click();
+                }}>
+                  <Download className="w-4 h-4 mr-1.5" /> Descargar
+                </Button>
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => {
+                  setShowQROpen(false);
+                  navigate(qrData.url);
+                }}>
+                  <Eye className="w-4 h-4 mr-1.5" /> Abrir
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>

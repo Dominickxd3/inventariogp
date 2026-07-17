@@ -28,6 +28,13 @@ router.get('/areas', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.get('/stats', async (req, res, next) => {
+  try {
+    const stats = await TrabajadoresRepository.getStats();
+    res.json(stats);
+  } catch (e) { next(e); }
+});
+
 router.get('/:id', async (req, res, next) => {
   try {
     const t = await TrabajadoresRepository.getById(parseInt(req.params.id));

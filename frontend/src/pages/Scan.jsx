@@ -101,7 +101,7 @@ export default function Scan() {
             {resultado.asignacion && (
               <>
                 <p><strong>Asignado a:</strong> {resultado.asignacion.TrabajadorNombre}</p>
-                <p><strong>Área:</strong> {resultado.asignacion.AreaName}</p>
+                <p><strong>Área:</strong> {resultado.asignacion.Area}</p>
               </>
             )}
           </div>

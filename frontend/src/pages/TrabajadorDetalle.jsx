@@ -58,7 +58,7 @@ export default function TrabajadorDetalle() {
   if (isLoading) return (
     <div className="space-y-6 max-w-4xl">
       <Skeleton className="h-9 w-24" />
-      <Card><CardContent className="p-6 space-y-4">
+      <Card className="shadow-sm"><CardContent className="p-6 space-y-4">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-4 w-40" />
         <div className="grid grid-cols-3 gap-4">
@@ -73,12 +73,12 @@ export default function TrabajadorDetalle() {
   const activasCount = activas?.length || 0;
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl mx-auto">
       <Button variant="ghost" onClick={() => navigate(-1)} className="flex items-center gap-2">
         <ArrowLeft className="w-4 h-4" /> Volver
       </Button>
 
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader>
           <div className="flex items-start justify-between">
             <div>
@@ -107,8 +107,8 @@ export default function TrabajadorDetalle() {
           </div>
         </CardContent>
       </Card>
-
-      <Card>
+      
+      <Card className="shadow-sm">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Equipos Asignados</CardTitle>
@@ -149,7 +149,7 @@ export default function TrabajadorDetalle() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader><CardTitle>Accesorios Vigentes</CardTitle></CardHeader>
         <CardContent>
           {accsLoading ? (
@@ -180,7 +180,7 @@ export default function TrabajadorDetalle() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader><CardTitle>Historial de Asignaciones</CardTitle></CardHeader>
         <CardContent>
           {historialLoading ? (

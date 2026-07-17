@@ -15,18 +15,23 @@ export const TrabajadoresRepository = {
       params.search = `%${filtros.search}%`;
     }
     if (filtros.area) {
-      where += ' AND Area = @area';
+      where += ' AND t.Area = @area';
       params.area = filtros.area;
     }
-    if (filtros.activos !== 'false') { where += ' AND Activo = @activo'; params.activo = '1'; }
+    if (filtros.activos !== 'false') { where += ' AND t.Activo = @activo'; params.activo = '1'; }
 
-    const countSql = `SELECT COUNT(*) as total FROM Tab_EQ_Trabajadores ${where}`;
+    const joinAsig = 'LEFT JOIN Tab_EQ_MovEquiposAsignaciones a ON t.IdTrabajador = a.IdReferente AND a.Estado = \'VIGENTE\'';
+
+    const countSql = `SELECT COUNT(DISTINCT t.IdTrabajador) as total FROM Tab_EQ_Trabajadores t ${joinAsig} ${where}`;
     const [{ total }] = await query(DB, countSql, params);
 
     const dataSql = `
-      SELECT IdTrabajador, IdTrabajadorERP, DOI, Trabajador, Ocupacion, Area, Activo
-      FROM Tab_EQ_Trabajadores ${where}
-      ORDER BY Trabajador
+      SELECT DISTINCT t.IdTrabajador, t.IdTrabajadorERP, t.DOI, t.Trabajador, t.Ocupacion, t.Area, t.Activo,
+        CASE WHEN a.IdMaeEquipo IS NOT NULL THEN 1 ELSE 0 END as ConEquipos
+      FROM Tab_EQ_Trabajadores t
+      ${joinAsig}
+      ${where}
+      ORDER BY t.Trabajador
       OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY
     `;
     params.offset = offset;
@@ -34,6 +39,23 @@ export const TrabajadoresRepository = {
     const rows = await query(DB, dataSql, params);
 
     return { rows, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
+  },
+
+  async getStats() {
+    const [stats] = await query(DB, `
+      SELECT
+        COUNT(*) as total,
+        SUM(CASE WHEN tiene_asig = 1 THEN 1 ELSE 0 END) as con_equipos,
+        SUM(CASE WHEN tiene_asig = 0 THEN 1 ELSE 0 END) as sin_equipos
+      FROM (
+        SELECT DISTINCT t.IdTrabajador,
+          CASE WHEN a.IdMaeEquipo IS NOT NULL THEN 1 ELSE 0 END as tiene_asig
+        FROM Tab_EQ_Trabajadores t
+        LEFT JOIN Tab_EQ_MovEquiposAsignaciones a ON t.IdTrabajador = a.IdReferente AND a.Estado = 'VIGENTE'
+        WHERE t.Activo = '1'
+      ) sub
+    `);
+    return stats;
   },
 
   async getAreas() {

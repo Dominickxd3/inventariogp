@@ -18,7 +18,8 @@ import { useState, useMemo } from 'react';
 import ComponentSearchSelect from '../components/ComponentSearchSelect';
 import IncidenciaSelect from '../components/IncidenciaSelect';
 import {
-  ArrowLeft, QrCode, Pencil, Save, X, Plus, Trash2, Monitor, Search, Cpu, Wrench, Hammer, AlertTriangle, Clock,
+  ArrowLeft, QrCode, Eye, Pencil, Save, X, Plus, Trash2, Monitor, Search, Cpu, Wrench, Hammer, AlertTriangle, Clock,
+  Download, Copy, Check,
 } from 'lucide-react';
 
 export default function EquipoDetalle() {
@@ -27,6 +28,7 @@ export default function EquipoDetalle() {
   const queryClient = useQueryClient();
   const [showQR, setShowQR] = useState(null);
   const [qrOpen, setQrOpen] = useState(false);
+  const [qrCopied, setQrCopied] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [form, setForm] = useState({});
   const [compOpen, setCompOpen] = useState(false);
@@ -696,7 +698,7 @@ export default function EquipoDetalle() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Área</p>
-                <p className="text-sm font-medium">{equipo.asignacion.AreaName || '-'}</p>
+                <p className="text-sm font-medium">{equipo.asignacion.Area || '-'}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Cargo</p>
@@ -1298,13 +1300,44 @@ export default function EquipoDetalle() {
 
       <Dialog open={qrOpen} onOpenChange={setQrOpen}>
         <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>Código QR</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Código QR</DialogTitle>
+            <DialogDescription>Escanea con tu celular para acceder a la ficha del equipo</DialogDescription>
+          </DialogHeader>
           {showQR && (
-            <div className="text-center space-y-4">
-              <img src={showQR.qr} alt="QR" className="mx-auto" />
-              <p className="text-sm text-muted-foreground">Escanea para ver información del equipo</p>
-              <a href={showQR.url} target="_blank" rel="noopener noreferrer"
-                className="text-xs text-primary underline break-all block">{showQR.url}</a>
+            <div className="text-center space-y-4 py-2">
+              <div className="bg-white rounded-xl p-4 inline-block mx-auto shadow-sm border border-border/50">
+                <img src={showQR.qr} alt="QR" className="mx-auto" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Enlace directo</p>
+                <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2">
+                  <code className="flex-1 text-xs text-left break-all">{showQR.url}</code>
+                  <Button variant="ghost" size="icon-sm" onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}${showQR.url}`);
+                    setQrCopied(true);
+                    setTimeout(() => setQrCopied(false), 2000);
+                  }}>
+                    {qrCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  </Button>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => {
+                  const a = document.createElement('a');
+                  a.href = showQR.qr;
+                  a.download = `QR-${showQR.equipo?.CodEquipo || 'equipo'}.png`;
+                  a.click();
+                }}>
+                  <Download className="w-4 h-4 mr-1.5" /> Descargar
+                </Button>
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => {
+                  setQrOpen(false);
+                  navigate(showQR.url);
+                }}>
+                  <Eye className="w-4 h-4 mr-1.5" /> Abrir
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>

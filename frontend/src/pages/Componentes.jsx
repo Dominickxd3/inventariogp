@@ -61,14 +61,14 @@ function CategoriaBadge({ categoria }) {
 }
 
 const CATEGORIA_TABS = [
-  { value: '', label: 'Todo' },
+  { value: '', label: 'TODOS' },
   { value: 'REPUESTO_TECNICO', label: 'Repuestos Técnicos' },
   { value: 'ACCESORIO', label: 'Accesorios' },
   { value: 'CONSUMIBLE', label: 'Consumibles' },
 ];
 
 const ESTADO_FILTERS = [
-  { value: '', label: 'Todo' },
+  { value: '', label: 'TODOS' },
   { value: 'DISPONIBLE', label: 'Disponible' },
   { value: 'ASIGNADO', label: 'Asignado' },
   { value: 'BAJA', label: 'Baja' },
@@ -192,10 +192,10 @@ export default function Componentes() {
             className="h-8 w-full rounded-lg border border-input bg-transparent pl-9 pr-2.5 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground"
           />
         </div>
-        <Select value={estadoFilter} onValueChange={setEstadoFilter}>
+        <Select value={estadoFilter || 'Todos'} onValueChange={(v) => setEstadoFilter(v === 'Todos' ? '' : v)}>
           <SelectTrigger className="w-[140px]"><SelectValue placeholder="Estado" /></SelectTrigger>
           <SelectContent>
-            {ESTADO_FILTERS.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+            {ESTADO_FILTERS.map((f) => <SelectItem key={f.value} value={f.value || 'Todos'}>{f.label}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>

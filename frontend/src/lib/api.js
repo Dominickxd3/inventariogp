@@ -68,6 +68,7 @@ export const api = {
     get: (id) => request(`/trabajadores/${id}`),
     getByDNI: (dni) => request(`/trabajadores/dni/${dni}`),
     areas: () => request('/trabajadores/areas'),
+    stats: () => request('/trabajadores/stats'),
     sync: () => request('/trabajadores/sync', { method: 'POST' }),
   },
   asignaciones: {

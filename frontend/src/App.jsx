@@ -10,6 +10,7 @@ import TrabajadorDetalle from './pages/TrabajadorDetalle'
 import Asignaciones from './pages/Asignaciones'
 import Incidencias from './pages/Incidencias'
 import Componentes from './pages/Componentes'
+import EquipoScan from './pages/EquipoScan'
 import Scan from './pages/Scan'
 
 function ProtectedRoute({ children }) {
@@ -38,6 +39,7 @@ export default function App() {
               <Route path="/asignaciones" element={<Asignaciones />} />
               <Route path="/incidencias" element={<Incidencias />} />
               <Route path="/componentes" element={<Componentes />} />
+              <Route path="/equipos/scan/:codigo" element={<EquipoScan />} />
               <Route path="/scan" element={<Scan />} />
             </Routes>
           </Layout>

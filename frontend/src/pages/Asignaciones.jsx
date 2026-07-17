@@ -326,7 +326,7 @@ function AsignarForm({ onSuccess, equipoInicial }) {
   const { data: trabajadores } = useQuery({
     queryKey: ['trabajadores-search', searchTrab],
     queryFn: () => api.trabajadores.search({ search: searchTrab }),
-    enabled: searchTrab.length > 2,
+    enabled: true,
   });
 
   const { data: equipos } = useQuery({
@@ -440,6 +440,10 @@ function AsignarForm({ onSuccess, equipoInicial }) {
                 <p className="text-muted-foreground text-xs">{t.DOI} - {t.Ocupacion}</p>
               </div>
             ))}
+          </div>
+          <div className="flex gap-2 pt-2">
+            <Button variant="outline" onClick={() => { onSuccess(); setStep(1); setSearchTrab(''); setSelectedTrab(null); }}>Cancelar</Button>
+            <Button onClick={() => setStep(2)} disabled={!selectedTrab}>Siguiente</Button>
           </div>
         </div>
       )}
