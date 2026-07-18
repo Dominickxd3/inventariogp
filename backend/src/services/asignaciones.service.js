@@ -109,18 +109,46 @@ export const AsignacionesService = {
   async cesar(id, idUsuario, accesorios, data) {
     const asig = await AsignacionesRepository.getById(id);
     if (!asig) throw new Error('Asignación no encontrada');
+    if (asig.Estado !== 'VIGENTE') throw new Error('La asignación ya fue cesada o no está vigente');
+
+    const motivo = (data?.Motivo || '').trim();
+    const obsTexto = (data?.Obs || '').trim();
+    const obsCombinada = [motivo, obsTexto].filter(Boolean).join(' — ');
+
+    const estadoMap = {
+      DEVOLUCION: 'DISPONIBLE',
+      DISPONIBLE: 'DISPONIBLE',
+      RENUNCIA: 'DISPONIBLE',
+      CAMBIO: 'DISPONIBLE',
+      TRASLADO: 'DISPONIBLE',
+      DAÑADO: 'MANTENIMIENTO',
+      DAÑO: 'MANTENIMIENTO',
+      ROTO: 'MANTENIMIENTO',
+      MANTENIMIENTO: 'MANTENIMIENTO',
+      PERDIDO: 'BAJA',
+      PERDIDA: 'BAJA',
+      ROBADO: 'BAJA',
+      ROBO: 'BAJA',
+      EXTRAVIADO: 'BAJA',
+      BAJA: 'BAJA',
+    };
+
+    const palabra = Object.keys(estadoMap).find(k =>
+      motivo.toUpperCase().includes(k)
+    );
+    const estadoNuevo = estadoMap[palabra] || 'DISPONIBLE';
 
     return withTransaction(DB, async (trx) => {
       await trxExec(trx, `
         UPDATE Tab_EQ_MovEquiposAsignaciones
-        SET Estado = 'CESADO', FecCese = GETDATE()
+        SET Estado = 'CESADO', FecCese = GETDATE(), Obs = @obs
         WHERE IdMovEquipoAsignacion = @id
-      `, { id });
-      await trxExec(trx, `UPDATE Tab_EQ_MaeEquipos SET Estado = 'DISPONIBLE' WHERE IdMaeEquipo = @id`, { id: asig.IdMaeEquipo });
+      `, { id, obs: obsCombinada || null });
+      await trxExec(trx, `UPDATE Tab_EQ_MaeEquipos SET Estado = @estado WHERE IdMaeEquipo = @id`, { estado: estadoNuevo, id: asig.IdMaeEquipo });
       await trxExec(trx, `
         INSERT INTO Tab_EQ_MovEstadosEquipos (IdMaeEquipo, EstadoAnterior, EstadoNuevo, IdUsuario, Obs)
-        VALUES (@idEquipo, 'ASIGNADO', 'DISPONIBLE', @idUsuario, 'Asignación finalizada')
-      `, { idEquipo: asig.IdMaeEquipo, idUsuario: idUsuario || null });
+        VALUES (@idEquipo, 'ASIGNADO', @estadoNuevo, @idUsuario, @obs)
+      `, { idEquipo: asig.IdMaeEquipo, estadoNuevo, idUsuario: idUsuario || null, obs: obsCombinada || 'Asignación finalizada' });
 
       if (accesorios?.length) {
         for (const acc of accesorios) {

@@ -49,28 +49,43 @@ export default function DataTable({
   pageSizeOptions = [10, 25, 50, 100],
   emptyMessage = 'No hay datos disponibles',
   loading,
+  paginationMode = 'client',
+  page: serverPage,
+  serverPageSize,
+  total: serverTotal,
+  totalPages: serverTotalPages,
+  onPageChange,
+  onPageSizeChange,
 }) {
+  const currentPageSize = serverPageSize || defaultPageSize;
   const [globalFilter, setGlobalFilter] = useState('');
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: defaultPageSize });
+
+  const isServer = paginationMode === 'server';
 
   const tableColumns = useMemo(() => columns.map((col) => ({
     accessorKey: col.key,
     header: col.label,
-    enableSorting: col.sortable !== false,
+    enableSorting: col.sortable !== false && !isServer,
     cell: col.render ? ({ row }) => col.render(row.original) : ({ getValue }) => getValue() ?? '-',
     ...(col.meta ? { meta: col.meta } : {}),
-  })), [columns]);
+  })), [columns, isServer]);
 
   const table = useReactTable({
     data,
     columns: tableColumns,
-    state: { globalFilter, pagination },
+    state: isServer
+      ? { globalFilter }
+      : { globalFilter, pagination },
     onGlobalFilterChange: setGlobalFilter,
-    onPaginationChange: setPagination,
+    onPaginationChange: isServer ? undefined : setPagination,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: isServer ? undefined : getSortedRowModel(),
+    getFilteredRowModel: isServer ? undefined : getFilteredRowModel(),
+    getPaginationRowModel: isServer ? undefined : getPaginationRowModel(),
+    pageCount: isServer ? (serverTotalPages ?? 1) : undefined,
+    manualPagination: isServer,
+    manualSorting: isServer,
     globalFilterFn: 'includesString',
   });
 
@@ -173,7 +188,46 @@ export default function DataTable({
         </div>
       </div>
 
-      {table.getPageCount() > 1 && (
+      {isServer && (serverTotalPages > 1 || serverTotal > currentPageSize) ? (
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>Mostrar</span>
+            <select
+              value={currentPageSize}
+              onChange={(e) => onPageSizeChange?.(Number(e.target.value))}
+              className="border border-input rounded-lg px-2 py-1 text-sm bg-transparent"
+            >
+              {pageSizeOptions.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            <span>{serverTotal > 0 ? `1–${Math.min(currentPageSize, serverTotal)} de ${serverTotal} registros` : '0 registros'}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">
+              Página {serverPage} de {serverTotalPages || 1}
+            </span>
+            <div className="flex gap-1">
+              <Button
+                variant="outline"
+                size="icon-sm"
+                onClick={() => onPageChange?.(serverPage - 1)}
+                disabled={serverPage <= 1}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                onClick={() => onPageChange?.(serverPage + 1)}
+                disabled={serverPage >= serverTotalPages}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : !isServer && table.getPageCount() > 1 && (
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>Mostrar</span>
