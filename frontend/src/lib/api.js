@@ -25,6 +25,35 @@ export async function request(path, options = {}) {
   return data;
 }
 
+export async function requestBlob(path, options = {}) {
+  const token = getToken();
+
+  const res = await fetch(`${BASE}${path}`, {
+    ...options,
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+  });
+
+  if (res.status === 401) {
+    localStorage.removeItem('token');
+    window.location.href = '/login';
+    throw new Error('Sesión vencida');
+  }
+
+  if (!res.ok) {
+    let message = 'No se pudo obtener el documento';
+    try {
+      const data = await res.json();
+      message = data.error || data.message || message;
+    } catch {}
+    throw new Error(message);
+  }
+
+  return res.blob();
+}
+
 export const api = {
   auth: {
     login: (usuario, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ usuario, password }) }),
@@ -66,7 +95,7 @@ export const api = {
   actas: {
     list: (params) => request(`/actas?${new URLSearchParams(params)}`),
     get: (id) => request(`/actas/${id}`),
-    getPdf: (id) => request(`/actas/${id}/pdf`),
+    getPdf: (id) => requestBlob(`/actas/${id}/pdf`),
     regenerarEnlace: (id) => request(`/actas/${id}/regenerar-enlace`, { method: 'POST' }),
     anular: (id, motivo) => request(`/actas/${id}/anular`, { method: 'POST', body: JSON.stringify({ motivo }) }),
     asignacionEstado: (idAsig) => request(`/asignaciones/${idAsig}/acta/estado`),

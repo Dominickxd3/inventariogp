@@ -64,6 +64,33 @@ export default function ActasList() {
     }
   }
 
+  async function handleVerPdf(idActa) {
+    try {
+      const blob = await api.actas.getPdf(idActa)
+
+      if (!blob || blob.size === 0 || blob.type !== 'application/pdf') {
+        throw new Error('El archivo PDF no es válido')
+      }
+
+      const objectUrl = URL.createObjectURL(blob)
+
+      const nuevaVentana = window.open(objectUrl, '_blank', 'noopener,noreferrer')
+
+      if (!nuevaVentana) {
+        URL.revokeObjectURL(objectUrl)
+        throw new Error('El navegador bloqueó la apertura del documento')
+      }
+
+      window.setTimeout(() => { URL.revokeObjectURL(objectUrl) }, 300000)
+    } catch (error) {
+      Swal.fire({
+        icon: 'error',
+        title: 'No se pudo abrir el acta',
+        text: error.message || 'Ocurrió un error al obtener el documento.',
+      })
+    }
+  }
+
   async function handleAnular() {
     if (!anularDialog || !motivoAnula || motivoAnula.length < 10) return
     try {
@@ -107,11 +134,11 @@ export default function ActasList() {
       render: (row) => (
         <div className="flex gap-1">
           {row.PdfFirmadoRuta ? (
-            <Button variant="ghost" size="icon-sm" onClick={() => window.open(`/api/actas/${row.IdActa}/pdf`, '_blank')} title="Ver PDF">
+            <Button variant="ghost" size="icon-sm" onClick={() => handleVerPdf(row.IdActa)} title="Ver PDF">
               <FileText className="w-4 h-4" />
             </Button>
           ) : row.PdfOriginalRuta ? (
-            <Button variant="ghost" size="icon-sm" onClick={() => window.open(`/api/actas/${row.IdActa}/pdf`, '_blank')} title="Ver PDF original">
+            <Button variant="ghost" size="icon-sm" onClick={() => handleVerPdf(row.IdActa)} title="Ver PDF original">
               <FileText className="w-4 h-4" />
             </Button>
           ) : null}
