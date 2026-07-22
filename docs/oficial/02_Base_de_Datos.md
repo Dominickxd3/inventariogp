@@ -1,228 +1,103 @@
 # 02 — Base de Datos
 
-> **Propósito**: Documento de referencia del modelo de datos completo, esquema, tablas, columnas, restricciones, índices y relaciones.
+> **Propósito**: Modelo de datos del sistema.
 > **Estado**: ⚠️ BORRADOR — PENDIENTE DE VALIDACIÓN
-> **Nota**: No modificar la base de datos sin autorización expresa del usuario.
 
 ---
 
-## 1. Configuración de la base de datos
+## A. Tablas verificadas mediante código
 
-- **BD**: `InventarioGP`
-- **Motor**: Microsoft SQL Server 2019+
-- **Autenticación**: SQL Server Auth (usuario `sa` en desarrollo)
-- **Esquema por defecto**: `dbo`
+Las siguientes tablas se confirman mediante consultas SQL en `backend/src/repositories/` y `backend/src/services/`.
 
-> ⚠️ **Correcciones verificadas respecto a código**:
-> - Los nombres reales de tablas usan prefijo `Tab_EQ_` (ej: `Tab_EQ_Trabajadores`, `Tab_EQ_MaeEquipos`, `Tab_EQ_MovEquiposAsignaciones`). Las estructuras de columnas listadas abajo son **inferidas** del modelo conceptual, no verificadas contra la BD real. Consultar los repositorios en `backend/src/repositories/` para la nomenclatura exacta de tablas y columnas.
-> - `bcryptjs` → `bcrypt` (verificado en `backend/package.json`)
+| Tabla | Propósito | Mencionada en |
+|-------|-----------|---------------|
+| `Tab_SYS_Usuarios` | Usuarios del sistema | `usuarios.repository.js` |
+| `Tab_SYS_LoginAudit` | Auditoría de inicios de sesión | `audit.repository.js` |
+| `Tab_EQ_Trabajadores` | Directorio de empleados | `trabajadores.repository.js` |
+| `Tab_EQ_MaeEquipos` | Activos tecnológicos | `equipos.repository.js` |
+| `Tab_EQ_TipodeEquipos` | Catálogo de tipos de equipo | `equipos.repository.js` |
+| `Tab_EQ_Componentes` | Repuestos y accesorios | `componentes.repository.js` |
+| `Tab_EQ_TipodeComponentes` | Catálogo de tipos de componente | `componentes.repository.js` |
+| `Tab_EQ_MovEquiposAsignaciones` | Asignaciones de equipos a trabajadores | `asignaciones.repository.js` |
+| `Tab_EQ_MovAccesoriosTrabajador` | Accesorios vinculados a asignaciones | `asignaciones.service.js`, `componentes.repository.js` |
+| `Tab_EQ_MovEquiposComponentes` | Componentes instalados en equipos | `componentes.repository.js` |
+| `Tab_EQ_MovEstadosEquipos` | Historial de cambios de estado de equipos | `equipos.repository.js` |
+| `Tab_EQ_Incidencias` | Reporte de incidencias | `incidencias.repository.js` |
+| `Tab_EQ_IntervencionesTecnicas` | Intervenciones técnicas | `intervenciones.repository.js` |
+| `Tab_EQ_IntervencionesComponentes` | Componentes usados en intervenciones | migración SQL |
+| `Tab_EQ_ComponentesEventos` | Eventos de componentes | migración SQL |
+| `Tab_EQ_CaracteristicasEquipo` | Características técnicas de equipos | `equipos.repository.js` |
+| `Tab_EQ_PlantillaCaracteristicas` | Plantilla de características | `equipos.repository.js` |
 
-## 2. Tablas del sistema
+### Notas sobre las tablas verificadas
 
-### 2.1 `EQ_Usuarios` — Usuarios del sistema
+- El sistema **no** tiene `Tab_EQ_Usuarios`; los usuarios están en `Tab_SYS_Usuarios`.
+- `Tab_SYS_LoginAudit` registra intentos de login (User_Logon, Exitoso, DireccionIP, UserAgent, Mensaje).
+- No se encontró evidencia de `Tab_EQ_Auditoria` genérica, `Tab_EQ_Dashboard`, `EQ_Notificaciones`, `EQ_Periodos` ni `EQ_IntervencionesProgramadas`.
+- No se encontró evidencia de stored procedures (`SP_ActualizarDashboard`).
 
-| Columna | Tipo | Restricciones |
-|---------|------|--------------|
-| IdUsuario | INT | PK, IDENTITY(1,1) |
-| Usuario | VARCHAR(100) | NOT NULL, UNIQUE |
-| Password | VARCHAR(255) | NOT NULL |
-| Rol | VARCHAR(20) | NOT NULL, CHECK (Rol IN ('ADMIN','TECNICO')) |
-| IdTrabajador | INT | FK → EQ_Trabajadores(IdTrabajador), NOT NULL, UNIQUE |
-| UltimoAcceso | DATETIME | NULL |
-| CreadoPor | INT | FK → EQ_Usuarios(IdUsuario), NOT NULL |
-| FechaCreacion | DATETIME | NOT NULL, DEFAULT GETDATE() |
-| Activo | BIT | NOT NULL, DEFAULT 1 |
+---
 
-### 2.2 `EQ_Trabajadores` — Directorio de empleados
+## B. Modelo conceptual pendiente de verificación contra BD real
 
-| Columna | Tipo | Restricciones |
-|---------|------|--------------|
-| IdTrabajador | INT | PK, IDENTITY(1,1) |
-| DNI | VARCHAR(20) | NOT NULL, UNIQUE |
-| Nombres | VARCHAR(100) | NOT NULL |
-| Cargo | VARCHAR(100) | NOT NULL |
-| Area | VARCHAR(100) | NULL |
-| Correo | VARCHAR(100) | NULL |
-| Celular | VARCHAR(20) | NULL |
-| Sede | VARCHAR(100) | NULL |
-| Activo | BIT | NOT NULL, DEFAULT 1 |
-| FechaCreacion | DATETIME | NOT NULL, DEFAULT GETDATE() |
+> Las siguientes secciones describen un modelo **inferido** del código y la lógica de negocio. Las columnas, tipos, restricciones, FK, índices y CHECK constraints listados **no han sido verificados contra el esquema real de SQL Server**. Consultar las migraciones en `backend/migrations/` y `backend/create_core_tables.sql` para el DDL real.
 
-**🔍 INFERENCIA**: La columna `Area` no tiene FK a un catálogo de áreas. Los valores se repiten libremente.
+### B.1 Convenciones generales
 
-### 2.3 `EQ_Equipos` — Activos tecnológicos
+| Elemento | Convención observada en código |
+|----------|-------------------------------|
+| Prefijo de tablas | `Tab_EQ_` para módulo Equipos, `Tab_SYS_` para sistema |
+| Columnas | PascalCase (ej: `IdMaeEquipo`, `NombreTrabajador`) |
+| PK | `Id[NombreTabla]` o similar |
+| Fechas | `DATE` (solo fecha), `DATETIME` (fecha+hora) |
+| Booleanos | `BIT` (0/1) |
+| Estados | `VARCHAR` con valores controlados |
 
-| Columna | Tipo | Restricciones |
-|---------|------|--------------|
-| IdEquipo | INT | PK, IDENTITY(1,1) |
-| TipoEquipo | VARCHAR(50) | NOT NULL |
-| Marca | VARCHAR(50) | NULL |
-| Modelo | VARCHAR(100) | NULL |
-| NumeroSerie | VARCHAR(100) | NULL, UNIQUE |
-| CodigoInterno | VARCHAR(50) | NULL, UNIQUE |
-| CodigoPatrimonial | VARCHAR(50) | NULL |
-| Caracteristicas | VARCHAR(500) | NULL |
-| Estado | VARCHAR(20) | NOT NULL, CHECK (Estado IN ('DISPONIBLE','ASIGNADO','MANTENIMIENTO','BAJA','RESGUARDADO')) |
-| FechaIngreso | DATE | NOT NULL |
-| FechaBaja | DATE | NULL |
-| IdTrabajador | INT | NULL, FK → EQ_Trabajadores(IdTrabajador) |
-| IdCreadoPor | INT | NULL (debería FK → EQ_Usuarios) |
-| FechaCreacion | DATETIME | NOT NULL, DEFAULT GETDATE() |
+### B.2 Estados observados
 
-**Hallazgos**:
-- ❌ `FechaBaja` no se usa (el sistema usa `FechaFin` en asignaciones).
-- ❌ `IdTrabajador` en Equipos es redundante con la asignación activa; no siempre se actualiza.
+**Equipos (`Tab_EQ_MaeEquipos.Estado`):** `DISPONIBLE`, `ASIGNADO`, `MANTENIMIENTO`, `BAJA`, `RESGUARDADO`
 
-### 2.4 `EQ_Componentes` — Repuestos y accesorios en almacén
+**Asignaciones (`Tab_EQ_MovEquiposAsignaciones.Estado`):** `VIGENTE`, `CESADO`
 
-| Columna | Tipo | Restricciones |
-|---------|------|--------------|
-| IdComponente | INT | PK, IDENTITY(1,1) |
-| TipoComponente | VARCHAR(50) | NOT NULL |
-| Marca | VARCHAR(50) | NULL |
-| Modelo | VARCHAR(100) | NULL |
-| NumeroSerie | VARCHAR(100) | NULL, UNIQUE |
-| Estado | VARCHAR(20) | NOT NULL, CHECK (Estado IN ('DISPONIBLE','INSTALADO','ASIGNADO','MANTENIMIENTO','BAJA')) |
-| Ubicacion | VARCHAR(100) | NULL |
-| Observaciones | VARCHAR(500) | NULL |
-| IdCreadoPor | INT | FK → EQ_Usuarios(IdUsuario) |
-| FechaCreacion | DATETIME | NOT NULL, DEFAULT GETDATE() |
+**Movimientos de accesorios (`Tab_EQ_MovAccesoriosTrabajador.Estado`):** `VIGENTE`, `CESADO`
 
-### 2.5 `EQ_Asignaciones` — Asignaciones de equipos
+**Componentes (`Tab_EQ_Componentes.Estado`):** `DISPONIBLE`, `ASIGNADO`, `INSTALADO`, `MANTENIMIENTO`, `BAJA`
 
-| Columna | Tipo | Restricciones |
-|---------|------|--------------|
-| IdAsignacion | INT | PK, IDENTITY(1,1) |
-| IdEquipo | INT | NOT NULL, FK → EQ_Equipos(IdEquipo) |
-| IdTrabajador | INT | NOT NULL, FK → EQ_Trabajadores(IdTrabajador) |
-| FechaAsignacion | DATE | NOT NULL |
-| FechaFin | DATE | NULL |
-| Estado | VARCHAR(20) | NOT NULL, CHECK (Estado IN ('VIGENTE','CESADA')) |
-| MotivoCese | VARCHAR(100) | NULL |
-| Obs | VARCHAR(500) | NULL |
-| IdCreadoPor | INT | FK → EQ_Usuarios(IdUsuario), NOT NULL |
-| FechaCreacion | DATETIME | NOT NULL, DEFAULT GETDATE() |
+**Incidencias (`Tab_EQ_Incidencias.Estado`):** `ABIERTO`, `EN_PROCESO`, `CERRADO`
 
-**Reglas**:
-- Un equipo solo puede tener una asignación `VIGENTE` a la vez.
-- `MotivoCese` usa 9 valores controlados (ver catálogo de estados).
-- `IdCreadoPor` es quien registró la asignación (no necesariamente el técnico que la realizó).
+**Usuarios (`Tab_SYS_Usuarios.Rol`):** `ADMIN`, `TECNICO`
 
-### 2.6 `EQ_AsignacionesAcc` — Accesorios ligados a asignaciones
+### B.3 Relaciones principales inferidas
 
-| Columna | Tipo | Restricciones |
-|---------|------|--------------|
-| IdAsignacionAcc | INT | PK, IDENTITY(1,1) |
-| IdAsignacion | INT | NOT NULL, FK → EQ_Asignaciones(IdAsignacion) |
-| IdComponente | INT | NOT NULL, FK → EQ_Componentes(IdComponente) |
-| Accion | VARCHAR(20) | NOT NULL, CHECK (Accion IN ('ASIGNADO','INSTALADO')) |
-| FechaRegistro | DATETIME | NOT NULL, DEFAULT GETDATE() |
+```
+Tab_SYS_Usuarios (IdUsuario)
+  └─ Tab_EQ_Trabajadores (IdTrabajador) — posible FK desde usuarios a trabajadores
 
-### 2.7 `EQ_EquiposComponentes` — Componentes instalados en equipos
+Tab_EQ_Trabajadores (IdTrabajador)
+  └─ Tab_EQ_MovEquiposAsignaciones (IdReferente) — trabajador asignado
 
-| Columna | Tipo | Restricciones |
-|---------|------|--------------|
-| IdEquipoComponente | INT | PK, IDENTITY(1,1) |
-| IdEquipo | INT | NOT NULL, FK → EQ_Equipos(IdEquipo) |
-| IdComponente | INT | NOT NULL, FK → EQ_Componentes(IdComponente), UNIQUE |
-| EstadoRelacion | VARCHAR(20) | NOT NULL, CHECK (EstadoRelacion IN ('INSTALADO','RETIRADO','REEMPLAZADO')) |
-| FechaInstalacion | DATETIME | NOT NULL, DEFAULT GETDATE() |
-| FechaRetiro | DATETIME | NULL |
+Tab_EQ_MaeEquipos (IdMaeEquipo)
+  ├─ Tab_EQ_MovEquiposAsignaciones (IdMaeEquipo) — equipo asignado
+  ├─ Tab_EQ_MovEquiposComponentes (IdMaeEquipo) — componentes instalados
+  ├─ Tab_EQ_MovEstadosEquipos (IdMaeEquipo) — historial de estados
+  └─ Tab_EQ_Incidencias (IdMaeEquipo) — incidencias reportadas
 
-### 2.8 `EQ_Incidencias` — Reporte de incidencias
+Tab_EQ_Componentes (IdComponente)
+  ├─ Tab_EQ_MovAccesoriosTrabajador (IdComponente) — accesorio asignado
+  └─ Tab_EQ_MovEquiposComponentes (IdComponente) — componente instalado
 
-| Columna | Tipo | Restricciones |
-|---------|------|--------------|
-| IdIncidencia | INT | PK, IDENTITY(1,1) |
-| IdEquipo | INT | NOT NULL, FK → EQ_Equipos(IdEquipo) |
-| Descripcion | VARCHAR(500) | NOT NULL |
-| TipoIncidencia | VARCHAR(50) | NOT NULL |
-| Prioridad | VARCHAR(20) | NOT NULL, CHECK (Prioridad IN ('BAJA','MEDIA','ALTA','CRITICA')) |
-| Estado | VARCHAR(20) | NOT NULL, CHECK (Estado IN ('ABIERTO','EN_PROCESO','CERRADO')) |
-| IdReportadoPor | INT | FK → EQ_Trabajadores(IdTrabajador) |
-| IdCreadoPor | INT | FK → EQ_Usuarios(IdUsuario) |
-| FechaCreacion | DATETIME | NOT NULL, DEFAULT GETDATE() |
+Tab_EQ_TipodeEquipos (IdTipodeEquipo) → Tab_EQ_MaeEquipos (IdTipodeEquipo)
+Tab_EQ_TipodeComponentes (IdTipodeComponente) → Tab_EQ_Componentes (IdTipodeComponente)
+```
 
-### 2.9 `EQ_Intervenciones` — Intervenciones técnicas
+---
 
-| Columna | Tipo | Restricciones |
-|---------|------|--------------|
-| IdIntervencion | INT | PK, IDENTITY(1,1) |
-| IdIncidencia | INT | NULL, FK → EQ_Incidencias(IdIncidencia) |
-| IdEquipo | INT | NOT NULL, FK → EQ_Equipos(IdEquipo) |
-| TipoIntervencion | VARCHAR(50) | NOT NULL |
-| Descripcion | VARCHAR(500) | NOT NULL |
-| Resultado | VARCHAR(20) | NOT NULL, CHECK (Resultado IN ('EXITOSO','PARCIAL','FALLIDO')) |
-| FechaInicio | DATETIME | NOT NULL, DEFAULT GETDATE() |
-| FechaFin | DATETIME | NULL |
-| IdCreadoPor | INT | FK → EQ_Usuarios(IdUsuario) |
+## C. Hallazgos
 
-### 2.10 `EQ_IntervencionesComponentes` — Componentes usados en intervención
-
-| Columna | Tipo | Restricciones |
-|---------|------|--------------|
-| IdIntervencionComp | INT | PK, IDENTITY(1,1) |
-| IdIntervencion | INT | NOT NULL, FK → EQ_Intervenciones(IdIntervencion) |
-| IdComponente | INT | NOT NULL, FK → EQ_Componentes(IdComponente) |
-| Accion | VARCHAR(20) | NOT NULL, CHECK (Accion IN ('INSTALAR','RETIRAR','REEMPLAZAR')) |
-
-### 2.11 `EQ_Dashboard` — Vistas materializadas para el dashboard
-
-Tabla poblada por el stored procedure `SP_ActualizarDashboard`.
-
-| Columna | Tipo | Restricciones |
-|---------|------|--------------|
-| Id | INT | PK, IDENTITY(1,1) |
-| Indicador | VARCHAR(100) | NOT NULL, UNIQUE |
-| Valor | INT | NOT NULL |
-| FechaActualizacion | DATETIME | NOT NULL, DEFAULT GETDATE() |
-
-### 2.12 `EQ_Auditoria` — Log de operaciones
-
-| Columna | Tipo | Restricciones |
-|---------|------|--------------|
-| IdAuditoria | INT | PK, IDENTITY(1,1) |
-| Tabla | VARCHAR(100) | NOT NULL |
-| Operacion | VARCHAR(20) | NOT NULL |
-| IdRegistro | INT | NOT NULL |
-| ValoresAnteriores | NVARCHAR(MAX) | NULL (JSON) |
-| ValoresNuevos | NVARCHAR(MAX) | NULL (JSON) |
-| IdUsuario | INT | NOT NULL, FK → EQ_Usuarios(IdUsuario) |
-| Fecha | DATETIME | NOT NULL, DEFAULT GETDATE() |
-
-### 2.13 `EQ_LoginAudit` — Auditoría de inicios de sesión
-
-| Columna | Tipo | Restricciones |
-|---------|------|--------------|
-| IdLoginAudit | INT | PK, IDENTITY(1,1) |
-| IdUsuario | INT | NULL, FK → EQ_Usuarios(IdUsuario) |
-| Usuario | VARCHAR(100) | NOT NULL |
-| Exitoso | BIT | NOT NULL |
-| DireccionIP | VARCHAR(50) | NULL |
-| Fecha | DATETIME | NOT NULL, DEFAULT GETDATE() |
-
-### 2.14 `EQ_Notificaciones` (pendiente de implementación)
-
-Tabla creada pero sin uso actual.
-
-### 2.15 `EQ_Periodos` — Períodos de intervenciones periódicas
-
-### 2.16 `EQ_IntervencionesProgramadas` — Programación de intervenciones
-
-## 3. Índices identificados
-
-- PKs por defecto en todas las tablas (clustered sobre Id)
-- FK implícitas referenciadas en consultas frecuentes: `IdEquipo`, `IdTrabajador`, `IdComponente`, `IdAsignacion`
-- 🔍 INFERENCIA: Es probable que falten índices no-clustered en columnas de filtrado frecuente como `EQ_Equipos.Estado`, `EQ_Asignaciones.Estado`, `EQ_Componentes.Estado`
-
-## 4. Hallazgos y observaciones
-
-| # | Hallazgo | Severidad |
-|---|----------|-----------|
-| 1 | `EQ_Equipos.FechaBaja` no se usa | 🟡 Media |
-| 2 | `EQ_Equipos.IdTrabajador` es redundante con asignación activa | 🟡 Media |
-| 3 | No hay CHECK que valide `EQ_Equipos.Estado` contra el catálogo real | 🔴 Alta |
-| 4 | `EQ_Componentes.Estado` permite `ASIGNADO` que no tiene sentido sin asignaciones | 🔴 Alta |
-| 5 | No hay tabla de `TipoEquipo` como catálogo — se usa VARCHAR libre | 🟡 Media |
-| 6 | No hay trigger/logging de cambios de estado en tablas principales | 🟡 Media |
-| 7 | `Tab_EQ_Usuarios.Password` usa bcrypt (hash, no plain text) al menos | ✅ Correcto |
+| # | Hallazgo | Severidad | Evidencia |
+|---|----------|-----------|-----------|
+| 1 | Los nombres reales de tablas (`Tab_EQ_MaeEquipos`, `Tab_EQ_MovEquiposAsignaciones`, etc.) difieren del modelo conceptual `EQ_Equipos`, `EQ_Asignaciones` | 🔴 Alta | Código en repositorios |
+| 2 | Usuarios viven en `Tab_SYS_Usuarios`, no en `Tab_EQ_Usuarios` | 🟡 Media | `usuarios.repository.js` |
+| 3 | No existe `Tab_EQ_Auditoria` genérica; solo `Tab_SYS_LoginAudit` para logins | 🟡 Media | Búsqueda en código |
+| 4 | No existe `Tab_EQ_Dashboard` ni `SP_ActualizarDashboard` documentado | 🟡 Media | No encontrado en código |
+| 5 | No se verificaron CHECK constraints, FK, índices ni tipos de columna contra la BD real | 🔴 Alta | No se ejecutó sp_help/INFORMATION_SCHEMA |

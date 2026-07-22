@@ -134,44 +134,81 @@ export const AsignacionesService = {
     const obsCombinada = [`Motivo: ${data.Motivo}`, obsTexto].filter(Boolean).join(' — ');
 
     return withTransaction(DB, async (trx) => {
-      const updResult = await trxExec(trx, `
-        UPDATE Tab_EQ_MovEquiposAsignaciones
-        SET Estado = 'CESADO', FecCese = GETDATE(), Obs = @obs
-        WHERE IdMovEquipoAsignacion = @id AND Estado = 'VIGENTE'
-      `, { id, obs: obsCombinada || null });
+      const dbAccs = await trxRows(trx, `
+        SELECT IdMovAccesorio, IdComponente, Estado
+        FROM Tab_EQ_MovAccesoriosTrabajador
+        WHERE IdMovEquipoAsignacion = @idAsignacion AND Estado = 'VIGENTE'
+      `, { idAsignacion: id });
 
-      if (updResult.rowsAffected?.[0] !== 1) {
-        const err = new Error('La asignación ya fue cesada o no está vigente');
+      const dbIds = dbAccs.map(a => a.IdMovAccesorio);
+      const hasVigentes = dbAccs.length > 0;
+
+      if (hasVigentes && !accesorios?.length) {
+        const err = new Error('La asignación tiene accesorios vigentes. Debes definir una acción para cada uno.');
         err.statusCode = 409;
         throw err;
       }
 
-      await trxExec(trx, `UPDATE Tab_EQ_MaeEquipos SET Estado = @estado WHERE IdMaeEquipo = @id`, { estado: estadoNuevo, id: asig.IdMaeEquipo });
-      await trxExec(trx, `
-        INSERT INTO Tab_EQ_MovEstadosEquipos (IdMaeEquipo, EstadoAnterior, EstadoNuevo, IdUsuario, Obs)
-        VALUES (@idEquipo, 'ASIGNADO', @estadoNuevo, @idUsuario, @obs)
-      `, { idEquipo: asig.IdMaeEquipo, estadoNuevo, idUsuario: idUsuario || null, obs: obsCombinada || 'Asignación finalizada' });
-
       if (accesorios?.length) {
+        const seen = new Set();
+        for (const acc of accesorios) {
+          if (seen.has(acc.idMovAccesorio)) {
+            const err = new Error(`ID de accesorio duplicado: ${acc.idMovAccesorio}`);
+            err.statusCode = 409;
+            throw err;
+          }
+          seen.add(acc.idMovAccesorio);
+        }
+
+        const sentIds = accesorios.map(a => a.idMovAccesorio).sort((a, b) => a - b);
+        const sortedDbIds = [...dbIds].sort((a, b) => a - b);
+
+        if (JSON.stringify(sentIds) !== JSON.stringify(sortedDbIds)) {
+          const missing = dbIds.filter(id => !sentIds.includes(id));
+          const extra = sentIds.filter(id => !dbIds.includes(id));
+          const partes = [];
+          if (missing.length) partes.push(`faltan: ${missing.join(', ')}`);
+          if (extra.length) partes.push(`sobran: ${extra.join(', ')}`);
+          const err = new Error(`Los accesorios enviados no coinciden con los vigentes (${partes.join('; ')})`);
+          err.statusCode = 409;
+          throw err;
+        }
+
         for (const acc of accesorios) {
           const { idMovAccesorio, accion } = acc;
-          if (accion === 'MANTENER') continue;
 
-          const verif = await trxRows(trx, `
-            SELECT IdMovAccesorio, IdComponente, Estado
-            FROM Tab_EQ_MovAccesoriosTrabajador
-            WHERE IdMovAccesorio = @idMovAccesorio
-              AND IdMovEquipoAsignacion = @idAsignacion
-              AND Estado = 'VIGENTE'
-          `, { idMovAccesorio, idAsignacion: id });
-
-          if (verif.length !== 1) {
-            const err = new Error(`Accesorio ID ${idMovAccesorio} no encontrado, no pertenece a esta asignación o ya fue procesado`);
+          const dbAcc = dbAccs.find(a => a.IdMovAccesorio === idMovAccesorio);
+          if (!dbAcc) {
+            const err = new Error(`Accesorio ID ${idMovAccesorio} no encontrado en los vigentes`);
             err.statusCode = 409;
             throw err;
           }
 
-          const idComponente = verif[0].IdComponente;
+          if (!dbAcc.IdComponente) {
+            const err = new Error(`El accesorio ID ${idMovAccesorio} no tiene componente asociado`);
+            err.statusCode = 409;
+            throw err;
+          }
+
+          const compCheck = await trxRows(trx, `
+            SELECT IdComponente FROM Tab_EQ_Componentes WHERE IdComponente = @id
+          `, { id: dbAcc.IdComponente });
+          if (compCheck.length !== 1) {
+            const err = new Error(`Componente ID ${dbAcc.IdComponente} del accesorio ID ${idMovAccesorio} no existe`);
+            err.statusCode = 409;
+            throw err;
+          }
+
+          if (accion === 'MANTENER') {
+            const err = new Error('La acción "Mantener asignado al trabajador" aún no tiene una regla empresarial aprobada. Usa "Devolver a disponible" o contacta al administrador.');
+            err.statusCode = 422;
+            throw err;
+          }
+        }
+
+        for (const acc of accesorios) {
+          const { idMovAccesorio, accion } = acc;
+          const dbAcc = dbAccs.find(a => a.IdMovAccesorio === idMovAccesorio);
 
           if (accion === 'DISPONIBLE') {
             const r1 = await trxExec(trx, `
@@ -184,13 +221,11 @@ export const AsignacionesService = {
               err.statusCode = 409;
               throw err;
             }
-            if (idComponente) {
-              const r2 = await trxExec(trx, `UPDATE Tab_EQ_Componentes SET Estado = 'DISPONIBLE' WHERE IdComponente = @id`, { id: idComponente });
-              if (r2.rowsAffected?.[0] !== 1) {
-                const err = new Error(`No se pudo actualizar el componente ID ${idComponente}`);
-                err.statusCode = 409;
-                throw err;
-              }
+            const r2 = await trxExec(trx, `UPDATE Tab_EQ_Componentes SET Estado = 'DISPONIBLE' WHERE IdComponente = @id`, { id: dbAcc.IdComponente });
+            if (r2.rowsAffected?.[0] !== 1) {
+              const err = new Error(`No se pudo actualizar el componente ID ${dbAcc.IdComponente}`);
+              err.statusCode = 409;
+              throw err;
             }
           } else if (accion === 'BAJA' || accion === 'PERDIDO') {
             const nuevoEstadoAcc = accion === 'BAJA' ? 'BAJA' : accion;
@@ -204,17 +239,42 @@ export const AsignacionesService = {
               err.statusCode = 409;
               throw err;
             }
-            if (idComponente) {
-              const r2 = await trxExec(trx, `UPDATE Tab_EQ_Componentes SET Estado = 'BAJA' WHERE IdComponente = @id`, { id: idComponente });
-              if (r2.rowsAffected?.[0] !== 1) {
-                const err = new Error(`No se pudo dar de baja el componente ID ${idComponente}`);
-                err.statusCode = 409;
-                throw err;
-              }
+            const r2 = await trxExec(trx, `UPDATE Tab_EQ_Componentes SET Estado = 'BAJA' WHERE IdComponente = @id`, { id: dbAcc.IdComponente });
+            if (r2.rowsAffected?.[0] !== 1) {
+              const err = new Error(`No se pudo dar de baja el componente ID ${dbAcc.IdComponente}`);
+              err.statusCode = 409;
+              throw err;
             }
           }
         }
       }
+
+      const updResult = await trxExec(trx, `
+        UPDATE Tab_EQ_MovEquiposAsignaciones
+        SET Estado = 'CESADO', FecCese = GETDATE(), Obs = @obs
+        WHERE IdMovEquipoAsignacion = @id AND Estado = 'VIGENTE'
+      `, { id, obs: obsCombinada || null });
+
+      if (updResult.rowsAffected?.[0] !== 1) {
+        const err = new Error('La asignación ya fue cesada o no está vigente');
+        err.statusCode = 409;
+        throw err;
+      }
+
+      const eqResult = await trxExec(trx, `
+        UPDATE Tab_EQ_MaeEquipos SET Estado = @estado
+        WHERE IdMaeEquipo = @id AND Estado = 'ASIGNADO'
+      `, { estado: estadoNuevo, id: asig.IdMaeEquipo });
+      if (eqResult.rowsAffected?.[0] !== 1) {
+        const err = new Error('El equipo no está en estado ASIGNADO o no se pudo actualizar');
+        err.statusCode = 409;
+        throw err;
+      }
+
+      await trxExec(trx, `
+        INSERT INTO Tab_EQ_MovEstadosEquipos (IdMaeEquipo, EstadoAnterior, EstadoNuevo, IdUsuario, Obs)
+        VALUES (@idEquipo, 'ASIGNADO', @estadoNuevo, @idUsuario, @obs)
+      `, { idEquipo: asig.IdMaeEquipo, estadoNuevo, idUsuario: idUsuario || null, obs: obsCombinada || 'Asignación finalizada' });
     });
   },
 

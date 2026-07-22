@@ -2,225 +2,338 @@
 
 > **Propósito**: Documentación de todos los endpoints de la API REST.
 > Base URL: `http://127.0.0.1:3001/api`
-> Autenticación: JWT en header `Authorization: Bearer <token>`
+> Autenticación: JWT en header `Authorization: Bearer <token>`, obtenido vía `POST /api/auth/login`
 > Respuesta error estándar: `{ error: string, details?: string, code?: string }`
-> **Estado**: ⚠️ BORRADOR — PENDIENTE DE VALIDACIÓN
+> **Estado**: ✅ Verificado contra backend/src/index.js y routers
 
 ---
 
-## 1. Auth
+## Rutas verificadas
+
+| Archivo | Prefijo |
+|---------|---------|
+| backend/src/routes/auth.routes.js | `/api/auth` |
+| backend/src/routes/equipos.routes.js | `/api/equipos` |
+| backend/src/routes/trabajadores.routes.js | `/api/trabajadores` |
+| backend/src/routes/asignaciones.routes.js | `/api/asignaciones` |
+| backend/src/routes/incidencias.routes.js | `/api/incidencias` |
+| backend/src/routes/componentes.routes.js | `/api/componentes` |
+
+---
+
+## 1. Auth (`/api/auth`)
 
 ### `POST /api/auth/login`
 
-Inicio de sesión. Registra intentos en `EQ_LoginAudit`.
+Inicio de sesión. Registra intentos en `Tab_SYS_LoginAudit`.
 
 **Body:**
 ```json
-{
-  "usuario": "string",
-  "password": "string"
-}
+{ "usuario": "string", "password": "string" }
 ```
 
 **Respuesta 200:**
 ```json
 {
   "token": "jwt...",
-  "usuario": {
-    "IdUsuario": 1,
-    "Usuario": "admin",
-    "Rol": "ADMIN",
-    "Area": "SISTEMAS",
-    "IdTrabajador": 1,
-    "Nombres": "Admin Sistemas"
-  }
+  "usuario": { "IdUsuario": 1, "Usuario": "admin", "Rol": "ADMIN", "IdTrabajador": 1, "Nombres": "Admin Sistemas" }
 }
 ```
 
 **Errores:** 401 (credenciales inválidas), 403 (usuario inactivo)
 
+### `GET /api/auth/me`
+
+Devuelve el usuario autenticado desde `req.usuario`.
+
+### `GET /api/auth/audit`
+
+Log de intentos de login (solo ADMIN).
+
 ---
 
-## 2. Equipos
+## 2. Equipos (`/api/equipos`)
 
 ### `GET /api/equipos`
 
-Lista paginada y filtrada de equipos.
-
-**Query params:** `search`, `tipo`, `estado`, `page` (default 1), `pageSize` (default 25)
+Lista paginada y filtrada. **Query params:** `search`, `tipo`, `estado`, `page` (default 1), `pageSize` (default 25)
 
 **Respuesta 200:**
 ```json
-{
-  "data": [ { "IdEquipo": 1, "TipoEquipo": "LAPTOP", "Marca": "DELL", ... } ],
-  "total": 150,
-  "page": 1,
-  "pageSize": 25,
-  "totalPages": 6
-}
+{ "data": [{ "IdMaeEquipo": 1, "CodEquipo": "EQ-001", "DesTipodeEquipo": "LAPTOP", ... }], "total": 150, "page": 1, "pageSize": 25, "totalPages": 6 }
 ```
+
+### `GET /api/equipos/dashboard`
+
+Estadísticas agregadas desde `EquiposRepository.getDashboardStats()`.
+
+### `GET /api/equipos/tipos`
+
+Catálogo de tipos de equipo desde `Tab_EQ_TipodeEquipos`.
+
+### `GET /api/equipos/tipos-asignables`
+
+Tipos de equipo que pueden asignarse.
+
+### `GET /api/equipos/scan/:codigo`
+
+Busca equipo por `CodBarra`.
+
+### `GET /api/equipos/:id`
+
+Detalle del equipo.
+
+### `GET /api/equipos/:id/timeline`
+
+Línea de tiempo de cambios de estado.
 
 ### `POST /api/equipos`
 
-Crear nuevo equipo. Requiere ADMIN.
+Crear equipo. Requiere ADMIN o TECNICO.
 
-**Body:** `{ TipoEquipo, Marca?, Modelo?, NumeroSerie?, CodigoInterno?, CodigoPatrimonial?, Caracteristicas?, IdCreadoPor, FechaIngreso }`
+**Body:** `{ IdTipodeEquipo, CodEquipo?, NombreEquipo?, Marca?, Modelo?, Serie?, CodBarra?, Obs? }`
+
+### `POST /api/equipos/rapido`
+
+Creación rápida (mismos campos).
 
 ### `PUT /api/equipos/:id`
 
 Actualizar equipo.
 
-### `GET /api/equipos/:id`
+### `POST /api/equipos/:id/baja`
 
-Detalle completo del equipo con asignación actual, componentes instalados, últimas intervenciones.
+Dar de baja un equipo. Requiere ADMIN.
 
-### `POST /api/equipos/baja/:id`
+### `POST /api/equipos/:id/qr`
 
-Dar de baja un equipo (requiere ADMIN, que no tenga asignaciones activas).
+Generar QR del equipo.
 
-### `POST /api/equipos/importar`
+### `POST /api/equipos/tipos`
 
-Importación masiva desde Excel/CSV.
+Crear tipo de equipo. Requiere ADMIN.
 
-### `GET /api/equipos/tipos`
+### `GET /api/equipos/:id/caracteristicas`
 
-Lista de tipos de equipo disponibles (desde `EQ_Equipos`, no catálogo separado).
+Características técnicas del equipo.
 
-### `GET /api/equipos/scan/:codigo`
+### `PUT /api/equipos/:id/caracteristicas`
 
-Obtener equipo por código QR (busca por `CodigoInterno` o `NumeroSerie`).
+Actualizar características.
+
+### `GET /api/equipos/:id/componentes`
+
+Componentes instalados en el equipo.
+
+### `POST /api/equipos/:id/componentes`
+
+Agregar componente al equipo. Requiere ADMIN o TECNICO.
+
+### `DELETE /api/equipos/:id/componentes/:idMovComponente`
+
+Retirar componente del equipo.
+
+### `POST /api/equipos/:id/estado`
+
+Cambiar estado del equipo. Requiere ADMIN.
+
+### `GET /api/equipos/:id/historial-estados`
+
+Historial de cambios de estado.
+
+### `GET /api/equipos/:id/incidencias`
+
+Incidencias del equipo.
+
+### `GET /api/equipos/:id/intervenciones`
+
+Intervenciones del equipo.
+
+### `POST /api/equipos/:id/intervenciones`
+
+Registrar intervención.
 
 ---
 
-## 3. Trabajadores
+## 3. Trabajadores (`/api/trabajadores`)
 
 ### `GET /api/trabajadores`
 
-Lista paginada y filtrada de trabajadores.
+Lista paginada y filtrada.
 
-**Query params:** `search`, `sede`, `cargo`, `area`, `page`, `pageSize`, `sortBy?`, `sortOrder?`
+**Query params:** `search`, `sede`, `cargo`, `area`, `page`, `pageSize`
 
 **Respuesta 200:**
 ```json
 {
-  "data": [ { "IdTrabajador": 1, "DNI": "...", "Nombres": "...", "ConEquipos": 1, ... } ],
-  "total": 200,
-  "page": 1,
-  "pageSize": 25,
-  "totalPages": 8,
+  "data": [{ "IdTrabajador": 1, "DOI": "...", "NombreTrabajador": "...", "ConEquipos": 1, ... }],
+  "total": 200, "page": 1, "pageSize": 25, "totalPages": 8,
   "stats": { "total": 200, "conEquipos": 45, "sinEquipos": 155 }
 }
 ```
 
-### `POST /api/trabajadores`
+### `POST /api/trabajadores/sync`
 
-Crear trabajador. ADMIN.
+Sincronizar desde ERP. Requiere ADMIN.
 
-### `PUT /api/trabajadores/:id`
+### `GET /api/trabajadores/areas`
 
-Actualizar trabajador.
+Lista de áreas distintas.
 
 ### `GET /api/trabajadores/stats`
 
-Estadísticas rápidas: total, con equipos, sin equipos.
+Estadísticas rápidas.
 
-### `GET /api/trabajadores/search?q=...`
+### `GET /api/trabajadores/:id`
 
-Búsqueda rápida para combos/selectores (retorna `{ IdTrabajador, Nombres, DNI, Area }`).
+Detalle del trabajador.
+
+### `GET /api/trabajadores/dni/:dni`
+
+Buscar por DNI.
 
 ---
 
-## 4. Asignaciones
+## 4. Asignaciones (`/api/asignaciones`)
 
 ### `GET /api/asignaciones`
 
 Lista paginada. **Query params:** `search`, `estado`, `page`, `pageSize`
 
+### `GET /api/asignaciones/:id`
+
+Asignación por ID.
+
+### `GET /api/asignaciones/:id/detalle`
+
+Detalle completo con equipo, trabajador, accesorios y timeline.
+
 ### `POST /api/asignaciones`
 
-Crear asignación.
+Crear asignación simple. Requiere ADMIN o TECNICO.
 
-**Body:** `{ IdEquipo, IdTrabajador, FechaAsignacion, accesorios?: [{ IdComponente, Accion }], IdCreadoPor }`
+**Body:** `{ IdEquipo, IdTrabajador, FechaAsignacion?, Obs? }`
 
-### `POST /api/asignaciones/cesar/:id`
+### `POST /api/asignaciones/bulk`
 
-Cesar asignación. **Requiere motivo controlado y observación.**
+Asignación múltiple (varios equipos a un trabajador).
 
-**Body:** `{ MotivoCese, Obs, accesorios?: [{ idMovAccesorio, accion }] }`
+### `POST /api/asignaciones/con-accesorios`
 
-**Respuesta 200:**
+Asignación con accesorios.
+
+### `POST /api/asignaciones/:id/cesar`
+
+Cesar asignación. Requiere ADMIN o TECNICO.
+
+**Body:**
 ```json
 {
-  "asignacion": { "Estado": "CESADA", "MotivoCese": "...", ... },
-  "nuevoEstadoEquipo": "DISPONIBLE"
+  "Motivo": "DEVOLUCION|RENUNCIA|CAMBIO|TRASLADO|DANADO|MANTENIMIENTO|PERDIDO|ROBADO|EXTRAVIADO",
+  "Obs": "string (max 500)",
+  "accesorios": [{ "idMovAccesorio": 1, "accion": "DISPONIBLE|MANTENER|BAJA|PERDIDO" }]
 }
 ```
 
-### `GET /api/asignaciones/activas/:idTrabajador`
+**Respuesta 200:** `{ "message": "Asignación finalizada" }`
+
+**Errores:** 409 (accesorios no coinciden, duplicados, asignación no vigente), 422 (MANTENER no implementado)
+
+### `GET /api/asignaciones/:id/accesorios`
+
+Accesorios vinculados a la asignación.
+
+### `POST /api/asignaciones/cesar-trabajador/:idTrabajador`
+
+Cesar todas las asignaciones activas de un trabajador. Requiere ADMIN.
+
+### `GET /api/asignaciones/:id/acta`
+
+Acta de entrega en HTML.
+
+### `GET /api/asignaciones/equipo/:idEquipo`
+
+Historial de asignaciones de un equipo.
+
+### `GET /api/asignaciones/trabajador/:idTrabajador`
+
+Historial de asignaciones de un trabajador.
+
+### `GET /api/asignaciones/trabajador/:idTrabajador/activas`
 
 Asignaciones activas de un trabajador.
 
 ---
 
-## 5. Componentes
+## 5. Componentes (`/api/componentes`)
 
 ### `GET /api/componentes`
 
 Lista paginada y filtrada.
 
-**Query params:** `search`, `tipo`, `estado`, `page`, `pageSize`
+**Query params:** `search`, `tipo`, `estado`, `page`, `pageSize`, `idTrabajador`
+
+### `GET /api/componentes/tipos`
+
+Catálogo de tipos de componente.
+
+### `GET /api/componentes/accesorios-disponibles`
+
+Accesorios disponibles para asignar.
+
+### `GET /api/componentes/accesorios-por-trabajador/:idTrabajador`
+
+Accesorios asignados a un trabajador.
+
+### `GET /api/componentes/:id/detalle`
+
+Detalle del componente con historial.
+
+### `POST /api/componentes/:id/baja`
+
+Dar de baja un componente.
+
+### `GET /api/componentes/:id`
+
+Componente por ID.
 
 ### `POST /api/componentes`
 
 Crear componente.
 
-**Body:** `{ TipoComponente, Marca?, Modelo?, NumeroSerie?, Estado?, Ubicacion?, Observaciones?, IdCreadoPor }`
+### `POST /api/componentes/rapido`
+
+Creación rápida.
 
 ### `PUT /api/componentes/:id`
 
 Actualizar componente.
 
-### `GET /api/componentes/tipos`
+### `POST /api/componentes/tipos`
 
-Lista de tipos de componente.
+Crear tipo de componente.
 
 ---
 
-## 6. Incidencias
+## 6. Incidencias (`/api/incidencias`)
 
 ### `GET /api/incidencias`
 
-Lista paginada.
-
-### `POST /api/incidencias`
-
-Crear incidencia.
-
-### `PUT /api/incidencias/:id`
-
-Actualizar (incluye cambiar estado a `CERRADO`).
+Lista paginada. **Query params:** `search`, `estado`, `prioridad`, `page`, `pageSize`
 
 ### `GET /api/incidencias/:id`
 
-Detalle con intervenciones asociadas.
+Detalle de la incidencia.
 
----
+### `POST /api/incidencias`
 
-## 7. Intervenciones
+Crear incidencia. Requiere ADMIN o TECNICO.
 
-> ⚠️ **PENDIENTE DE VALIDACIÓN**: No existe ruta `/api/intervenciones`. Las intervenciones se gestionan desde `EquiposService` (`backend/src/services/equipos.service.js`) invocando directamente al repositorio `intervenciones.repository.js`. Puede que no haya endpoints REST dedicados.
+**Body:** `{ IdMaeEquipo, TipoIncidencia, Descripcion, Prioridad? }`
 
----
+### `POST /api/incidencias/:id/cerrar`
 
-## 8. Dashboard
-
-> ⚠️ **PENDIENTE DE VALIDACIÓN**: No existe ruta `/api/dashboard`. Las estadísticas del dashboard se obtienen desde `EquiposRepository.getDashboardStats()`.
-
----
-
-## 9. Mantenimiento
-
-> ⚠️ **PENDIENTE DE VALIDACIÓN**: No existe ruta `/api/mantenimiento/actualizar-dashboard`. No se encontró referencia a `SP_ActualizarDashboard` en el código.
+Cerrar incidencia. Requiere ADMIN o TECNICO.
 
 ---
 
@@ -228,9 +341,9 @@ Detalle con intervenciones asociadas.
 
 | Convención | Detalle |
 |------------|---------|
-| Nombres de endpoints | kebab-case, plural (`/api/equipos`, `/api/asignaciones/cesar/:id`) |
+| Nombres de endpoints | kebab-case, plural |
 | Paginación | `page` (1-indexed) + `pageSize`; respuesta incluye `total`, `totalPages` |
 | Búsqueda | Parámetro `search` para búsqueda textual general |
 | Fechas | Formato ISO (`YYYY-MM-DD` o `YYYY-MM-DDTHH:mm:ss`) |
 | Respuestas de lista | Siempre `{ data: [], total, page, pageSize, totalPages }` |
-| Códigos de error | 400 (validación), 401 (no auth), 403 (rol incorrecto), 404 (no encontrado), 409 (conflicto/duplicado), 500 (error interno) |
+| Códigos de error | 400 (validación Zod), 401 (no auth), 403 (rol incorrecto), 404 (no encontrado), 409 (conflicto), 422 (no implementado), 500 (error interno) |

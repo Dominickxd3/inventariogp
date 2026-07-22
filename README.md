@@ -9,7 +9,7 @@ Sistema web para administrar equipos tecnológicos, componentes, asignaciones a 
 | Capa | Tecnología |
 |---|---|
 | Frontend | React 19, Vite 8, Tailwind CSS 4, shadcn/ui |
-| Backend | Node.js 24, Express 4, mssql 11 |
+| Backend | Node.js (versión en producción: pendiente de confirmar), Express 4, mssql 11 |
 | BD | SQL Server (2019+) |
 | Autenticación | JWT (8h expiración) |
 | HTTP Client | fetch() nativo (`lib/api.js`) |

@@ -25,10 +25,17 @@ const MOTIVOS = [
 
 const ACC_OPTIONS = [
   { value: 'DISPONIBLE', label: 'Devolver a disponible' },
-  { value: 'MANTENER', label: 'Mantener asignado al trabajador' },
+  { value: 'MANTENER', label: 'Mantener asignado al trabajador', disabled: true },
   { value: 'BAJA', label: 'Dar de baja' },
   { value: 'PERDIDO', label: 'Marcar como perdido/dañado' },
 ]
+
+function escapeHtml(str) {
+  if (!str) return ''
+  const d = document.createElement('div')
+  d.textContent = str
+  return d.innerHTML
+}
 
 export default function CesarAsignacionDialog({
   open,
@@ -51,18 +58,21 @@ export default function CesarAsignacionDialog({
     queryKey: ['cesar-accesorios', cesarTarget?.IdMovEquipoAsignacion],
     queryFn: () => api.asignaciones.linkedAccs(cesarTarget?.IdMovEquipoAsignacion),
     enabled: !!cesarTarget && open,
+    refetchOnMount: 'always',
   })
 
   useEffect(() => {
-    if (accs?.length) {
-      setAccActions(accs.map((a) => ({
-        idMovAccesorio: a.IdMovAccesorio,
-        accion: 'DISPONIBLE',
-      })))
-    } else {
-      setAccActions([])
+    if (open && cesarTarget?.IdMovEquipoAsignacion) {
+      if (accs?.length) {
+        setAccActions(accs.map((a) => ({
+          idMovAccesorio: a.IdMovAccesorio,
+          accion: 'DISPONIBLE',
+        })))
+      } else {
+        setAccActions([])
+      }
     }
-  }, [accs])
+  }, [open, cesarTarget?.IdMovEquipoAsignacion, accs])
 
   function handleOpenChange(v) {
     if (!v) {
@@ -86,6 +96,16 @@ export default function CesarAsignacionDialog({
   }
 
   async function handleSubmit() {
+    if (accsLoading) {
+      Swal.fire({ icon: 'info', title: 'Cargando accesorios', text: 'Espera a que se carguen los accesorios vinculados antes de finalizar.' })
+      return
+    }
+
+    if (accsError) {
+      Swal.fire({ icon: 'error', title: 'Error al cargar accesorios', text: 'No se puede finalizar la asignación sin verificar los accesorios. Corrige el error e intenta de nuevo.' })
+      return
+    }
+
     if (!motivo) {
       Swal.fire({ icon: 'warning', title: 'Motivo requerido', text: 'Selecciona el motivo del cese' })
       return
@@ -104,7 +124,9 @@ export default function CesarAsignacionDialog({
       ? accs.map((a) => {
           const act = accActions.find((x) => x.idMovAccesorio === a.IdMovAccesorio)
           const opt = ACC_OPTIONS.find((o) => o.value === act?.accion)
-          return `  • ${a.CodComponente || `ID ${a.IdMovAccesorio}`} → ${opt?.label || act?.accion || 'DISPONIBLE'}`
+          const cod = a.CodComponente || `ID ${a.IdMovAccesorio}`
+          const lbl = opt?.label || act?.accion || 'DISPONIBLE'
+          return `  \u2022 ${cod} \u2192 ${lbl}`
         }).join('\n')
       : '  Sin accesorios vinculados.'
 
@@ -112,28 +134,29 @@ export default function CesarAsignacionDialog({
       icon: 'question',
       title: 'Confirmar cese',
       html: `<div style="text-align:left;font-size:13px;">
-        <p><strong>Equipo:</strong> ${cesarTarget.CodEquipo}</p>
-        <p><strong>Motivo:</strong> ${motivoElegido?.label}</p>
-        <p><strong>Estado final del equipo:</strong> ${estadoDestino}</p>
-        ${hayAcc ? `<p style="margin-top:8px;"><strong>Accesorios:</strong></p><pre style="font-size:12px;line-height:1.5;">${resumenAcc}</pre>` : ''}
+        <p><strong>Equipo:</strong> ${escapeHtml(cesarTarget.CodEquipo)}</p>
+        <p><strong>Motivo:</strong> ${escapeHtml(motivoElegido?.label)}</p>
+        <p><strong>Estado final del equipo:</strong> ${escapeHtml(estadoDestino)}</p>
+        ${hayAcc ? `<p style="margin-top:8px;"><strong>Accesorios:</strong></p><pre style="font-size:12px;line-height:1.5;">${escapeHtml(resumenAcc)}</pre>` : ''}
       </div>`,
       showCancelButton: true,
-      confirmButtonText: 'Sí, finalizar',
+      confirmButtonText: 'S\u00ed, finalizar',
       cancelButtonText: 'Cancelar',
     })
     if (!confirm.isConfirmed) return
 
     setSubmitting(true)
     try {
-      await api.asignaciones.cesar(cesarTarget.IdMovEquipoAsignacion, accActions.length ? accActions : undefined, {
+      const accsToSend = accs?.length ? accActions : undefined
+      await api.asignaciones.cesar(cesarTarget.IdMovEquipoAsignacion, accsToSend, {
         Motivo: motivo,
         Obs: obs.trim() || undefined,
       })
-      Swal.fire({ icon: 'success', title: 'Asignación finalizada', text: 'El cambio de estado se registró correctamente', timer: 2000, showConfirmButton: false })
+      Swal.fire({ icon: 'success', title: 'Asignaci\u00f3n finalizada', text: 'El cambio de estado se registr\u00f3 correctamente', timer: 2000, showConfirmButton: false })
       onSuccess?.()
       handleOpenChange(false)
     } catch (e) {
-      Swal.fire({ icon: 'error', title: 'Error al cesar', text: e.message || 'No se pudo cesar la asignación' })
+      Swal.fire({ icon: 'error', title: 'Error al cesar', text: e.message || 'No se pudo cesar la asignaci\u00f3n' })
     } finally {
       setSubmitting(false)
     }
@@ -143,12 +166,13 @@ export default function CesarAsignacionDialog({
   const estadoDestino = motivoElegido?.estado || 'DISPONIBLE'
 
   const hasIncompleteActions = accs?.length > 0 && accActions.length !== accs.length
+  const bloqueadoPorAccs = accsLoading || accsError
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Finalizar asignación</DialogTitle>
+          <DialogTitle>Finalizar asignaci&oacute;n</DialogTitle>
           <DialogDescription>
             {cesarTarget ? (
               <>
@@ -156,7 +180,7 @@ export default function CesarAsignacionDialog({
                 {cesarTarget.TrabajadorNombre ? ` de ${cesarTarget.TrabajadorNombre}` : ''}
               </>
             ) : (
-              'Selecciona el motivo para finalizar la asignación'
+              'Selecciona el motivo para finalizar la asignaci\u00f3n'
             )}
           </DialogDescription>
         </DialogHeader>
@@ -178,14 +202,14 @@ export default function CesarAsignacionDialog({
             </Select>
             {motivo && (
               <p className="text-xs text-muted-foreground mt-1">
-                El equipo pasará a estado <strong>{estadoDestino}</strong>
+                El equipo pasar&aacute; a estado <strong>{estadoDestino}</strong>
               </p>
             )}
           </div>
 
           <div className="space-y-1.5">
             <label className="text-sm font-medium">
-              Observación <span className="text-muted-foreground text-xs">(opcional)</span>
+              Observaci&oacute;n <span className="text-muted-foreground text-xs">(opcional)</span>
             </label>
             <textarea
               value={obs}
@@ -207,8 +231,11 @@ export default function CesarAsignacionDialog({
             <div className="rounded-lg border border-destructive/30 p-3">
               <div className="flex items-center gap-2 text-sm text-destructive">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
-                <span>No se pudieron cargar los accesorios: {accsErrorObj?.message || 'Error de conexión'}</span>
+                <span>No se pudieron cargar los accesorios: {accsErrorObj?.message || 'Error de conexi\u00f3n'}</span>
               </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                La asignaci&oacute;n no puede finalizarse hasta verificar sus accesorios.
+              </p>
               <Button variant="outline" size="sm" className="mt-2" onClick={() => refetchAccs()}>
                 <RefreshCw className="w-3 h-3 mr-1" /> Reintentar
               </Button>
@@ -232,7 +259,7 @@ export default function CesarAsignacionDialog({
                       </SelectTrigger>
                       <SelectContent>
                         {ACC_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                          <SelectItem key={opt.value} value={opt.value} disabled={opt.disabled}>{opt.label}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -250,9 +277,9 @@ export default function CesarAsignacionDialog({
           <Button
             variant="destructive"
             onClick={handleSubmit}
-            disabled={submitting || !motivo || accsLoading || hasIncompleteActions}
+            disabled={submitting || !motivo || bloqueadoPorAccs || hasIncompleteActions}
           >
-            {submitting ? 'Finalizando...' : 'Finalizar asignación'}
+            {submitting ? 'Finalizando...' : 'Finalizar asignaci\u00f3n'}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -6,9 +6,9 @@
 
 ## Decisión
 
-Se implementó una tabla `Tab_EQ_LoginAudit` donde los **services** insertan registros de auditoría de login explícitamente después de cada operación. No se usan triggers de base de datos.
+Se implementó una tabla `Tab_SYS_LoginAudit` donde los **services** insertan registros de auditoría de login explícitamente después de cada operación. No se usan triggers de base de datos.
 
-> ⚠️ **PENDIENTE DE VALIDACIÓN**: No se encontró en el código una tabla `Tab_EQ_Auditoria` genérica. Solo existe `Tab_EQ_LoginAudit` para intentos de inicio de sesión y `Tab_EQ_MovEstadosEquipos` para cambios de estado de equipos. La trazabilidad de operaciones (asignaciones, ceses, componentes) se maneja mediante **log de cambios** en el frontend y verificación condicional en los services.
+> ⚠️ **PENDIENTE DE VALIDACIÓN**: No se encontró en el código una tabla `Tab_EQ_Auditoria` genérica. Solo existe `Tab_SYS_LoginAudit` para intentos de inicio de sesión y `Tab_EQ_MovEstadosEquipos` para cambios de estado de equipos. La trazabilidad de operaciones (asignaciones, ceses, componentes) se maneja mediante **log de cambios** en el frontend y verificación condicional en los services.
 
 ## Consecuencias
 

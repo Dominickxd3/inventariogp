@@ -9,7 +9,7 @@
 | Capa | Tecnología | Notas |
 |------|-----------|-------|
 | Frontend | React 19, Vite 8, Tailwind CSS 4, shadcn/ui, React Router 7 | — |
-| Backend | Node.js 24, Express 4, ES Modules (`"type": "module"`) | — |
+| Backend | Node.js (versión en producción: pendiente de confirmar), Express 4, ES Modules (`"type": "module"`) | — |
 | Base de datos | SQL Server 2019+ con mssql driver | Pool vía `mssql.connect()` |
 | Autenticación | JWT (jsonwebtoken), expiración 8h | — |
 | QR | qrcode.react + html5-qrcode | — |
@@ -78,16 +78,15 @@ Frontend                         Backend                        SQL Server
   ├─────────────────────────────►  ├────────────────────────────►│
   │  ◄─────────────────────────────│  ◄───────────────────────────│
   │                                │                              │
-  api.js añade automáticamente:    services llaman repositories:  Tab_EQ_Equipos
+  api.js añade automáticamente:    services llaman repositories:  Tab_EQ_MaeEquipos
     - Content-Type: application/json  - getById(id)               Tab_EQ_Trabajadores
-    - Authorization: Bearer <token>   - getAll(pagination)        Tab_EQ_Asignacion
+    - Authorization: Bearer <token>   - getAll(pagination)        Tab_EQ_MovEquiposAsignaciones
                                        - create(data)             Tab_EQ_Componentes
-                                       - update(id, data)         Tab_EQ_Accesorio
-                                       - delete(id)               Tab_EQ_Incidencia
-                                                                   Tab_EQ_EquipoComponente
-                                                                   Tab_EQ_MovEquipoAsignacion
-                                                                   Tab_EQ_MovAccesorio
-                                                                   Tab_EQ_LoginAudit
+                                       - update(id, data)         Tab_EQ_MovAccesoriosTrabajador
+                                       - delete(id)               Tab_EQ_Incidencias
+                                                                   Tab_EQ_MovEquiposComponentes
+                                                                   Tab_EQ_MovEstadosEquipos
+                                                                   Tab_SYS_LoginAudit
 
 ```
 

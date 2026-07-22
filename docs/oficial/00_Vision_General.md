@@ -28,7 +28,7 @@ Sistema web interno del área de sistemas de **Grupo Pecuario** para administrar
 
 | Módulo | Estado | Notas |
 |--------|--------|-------|
-| Login/Auth | ✅ Operativo | JWT, roles ADMIN/TECNICO, auditoría de login en Tab_EQ_LoginAudit |
+| Login/Auth | ✅ Operativo | JWT, roles ADMIN/TECNICO, auditoría de login en Tab_SYS_LoginAudit |
 | Equipos | ✅ Operativo | CRUD, estados, QR, dashboard, características técnicas |
 | Trabajadores | ✅ Operativo | Sincronización con ERP, estadísticas, búsqueda |
 | Asignaciones | ✅ Operativo | Asignación simple/múltiple/con accesorios, cese por motivo, acta HTML |
