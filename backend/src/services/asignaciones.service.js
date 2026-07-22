@@ -123,7 +123,13 @@ export const AsignacionesService = {
       EXTRAVIADO: 'BAJA',
     };
 
-    const estadoNuevo = ESTADO_POR_MOTIVO[data.Motivo] || 'DISPONIBLE';
+    if (!ESTADO_POR_MOTIVO[data.Motivo]) {
+      const err = new Error(`Motivo de cese no válido: ${data.Motivo}`);
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const estadoNuevo = ESTADO_POR_MOTIVO[data.Motivo];
     const obsTexto = (data?.Obs || '').trim();
     const obsCombinada = [`Motivo: ${data.Motivo}`, obsTexto].filter(Boolean).join(' — ');
 
@@ -151,17 +157,60 @@ export const AsignacionesService = {
           const { idMovAccesorio, accion } = acc;
           if (accion === 'MANTENER') continue;
 
+          const verif = await trxRows(trx, `
+            SELECT IdMovAccesorio, IdComponente, Estado
+            FROM Tab_EQ_MovAccesoriosTrabajador
+            WHERE IdMovAccesorio = @idMovAccesorio
+              AND IdMovEquipoAsignacion = @idAsignacion
+              AND Estado = 'VIGENTE'
+          `, { idMovAccesorio, idAsignacion: id });
+
+          if (verif.length !== 1) {
+            const err = new Error(`Accesorio ID ${idMovAccesorio} no encontrado, no pertenece a esta asignación o ya fue procesado`);
+            err.statusCode = 409;
+            throw err;
+          }
+
+          const idComponente = verif[0].IdComponente;
+
           if (accion === 'DISPONIBLE') {
-            await trxExec(trx, `UPDATE Tab_EQ_MovAccesoriosTrabajador SET Estado = 'CESADO', FecCese = GETDATE() WHERE IdMovAccesorio = @id`, { id: idMovAccesorio });
-            const compRows = await trxRows(trx, `SELECT IdComponente FROM Tab_EQ_MovAccesoriosTrabajador WHERE IdMovAccesorio = @id`, { id: idMovAccesorio });
-            if (compRows[0]) {
-              await trxExec(trx, `UPDATE Tab_EQ_Componentes SET Estado = 'DISPONIBLE' WHERE IdComponente = @id`, { id: compRows[0].IdComponente });
+            const r1 = await trxExec(trx, `
+              UPDATE Tab_EQ_MovAccesoriosTrabajador
+              SET Estado = 'CESADO', FecCese = GETDATE()
+              WHERE IdMovAccesorio = @id AND Estado = 'VIGENTE'
+            `, { id: idMovAccesorio });
+            if (r1.rowsAffected?.[0] !== 1) {
+              const err = new Error(`No se pudo cesar el accesorio ID ${idMovAccesorio}`);
+              err.statusCode = 409;
+              throw err;
+            }
+            if (idComponente) {
+              const r2 = await trxExec(trx, `UPDATE Tab_EQ_Componentes SET Estado = 'DISPONIBLE' WHERE IdComponente = @id`, { id: idComponente });
+              if (r2.rowsAffected?.[0] !== 1) {
+                const err = new Error(`No se pudo actualizar el componente ID ${idComponente}`);
+                err.statusCode = 409;
+                throw err;
+              }
             }
           } else if (accion === 'BAJA' || accion === 'PERDIDO') {
-            await trxExec(trx, `UPDATE Tab_EQ_MovAccesoriosTrabajador SET Estado = '${accion}', FecCese = GETDATE() WHERE IdMovAccesorio = @id`, { id: idMovAccesorio });
-            const compRows = await trxRows(trx, `SELECT IdComponente FROM Tab_EQ_MovAccesoriosTrabajador WHERE IdMovAccesorio = @id`, { id: idMovAccesorio });
-            if (compRows[0]) {
-              await trxExec(trx, `UPDATE Tab_EQ_Componentes SET Estado = 'BAJA' WHERE IdComponente = @id`, { id: compRows[0].IdComponente });
+            const nuevoEstadoAcc = accion === 'BAJA' ? 'BAJA' : accion;
+            const r1 = await trxExec(trx, `
+              UPDATE Tab_EQ_MovAccesoriosTrabajador
+              SET Estado = @nuevoEstado, FecCese = GETDATE()
+              WHERE IdMovAccesorio = @id AND Estado = 'VIGENTE'
+            `, { id: idMovAccesorio, nuevoEstado: nuevoEstadoAcc });
+            if (r1.rowsAffected?.[0] !== 1) {
+              const err = new Error(`No se pudo actualizar el accesorio ID ${idMovAccesorio}`);
+              err.statusCode = 409;
+              throw err;
+            }
+            if (idComponente) {
+              const r2 = await trxExec(trx, `UPDATE Tab_EQ_Componentes SET Estado = 'BAJA' WHERE IdComponente = @id`, { id: idComponente });
+              if (r2.rowsAffected?.[0] !== 1) {
+                const err = new Error(`No se pudo dar de baja el componente ID ${idComponente}`);
+                err.statusCode = 409;
+                throw err;
+              }
             }
           }
         }

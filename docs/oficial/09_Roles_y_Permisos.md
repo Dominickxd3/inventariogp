@@ -1,7 +1,7 @@
 # 09 — Roles y Permisos
 
 > **Propósito**: Matriz de roles del sistema y permisos por endpoint.
-> **Estado**: ✅ Completo
+> **Estado**: ⚠️ BORRADOR — PENDIENTE DE VALIDACIÓN
 
 ---
 

@@ -1,9 +1,11 @@
 # 03 — Reglas de Negocio
 
 > **Propósito**: Catálogo de todas las reglas de negocio implementadas en el sistema, extraídas del código fuente.
-> **Estado**: ✅ Completo
+> **Estado**: ⚠️ BORRADOR — PENDIENTE DE VALIDACIÓN
 
 ---
+
+> ⚠️ Los nombres de tablas en este documento usan la nomenclatura corta `EQ_*` (ej: `EQ_AsignacionesAcc`). Los nombres reales en BD son `Tab_EQ_*` (ej: `Tab_EQ_MovEquiposAsignaciones`, `Tab_EQ_MovAccesoriosTrabajador`). Ver `backend/src/repositories/` para la nomenclatura exacta.
 
 ## Convenciones del documento
 
@@ -73,7 +75,7 @@
 | ID | Regla | Implementación |
 |----|-------|---------------|
 | RN-UA-01 | Solo ADMIN puede crear/modificar usuarios | `auth.js` middleware |
-| RN-UA-02 | Las contraseñas se almacenan hasheadas con bcryptjs | `auth.service.js` |
+| RN-UA-02 | Las contraseñas se almacenan hasheadas con bcrypt | `auth.service.js` |
 | RN-UA-03 | El usuario debe tener estado `Activo = 1` para poder iniciar sesión | `auth.service.js` |
 | RN-UA-04 | Cada intento de login (exitoso o fallido) se registra en `EQ_LoginAudit` | `auth.service.js` |
 | RN-UA-05 | La contraseña mínima es 6 caracteres | `validators.js` |

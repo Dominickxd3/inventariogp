@@ -4,7 +4,7 @@
 > Base URL: `http://127.0.0.1:3001/api`
 > Autenticación: JWT en header `Authorization: Bearer <token>`
 > Respuesta error estándar: `{ error: string, details?: string, code?: string }`
-> **Estado**: ✅ Completo
+> **Estado**: ⚠️ BORRADOR — PENDIENTE DE VALIDACIÓN
 
 ---
 
@@ -208,37 +208,19 @@ Detalle con intervenciones asociadas.
 
 ## 7. Intervenciones
 
-### `GET /api/intervenciones`
-
-Lista paginada.
-
-### `POST /api/intervenciones`
-
-Crear intervención (con componente/s instalado/s y/o retirado/s).
-
-### `PUT /api/intervenciones/:id`
-
-Actualizar intervención.
-
-### `GET /api/intervenciones/:id`
-
-Detalle con componentes usados.
+> ⚠️ **PENDIENTE DE VALIDACIÓN**: No existe ruta `/api/intervenciones`. Las intervenciones se gestionan desde `EquiposService` (`backend/src/services/equipos.service.js`) invocando directamente al repositorio `intervenciones.repository.js`. Puede que no haya endpoints REST dedicados.
 
 ---
 
 ## 8. Dashboard
 
-### `GET /api/dashboard`
-
-Estadísticas agregadas. Retorna objeto con indicadores.
+> ⚠️ **PENDIENTE DE VALIDACIÓN**: No existe ruta `/api/dashboard`. Las estadísticas del dashboard se obtienen desde `EquiposRepository.getDashboardStats()`.
 
 ---
 
 ## 9. Mantenimiento
 
-### `POST /api/mantenimiento/actualizar-dashboard`
-
-Trigger manual para refrescar `SP_ActualizarDashboard`.
+> ⚠️ **PENDIENTE DE VALIDACIÓN**: No existe ruta `/api/mantenimiento/actualizar-dashboard`. No se encontró referencia a `SP_ActualizarDashboard` en el código.
 
 ---
 

@@ -15,6 +15,12 @@ function DebouncedInput({ value, onChange, placeholder, className }) {
     setLocal(value || '');
   }, [value]);
 
+  useEffect(() => {
+    return () => {
+      if (timeout.current) clearTimeout(timeout.current);
+    };
+  }, []);
+
   const handleChange = (e) => {
     const v = e.target.value;
     setLocal(v);
@@ -188,7 +194,7 @@ export default function DataTable({
         </div>
       </div>
 
-      {isServer && (serverTotalPages > 1 || serverTotal > currentPageSize) ? (
+      {isServer ? (
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>Mostrar</span>
@@ -203,31 +209,35 @@ export default function DataTable({
             </select>
             <span>{(() => { const start = serverTotal === 0 ? 0 : (serverPage - 1) * currentPageSize + 1; const end = Math.min(serverPage * currentPageSize, serverTotal); return `${start}–${end} de ${serverTotal} registros`; })()}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              Página {serverPage} de {serverTotalPages || 1}
-            </span>
-            <div className="flex gap-1">
-              <Button
-                variant="outline"
-                size="icon-sm"
-                onClick={() => onPageChange?.(serverPage - 1)}
-                disabled={serverPage <= 1}
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon-sm"
-                onClick={() => onPageChange?.(serverPage + 1)}
-                disabled={serverPage >= serverTotalPages}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
+          {(serverTotalPages > 1 || serverTotal > currentPageSize) && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                Página {serverPage} de {serverTotalPages || 1}
+              </span>
+              <div className="flex gap-1">
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => onPageChange?.(serverPage - 1)}
+                  disabled={serverPage <= 1}
+                  aria-label="Página anterior"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => onPageChange?.(serverPage + 1)}
+                  disabled={serverPage >= serverTotalPages}
+                  aria-label="Página siguiente"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
-      ) : !isServer && table.getPageCount() > 1 && (
+      ) : !isServer && (
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>Mostrar</span>
@@ -242,29 +252,33 @@ export default function DataTable({
             </select>
             <span>de {table.getRowCount()} registros</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              Página {pagination.pageIndex + 1} de {table.getPageCount()}
-            </span>
-            <div className="flex gap-1">
-              <Button
-                variant="outline"
-                size="icon-sm"
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon-sm"
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
+          {table.getPageCount() > 1 && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                Página {pagination.pageIndex + 1} de {table.getPageCount()}
+              </span>
+              <div className="flex gap-1">
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => table.previousPage()}
+                  disabled={!table.getCanPreviousPage()}
+                  aria-label="Página anterior"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => table.nextPage()}
+                  disabled={!table.getCanNextPage()}
+                  aria-label="Página siguiente"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
     </div>

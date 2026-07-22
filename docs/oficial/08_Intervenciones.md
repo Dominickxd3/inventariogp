@@ -1,7 +1,7 @@
 # 08 — Intervenciones
 
 > **Propósito**: Documentación del módulo de Intervenciones — mantenimiento, reparación y reemplazo de componentes.
-> **Estado**: 🔴 En refactor (P0) — Pendiente de implementación
+> **Estado**: ⚠️ BORRADOR — PENDIENTE DE VALIDACIÓN
 
 ---
 

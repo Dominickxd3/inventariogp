@@ -1,17 +1,21 @@
 # 02 — Base de Datos
 
 > **Propósito**: Documento de referencia del modelo de datos completo, esquema, tablas, columnas, restricciones, índices y relaciones.
-> **Estado**: ✅ Completo
+> **Estado**: ⚠️ BORRADOR — PENDIENTE DE VALIDACIÓN
 > **Nota**: No modificar la base de datos sin autorización expresa del usuario.
 
 ---
 
 ## 1. Configuración de la base de datos
 
-- **BD**: `DB_INVENTARIOGP`
+- **BD**: `InventarioGP`
 - **Motor**: Microsoft SQL Server 2019+
 - **Autenticación**: SQL Server Auth (usuario `sa` en desarrollo)
-- **Esquema por defecto**: `dbo` (aunque `EQ_` es prefijo de nomenclatura, no un esquema separado)
+- **Esquema por defecto**: `dbo`
+
+> ⚠️ **Correcciones verificadas respecto a código**:
+> - Los nombres reales de tablas usan prefijo `Tab_EQ_` (ej: `Tab_EQ_Trabajadores`, `Tab_EQ_MaeEquipos`, `Tab_EQ_MovEquiposAsignaciones`). Las estructuras de columnas listadas abajo son **inferidas** del modelo conceptual, no verificadas contra la BD real. Consultar los repositorios en `backend/src/repositories/` para la nomenclatura exacta de tablas y columnas.
+> - `bcryptjs` → `bcrypt` (verificado en `backend/package.json`)
 
 ## 2. Tablas del sistema
 
@@ -221,4 +225,4 @@ Tabla creada pero sin uso actual.
 | 4 | `EQ_Componentes.Estado` permite `ASIGNADO` que no tiene sentido sin asignaciones | 🔴 Alta |
 | 5 | No hay tabla de `TipoEquipo` como catálogo — se usa VARCHAR libre | 🟡 Media |
 | 6 | No hay trigger/logging de cambios de estado en tablas principales | 🟡 Media |
-| 7 | `EQ_Usuarios.Password` usa bcryptjs (hash, no plain text) al menos | ✅ Correcto |
+| 7 | `Tab_EQ_Usuarios.Password` usa bcrypt (hash, no plain text) al menos | ✅ Correcto |

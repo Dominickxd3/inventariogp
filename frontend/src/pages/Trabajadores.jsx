@@ -42,10 +42,11 @@ export default function Trabajadores() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  const { data: areas } = useQuery({
+  const areasQuery = useQuery({
     queryKey: ['trabajadores-areas'],
     queryFn: api.trabajadores.areas,
   });
+  const areas = areasQuery.data;
 
   const { data, isLoading, isFetching, isError, error } = useQuery({
     queryKey: ['trabajadores', search, areaFiltro, page, pageSize],
@@ -66,7 +67,6 @@ export default function Trabajadores() {
 
   const stats = statsQuery.data;
   const statsError = statsQuery.isError;
-  const areasError = false;
 
   if (isError) {
     return (
@@ -152,25 +152,39 @@ export default function Trabajadores() {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Buscar por DNI o nombre..."
-            className="h-8 w-64 rounded-lg border border-input bg-transparent pl-9 pr-2.5 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground"
+            aria-label="Buscar trabajadores"
+            className="h-8 w-full sm:w-64 rounded-lg border border-input bg-transparent pl-9 pr-2.5 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground"
           />
         </div>
-        <Select value={areaFiltro} onValueChange={(v) => { setAreaFiltro(v); setPage(1); }}>
-          <SelectTrigger className="h-9 w-[340px]" title={areaFiltro || 'Todas las áreas'}>
-            <SelectValue placeholder="Todas las áreas" className="line-clamp-none">
-              {areaFiltro || null}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent className="max-h-72 w-[340px] overflow-y-auto" align="start">
-            <SelectItem value="">Todas las áreas</SelectItem>
-            {areas?.map((a) => (
-              <SelectItem key={a.Area} value={a.Area}>
-                <span className="block truncate" title={a.Area}>{a.Area}</span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Select value={areaFiltro} onValueChange={(v) => { setAreaFiltro(v); setPage(1); }}>
+            <SelectTrigger className="h-9 w-full sm:w-[340px]" title={areaFiltro || 'Todas las áreas'} aria-label="Filtrar por área">
+              <SelectValue placeholder="Todas las áreas" className="line-clamp-none">
+                {areaFiltro || null}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent className="max-h-72 w-[340px] overflow-y-auto" align="start">
+              <SelectItem value="">Todas las áreas</SelectItem>
+              {areas?.map((a) => (
+                <SelectItem key={a.Area} value={a.Area}>
+                  <span className="block truncate" title={a.Area}>{a.Area}</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {areasQuery.isError && (
+            <Button variant="ghost" size="icon-sm" onClick={() => areasQuery.refetch()} title="Reintentar cargar áreas">
+              <RefreshCw className="w-4 h-4 text-muted-foreground" />
+            </Button>
+          )}
+        </div>
       </div>
+      {areasQuery.isError && (
+        <p className="text-xs text-destructive flex items-center gap-1">
+          <AlertTriangle className="w-3 h-3" />
+          No se pudieron cargar las áreas. El filtro podría estar incompleto.
+        </p>
+      )}
 
       {isFetching && !isLoading && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">

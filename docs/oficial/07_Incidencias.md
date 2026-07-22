@@ -1,7 +1,7 @@
 # 07 — Incidencias
 
 > **Propósito**: Documentación del módulo de Incidencias — reporte y seguimiento de fallas en equipos.
-> **Estado**: 🟡 Estable, requiere mejoras en cierre automático
+> **Estado**: ⚠️ BORRADOR — PENDIENTE DE VALIDACIÓN
 
 ---
 

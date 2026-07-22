@@ -1,7 +1,7 @@
 # 10 — Convenciones
 
 > **Propósito**: Convenciones de código, estilo, nombres y organización del proyecto.
-> **Estado**: ✅ Completo (extraído del código existente)
+> **Estado**: ⚠️ BORRADOR — PENDIENTE DE VALIDACIÓN
 
 ---
 
@@ -41,11 +41,11 @@ try {
 ### 1.4 Validación con Zod
 - Esquemas definidos en `validators.js`
 - Schema por operación: `{ body, params, query }`
-- `req.parsedBody`, `req.parsedParams`, `req.parsedQuery`
+- `req.body`, `req.params`, `req.query` (validados y reemplazados por el middleware de Zod)
 - Error 400 con detalles del zod error
 
 ### 1.5 Autenticación
-- Middleware `auth.verifyToken` → `req.user`
+- Middleware `auth.verifyToken` → `req.usuario` (⚠️ no `req.user`)
 - Middleware `auth.requireRole(...)` → verifica rol
 - JWT con payload: `{ IdUsuario, Usuario, Rol, Area }`, expira 8h
 
@@ -56,7 +56,7 @@ try {
 ### 2.1 Estructura de archivos
 ```
 src/
-  api/          → api.js (axios client), queryClient.js (react-query)
+  lib/          → api.js (fetch client), queryClient.js (react-query)
   components/   → ui/ (shadcn), DataTable, ErrorBoundary, modales compartidos
   pages/        → una carpeta plana por página/ruta
   providers/    → AuthProvider, ThemeProvider
@@ -97,12 +97,11 @@ src/
 ## 3. Base de Datos — SQL Server
 
 ### 3.1 Nombres
-- Tablas: **Prefijo_EQ_Nombre** (ej: `EQ_Equipos`, `EQ_Asignaciones`)
-- Columnas: **PascalCase** con prefijo Id (ej: `IdEquipo`, `NombreTrabajador`)
-- PK: `Id[NombreTabla]` (ej: `IdEquipo`, `IdAsignacion`)
+- Tablas: **`Tab_EQ_Nombre`** (ej: `Tab_EQ_MaeEquipos`, `Tab_EQ_MovEquiposAsignaciones`, `Tab_EQ_Trabajadores`)
+- Columnas: **PascalCase** con prefijo Id (ej: `IdMaeEquipo`, `IdTrabajador`)
+- PK: `Id[NombreTabla]` (ej: `IdMaeEquipo`, `IdMovEquipoAsignacion`)
 - FK: mismo nombre que la columna referenciada
 - Constraints: `PK_`, `FK_`, `UQ_`, `CK_`, `DF_` como prefijo
-- Stored Procedures: **SP_** (ej: `SP_ActualizarDashboard`)
 
 ### 3.2 Tipos de dato
 - IDs: `INT IDENTITY(1,1)`

@@ -12,7 +12,7 @@ Sistema web para administrar equipos tecnológicos, componentes, asignaciones a 
 | Backend | Node.js 24, Express 4, mssql 11 |
 | BD | SQL Server (2019+) |
 | Autenticación | JWT (8h expiración) |
-| HTTP Client | @tanstack/react-query 5 |
+| HTTP Client | fetch() nativo (`lib/api.js`) |
 | Tablas | @tanstack/react-table 8 |
 | QR | qrcode.react + html5-qrcode |
 

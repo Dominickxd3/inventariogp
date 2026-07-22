@@ -1,7 +1,7 @@
 # 06 — Equipos
 
 > **Propósito**: Documentación del módulo de Equipos — activos tecnológicos y su ciclo de vida.
-> **Estado**: 🟡 Estable con áreas de mejora identificadas
+> **Estado**: ⚠️ BORRADOR — PENDIENTE DE VALIDACIÓN
 
 ---
 

@@ -1,7 +1,7 @@
 # 05 — Componentes
 
 > **Propósito**: Documentación del módulo de Componentes — repuestos, accesorios y su ciclo de vida en el sistema.
-> **Estado**: 🔴 En refactor (P0) — Pendiente de implementación
+> **Estado**: ⚠️ BORRADOR — PENDIENTE DE VALIDACIÓN
 
 ---
 
