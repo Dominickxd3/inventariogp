@@ -1,4 +1,4 @@
-import { query, withTransaction, createRequest } from '../config/db.js';
+import { query, executeQuery, withTransaction, createRequest } from '../config/db.js';
 import { actasConfig } from '../config/actas.js';
 
 const DB = actasConfig.dbName;
@@ -115,7 +115,7 @@ export const ActasRepository = {
   },
 
   async updateSigned(idActa, data) {
-    const r = await query(DB, `
+    const r = await executeQuery(DB, `
       UPDATE Tab_EQ_ActasAsignacion
       SET EstadoActa = 'FIRMADA',
           FechaFirma = @fechaFirma,
@@ -135,11 +135,11 @@ export const ActasRepository = {
       pdfFirmadoRuta: data.PdfFirmadoRuta,
       pdfFirmadoHash: data.PdfFirmadoHash,
     });
-    return r.rowsAffected?.[0] || 0;
+    return r.rowsAffected?.[0] ?? 0;
   },
 
   async updateExpired() {
-    await query(DB, `
+    await executeQuery(DB, `
       UPDATE Tab_EQ_ActasAsignacion
       SET EstadoActa = 'VENCIDA'
       WHERE EstadoActa = 'PENDIENTE_FIRMA'
@@ -148,31 +148,33 @@ export const ActasRepository = {
   },
 
   async updateVencida(idActa) {
-    const r = await query(DB, `
+    const r = await executeQuery(DB, `
       UPDATE Tab_EQ_ActasAsignacion
       SET EstadoActa = 'VENCIDA'
       WHERE IdActa = @idActa AND EstadoActa = 'PENDIENTE_FIRMA'
     `, { idActa });
-    return r.rowsAffected?.[0] || 0;
+    return r.rowsAffected?.[0] ?? 0;
   },
 
   async regenerateToken(idActa, tokenHash, fechaExpiracion) {
-    const r = await query(DB, `
+    const r = await executeQuery(DB, `
       UPDATE Tab_EQ_ActasAsignacion
       SET TokenHash = @tokenHash, FechaExpiracion = @fechaExpiracion,
           EstadoActa = 'PENDIENTE_FIRMA'
       WHERE IdActa = @idActa
+        AND EstadoActa IN ('PENDIENTE_FIRMA', 'VENCIDA')
     `, { idActa, tokenHash, fechaExpiracion });
-    return r.rowsAffected?.[0] || 0;
+    return r.rowsAffected?.[0] ?? 0;
   },
 
   async annul(idActa, motivo) {
-    const r = await query(DB, `
+    const r = await executeQuery(DB, `
       UPDATE Tab_EQ_ActasAsignacion
       SET EstadoActa = 'ANULADA', MotivoAnulacion = @motivo, FechaAnulacion = GETDATE()
       WHERE IdActa = @idActa
+        AND EstadoActa NOT IN ('FIRMADA', 'ANULADA')
     `, { idActa, motivo });
-    return r.rowsAffected?.[0] || 0;
+    return r.rowsAffected?.[0] ?? 0;
   },
 
   async getStatus(idMovEquipoAsignacion) {

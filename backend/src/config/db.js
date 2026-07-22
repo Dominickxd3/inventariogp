@@ -38,6 +38,15 @@ export async function query(dbName, sqlQuery, params = {}) {
   return result.recordset ? Array.from(result.recordset) : [];
 }
 
+export async function executeQuery(dbName, sqlText, params = {}) {
+  const pool = await getPool(dbName);
+  const request = pool.request();
+  Object.entries(params).forEach(([key, value]) => {
+    request.input(key, value);
+  });
+  return request.query(sqlText);
+}
+
 export async function execute(dbName, procedure, params = {}) {
   const pool = await getPool(dbName);
   const request = pool.request();
