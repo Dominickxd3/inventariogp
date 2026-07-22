@@ -14,27 +14,80 @@ function escapeJsonValue(v) {
   return String(v).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
 }
 
+function normalizarClave(clave) {
+  if (!clave) return '';
+  const alias = {
+    'marca': 'marca',
+    'modelo': 'modelo',
+    'color': 'color',
+    'ram': 'ram',
+    'memoria': 'ram',
+    'memoria ram': 'ram',
+    'memoria principal': 'ram',
+    'capacidad': 'capacidad',
+    'almacenamiento': 'capacidad',
+    'disco': 'capacidad',
+    'disco duro': 'capacidad',
+    'ssd': 'capacidad',
+    'nvme': 'capacidad',
+    'capacidad de disco': 'capacidad',
+    'serie': 'serie',
+    'numero de serie': 'serie',
+    'número de serie': 'serie',
+    'serial': 'serie',
+    's/n': 'serie',
+    'tipo': 'tipo',
+    'tipo equipo': 'tipo',
+    'tipo de equipo': 'tipo',
+  };
+  const limpia = clave
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return alias[limpia] || '';
+}
+
 function buildSnapshot({ asignacion, trabajador, equipo, caracteristicas, accesorios, tipoActa, plantilla }) {
   const eq = {
     id: equipo.IdMaeEquipo,
     codigo: equipo.CodEquipo || '',
-    marca: '',
-    modelo: '',
+    tipoEquipo: equipo.DesTipodeEquipo || '',
+    marca: equipo.Marca || '',
+    modelo: equipo.Modelo || '',
     color: '',
     ram: '',
     capacidad: '',
     serie: equipo.SerieFabricante || equipo.CodBarra || '',
   };
 
+  const reconocidas = new Set();
   if (caracteristicas?.length) {
     const mapCarac = {};
-    caracteristicas.forEach(c => { mapCarac[c.Clave?.toLowerCase()] = c.Valor; });
-    eq.marca = mapCarac['marca'] || equipo.Marca || '';
-    eq.modelo = mapCarac['modelo'] || equipo.Modelo || '';
-    eq.color = mapCarac['color'] || '';
-    eq.ram = mapCarac['ram'] || mapCarac['memoria ram'] || '';
-    eq.capacidad = mapCarac['capacidad'] || mapCarac['disco duro'] || mapCarac['almacenamiento'] || '';
-    eq.serie = mapCarac['serie'] || mapCarac['numero de serie'] || equipo.SerieFabricante || equipo.CodBarra || '';
+    for (const c of caracteristicas) {
+      const key = normalizarClave(c.Clave);
+      if (key) {
+        mapCarac[key] = c.Valor;
+        reconocidas.add(c.Clave);
+      } else if (process.env.NODE_ENV === 'development') {
+        console.log(`[Actas] Característica no reconocida: "${c.Clave}" = "${c.Valor}"`);
+      }
+    }
+    if (mapCarac['marca']) eq.marca = mapCarac['marca'];
+    if (mapCarac['modelo']) eq.modelo = mapCarac['modelo'];
+    if (mapCarac['color']) eq.color = mapCarac['color'];
+    if (mapCarac['ram']) eq.ram = mapCarac['ram'];
+    if (mapCarac['capacidad']) eq.capacidad = mapCarac['capacidad'];
+    if (mapCarac['serie']) eq.serie = mapCarac['serie'];
+    if (mapCarac['tipo']) eq.tipoEquipo = mapCarac['tipo'];
+  }
+
+  if (process.env.NODE_ENV === 'development' && caracteristicas?.length) {
+    const noReconocidas = caracteristicas.filter(c => !reconocidas.has(c.Clave));
+    if (noReconocidas.length) {
+      console.log(`[Actas] Características no mapeadas (${noReconocidas.length}):`, noReconocidas.map(c => `${c.Clave}=${c.Valor}`).join(', '));
+    }
   }
 
   const accs = (accesorios || []).map(a => ({
@@ -58,6 +111,7 @@ function buildSnapshot({ asignacion, trabajador, equipo, caracteristicas, acceso
     equipo: {
       id: eq.id,
       codigo: escapeJsonValue(eq.codigo),
+      tipoEquipo: escapeJsonValue(eq.tipoEquipo),
       marca: escapeJsonValue(eq.marca),
       modelo: escapeJsonValue(eq.modelo),
       color: escapeJsonValue(eq.color),

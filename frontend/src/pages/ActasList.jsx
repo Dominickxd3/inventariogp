@@ -7,7 +7,7 @@ import { Button } from '#components/ui/button.jsx'
 import Swal from 'sweetalert2'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '#components/ui/dialog.jsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#components/ui/select.jsx'
-import { AlertTriangle, FileText, Link, XCircle, RefreshCw } from 'lucide-react'
+import { AlertTriangle, FileText, Link, XCircle } from 'lucide-react'
 
 const ESTADO_COLORS = {
   PENDIENTE_FIRMA: 'text-yellow-600 bg-yellow-50 border-yellow-200',
@@ -65,29 +65,25 @@ export default function ActasList() {
   }
 
   async function handleVerPdf(idActa) {
+    const pdfWindow = window.open('about:blank', '_blank')
+    if (!pdfWindow) {
+      Swal.fire({ icon: 'error', title: 'No se pudo abrir el acta', text: 'El navegador bloqueó la apertura del documento. Permite ventanas emergentes e intenta nuevamente.' })
+      return
+    }
+    pdfWindow.document.write('Cargando documento...')
+    pdfWindow.document.title = 'Acta'
     try {
       const blob = await api.actas.getPdf(idActa)
-
       if (!blob || blob.size === 0 || blob.type !== 'application/pdf') {
+        pdfWindow.close()
         throw new Error('El archivo PDF no es válido')
       }
-
       const objectUrl = URL.createObjectURL(blob)
-
-      const nuevaVentana = window.open(objectUrl, '_blank', 'noopener,noreferrer')
-
-      if (!nuevaVentana) {
-        URL.revokeObjectURL(objectUrl)
-        throw new Error('El navegador bloqueó la apertura del documento')
-      }
-
+      pdfWindow.location.replace(objectUrl)
       window.setTimeout(() => { URL.revokeObjectURL(objectUrl) }, 300000)
     } catch (error) {
-      Swal.fire({
-        icon: 'error',
-        title: 'No se pudo abrir el acta',
-        text: error.message || 'Ocurrió un error al obtener el documento.',
-      })
+      if (!pdfWindow.closed) pdfWindow.close()
+      Swal.fire({ icon: 'error', title: 'No se pudo abrir el acta', text: error.message || 'Ocurrió un error al obtener el documento.' })
     }
   }
 

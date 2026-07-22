@@ -7,6 +7,19 @@ import { config } from './config/index.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { closeAll } from './config/db.js';
 import { loginLimiter } from './middleware/rateLimiter.js';
+import { actasConfig } from './config/actas.js';
+import fs from 'fs';
+
+// Validar plantillas de actas al inicio
+for (const [tipo, ruta] of Object.entries({
+  ENTREGA: actasConfig.templateEntrega,
+  DEVOLUCION: actasConfig.templateDevolucion,
+})) {
+  if (!fs.existsSync(ruta)) {
+    console.error(`[Actas] Plantilla de ${tipo} no encontrada: ${ruta}`);
+    process.exit(1);
+  }
+}
 
 import equiposRoutes from './routes/equipos.routes.js';
 import trabajadoresRoutes from './routes/trabajadores.routes.js';

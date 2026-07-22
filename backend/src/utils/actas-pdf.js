@@ -1,7 +1,6 @@
-import { PDFDocument, rgb, StandardFonts, degrees } from 'pdf-lib';
+import { PDFDocument, rgb } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import fs from 'fs';
-import path from 'path';
 import { getLayout } from '../config/actas-layouts.js';
 import { actasConfig } from '../config/actas.js';
 
@@ -15,86 +14,69 @@ async function loadFont(pdfDoc) {
   return pdfDoc.embedFont(fontBytes, { subset: true });
 }
 
-function drawWatermark(page, layout, text) {
-  const { x, y, size, opacity } = layout.watermark;
-  page.drawText(text, {
-    x, y,
-    size,
-    opacity,
-    color: rgb(0.8, 0.8, 0.8),
-  });
-}
-
-function drawFooter(page, layout) {
-  const { footerText, footerY } = layout;
-  page.drawText(footerText, {
-    x: 70,
-    y: footerY,
-    size: 8,
-    color: rgb(0.4, 0.4, 0.4),
-  });
+function getTemplatePath(tipoActa) {
+  return tipoActa === 'ENTREGA' ? actasConfig.templateEntrega : actasConfig.templateDevolucion;
 }
 
 export async function generarActaPdf(snapshot) {
-  const layout = getLayout(snapshot.tipoActa, snapshot.plantilla);
+  const templatePath = getTemplatePath(snapshot.tipoActa);
+  if (!fs.existsSync(templatePath)) {
+    throw new Error(`Plantilla no encontrada: ${templatePath}`);
+  }
 
-  const pdfDoc = await PDFDocument.create();
+  const templateBytes = fs.readFileSync(templatePath);
+  const pdfDoc = await PDFDocument.load(templateBytes);
   pdfDoc.registerFontkit(fontkit);
   const font = await loadFont(pdfDoc);
-  const page = pdfDoc.addPage([layout.pageSize.width, layout.pageSize.height]);
+  const page = pdfDoc.getPages()[0];
 
   const draw = (text, x, y, size = 11, color = rgb(0, 0, 0)) => {
     page.drawText(String(text || ''), { x, y, size, font, color });
   };
 
-  const title = snapshot.tipoActa === 'ENTREGA'
-    ? 'CARGO DE ENTREGA DE EQUIPO'
-    : 'CARGO DE DEVOLUCIÓN DE EQUIPO';
+  const layout = getLayout(snapshot.tipoActa, snapshot.plantilla);
 
-  draw(title, 70, 750, 14);
+  const nombre = snapshot.trabajador.nombre || '';
+  const dni = snapshot.trabajador.dni || '';
 
-  draw('Grupo Pecuario S.A.C.', 70, 730, 11);
-  draw('RUC: 20513967234', 70, 715, 10);
+  draw(nombre, layout.trabajador.x, layout.trabajador.y, layout.trabajador.size);
+  draw(dni, layout.dni.x, layout.dni.y, layout.dni.size);
 
-  draw('DATOS DEL TRABAJADOR', 70, 670, 11);
-  draw(`Trabajador: ${snapshot.trabajador.nombre}`, layout.trabajador.x, layout.trabajador.y, layout.trabajador.size);
-  draw(`DNI: ${snapshot.trabajador.dni}`, layout.dni.x, layout.dni.y, layout.dni.size);
+  const labels = ['Tipo', 'Marca', 'Modelo', 'Color', 'Memoria RAM', 'Almacenamiento', 'N° de Serie', 'Código'];
+  const values = [
+    snapshot.equipo.tipoEquipo || '—',
+    snapshot.equipo.marca || '—',
+    snapshot.equipo.modelo || '—',
+    snapshot.equipo.color || '—',
+    snapshot.equipo.ram || '—',
+    snapshot.equipo.capacidad || '—',
+    snapshot.equipo.serie || '—',
+    snapshot.equipo.codigo || '—',
+  ];
 
-  draw('DATOS DEL EQUIPO', 70, 550, 11);
-  draw(`Marca: ${snapshot.equipo.marca || '—'}`, layout.marca.x, layout.marca.y, layout.marca.size);
-  draw(`Modelo: ${snapshot.equipo.modelo || '—'}`, layout.modelo.x, layout.modelo.y, layout.modelo.size);
-  draw(`Color: ${snapshot.equipo.color || '—'}`, layout.color.x, layout.color.y, layout.color.size);
-  draw(`RAM: ${snapshot.equipo.ram || '—'}`, layout.ram.x, layout.ram.y, layout.ram.size);
-  draw(`Capacidad: ${snapshot.equipo.capacidad || '—'}`, layout.capacidad.x, layout.capacidad.y, layout.capacidad.size);
-  draw(`Serie: ${snapshot.equipo.serie || '—'}`, layout.serie.x, layout.serie.y, layout.serie.size);
+  const col2 = 220 + 68;
+  let rowY = layout.tabla.row1Y;
+  for (let i = 0; i < labels.length; i++) {
+    draw(values[i], col2, rowY, 9, rgb(0.1, 0.1, 0.1));
+    rowY -= layout.tabla.rowHeight;
+  }
 
   if (snapshot.accesorios?.length) {
-    draw('ACCESORIOS:', 70, layout.accesorios.y + 14, 11);
-    snapshot.accesorios.forEach((acc, i) => {
-      const lineY = layout.accesorios.y - (i * layout.accesorios.lineHeight);
-      if (lineY > 280) {
-        draw(`• ${acc.codigo || ''} ${acc.descripcion || ''}`, layout.accesorios.x, lineY, layout.accesorios.size);
-      }
-    });
+    let accY = layout.accesorios.startY;
+    for (const acc of snapshot.accesorios) {
+      if (accY < layout.accesorios.minY) break;
+      draw(`${acc.codigo || ''}  ${acc.descripcion || ''}`, layout.accesorios.x, accY, 9, rgb(0.2, 0.2, 0.2));
+      accY -= layout.accesorios.lineHeight;
+    }
   }
 
   const fechaStr = new Date(snapshot.fechaDocumento).toLocaleDateString('es-PE', {
     year: 'numeric', month: 'long', day: 'numeric',
   });
-  draw(`Fecha: ${fechaStr}`, layout.fecha.x, layout.fecha.y, layout.fecha.size);
+  draw(`Fecha: ${fechaStr}`, layout.fecha.x, layout.fecha.y, 9, rgb(0.3, 0.3, 0.3));
 
-  draw('FIRMA DEL TRABAJADOR', layout.firmaLinea.x, 180, 10);
-  page.drawLine({
-    start: { x: layout.firmaLinea.x, y: layout.firmaLinea.yLine },
-    end: { x: layout.firmaLinea.x + layout.firmaLinea.width, y: layout.firmaLinea.yLine },
-    thickness: 1,
-    color: rgb(0, 0, 0),
-  });
-  draw(snapshot.trabajador.nombre, layout.nombreFirma.x, layout.nombreFirma.y, layout.nombreFirma.size);
-  draw(`DNI: ${snapshot.trabajador.dni}`, layout.dniFirma.x, layout.dniFirma.y, layout.dniFirma.size);
-
-  drawWatermark(page, layout, 'GRUPO PECUARIO S.A.C.');
-  drawFooter(page, layout);
+  draw(nombre, layout.nombreFirma.x, layout.nombreFirma.y, layout.nombreFirma.size);
+  draw(`DNI: ${dni}`, layout.dniFirma.x, layout.dniFirma.y, layout.dniFirma.size);
 
   const pdfBytes = await pdfDoc.save();
   return pdfBytes;
@@ -104,8 +86,7 @@ export async function incrustarFirma(pdfOriginalBytes, firmaBase64, layout) {
   const pdfDoc = await PDFDocument.load(pdfOriginalBytes);
   pdfDoc.registerFontkit(fontkit);
   const font = await loadFont(pdfDoc);
-  const pages = pdfDoc.getPages();
-  const page = pages[0];
+  const page = pdfDoc.getPages()[0];
 
   const firmaBuffer = Buffer.from(firmaBase64.replace(/^data:image\/png;base64,/, ''), 'base64');
   let firmaImage;
