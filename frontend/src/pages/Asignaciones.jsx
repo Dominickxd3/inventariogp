@@ -86,13 +86,19 @@ export default function Asignaciones() {
   const [showCesarDialog, setShowCesarDialog] = useState(false);
   const [cesarTarget, setCesarTarget] = useState(null);
 
-  const abrirActa = async (id) => {
+  const abrirActa = async (idAsig) => {
     try {
+      const actas = await api.actas.asignacionEstado(idAsig);
+      if (!actas?.length) {
+        Swal.fire({ icon: 'info', title: 'Sin acta', text: 'Esta asignación no tiene un acta electrónica.' });
+        return;
+      }
+      const acta = actas[0];
       const token = localStorage.getItem('token');
-      const res = await fetch(`/api/asignaciones/${id}/acta`, {
+      const res = await fetch(`/api/actas/${acta.IdActa}/pdf`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error('Error al generar acta');
+      if (!res.ok) throw new Error('Error al descargar PDF');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
@@ -190,7 +196,7 @@ export default function Asignaciones() {
             <DialogTitle>Nueva Asignación</DialogTitle>
             <DialogDescription>Selecciona trabajador y equipos para asignar</DialogDescription>
           </DialogHeader>
-          <AsignarForm equipoInicial={nuevoEquipoId} onSuccess={() => { setShowModal(false); queryClient.invalidateQueries({ queryKey: ['asignaciones'] }); }} />
+          <AsignarForm equipoInicial={nuevoEquipoId} onSuccess={() => { setShowModal(false); queryClient.invalidateQueries({ queryKey: ['asignaciones'] }); queryClient.invalidateQueries({ queryKey: ['actas'] }); }} />
         </DialogContent>
       </Dialog>
 
@@ -211,6 +217,7 @@ export default function Asignaciones() {
         cesarTarget={cesarTarget}
         onSuccess={() => {
           queryClient.invalidateQueries({ queryKey: ['asignaciones'] });
+          queryClient.invalidateQueries({ queryKey: ['actas'] });
           queryClient.invalidateQueries({ queryKey: ['equipos'] });
           queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
           queryClient.invalidateQueries({ queryKey: ['asignacion-detalle'] });
@@ -261,11 +268,35 @@ function AsignarForm({ onSuccess, equipoInicial }) {
 
   const totalSteps = 4;
 
+  function mostrarActaLink(acta) {
+    if (!acta) return '';
+    return `<div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-left">
+      <p class="text-sm font-semibold text-blue-800 mb-1">Acta electrónica generada</p>
+      <p class="text-xs text-blue-700">Código: ${acta.CodigoActa}</p>
+      <p class="text-xs text-blue-700 mt-1">Enlace para firma:</p>
+      <input type="text" readonly value="${acta.urlFirma}" class="w-full mt-1 p-1.5 border border-blue-300 rounded text-xs bg-white" onclick="this.select()" />
+      <p class="text-xs text-muted-foreground mt-1">Comparte este enlace con el trabajador para que firme electrónicamente.</p>
+    </div>`;
+  }
+
+  function mostrarWarningActa(msg) {
+    return `<div class="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-left">
+      <p class="text-sm font-medium text-amber-800">${msg}</p>
+    </div>`;
+  }
+
   const asignarMutation = useMutation({
     mutationFn: api.asignaciones.createBulk,
-    onSuccess: () => {
+    onSuccess: (resp) => {
       onSuccess();
-      Swal.fire({ icon: 'success', title: 'Equipos asignados', text: `${selectedEquipos.length} equipo(s) asignado(s) correctamente`, timer: 2000, showConfirmButton: false });
+      const actas = (resp.results || []).filter(r => r.actaGenerada).map(r => r.acta?.CodigoActa).filter(Boolean);
+      const warnings = (resp.results || []).filter(r => r.warning).map(r => r.warning);
+      let html = `${selectedEquipos.length} equipo(s) asignado(s) correctamente.`;
+      if (actas.length) html += `<p class="mt-2 text-xs text-green-700">${actas.length} acta(s) generada(s).</p>`;
+      const primeraActa = (resp.results || []).find(r => r.acta)?.acta;
+      if (primeraActa) html += mostrarActaLink(primeraActa);
+      warnings.forEach(w => { html += mostrarWarningActa(w); });
+      Swal.fire({ icon: 'success', title: 'Equipos asignados', html, confirmButtonText: 'Cerrar' });
     },
     onError: (err) => {
       console.error('Error al asignar:', err);
@@ -277,7 +308,10 @@ function AsignarForm({ onSuccess, equipoInicial }) {
     mutationFn: api.asignaciones.createConAccesorios,
     onSuccess: (resp) => {
       onSuccess();
-      Swal.fire({ icon: 'success', title: 'Asignación completada', text: `Equipo y ${resp.accesorios} accesorio(s) asignados`, timer: 2000, showConfirmButton: false });
+      let html = `Equipo y ${resp.accesorios} accesorio(s) asignados.`;
+      if (resp.acta) html += mostrarActaLink(resp.acta);
+      if (resp.warning) html += mostrarWarningActa(resp.warning);
+      Swal.fire({ icon: 'success', title: 'Asignación completada', html, confirmButtonText: 'Cerrar' });
     },
     onError: (err) => {
       console.error('Error al asignar con accesorios:', err);

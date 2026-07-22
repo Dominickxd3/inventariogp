@@ -50,6 +50,19 @@ export const api = {
       list: (id) => request(`/equipos/${id}/intervenciones`),
       create: (id, data) => request(`/equipos/${id}/intervenciones`, { method: 'POST', body: JSON.stringify(data) }),
     },
+    incidencias: {
+      list: (id) => request(`/equipos/${id}/incidencias`),
+    },
+    caracteristicas: {
+      get: (id) => request(`/equipos/${id}/caracteristicas`),
+      save: (id, data) => request(`/equipos/${id}/caracteristicas`, { method: 'PUT', body: JSON.stringify(data) }),
+    },
+    componentes: {
+      list: (id) => request(`/equipos/${id}/componentes`),
+      add: (id, data) => request(`/equipos/${id}/componentes`, { method: 'POST', body: JSON.stringify(data) }),
+      remove: (id, idMov, motivo) => request(`/equipos/${id}/componentes/${idMov}`, { method: 'DELETE', body: JSON.stringify({ motivo }) }),
+    },
+  },
   actas: {
     list: (params) => request(`/actas?${new URLSearchParams(params)}`),
     get: (id) => request(`/actas/${id}`),
@@ -70,19 +83,6 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ token, ultimosCuatroDni, aceptaCondiciones, firmaBase64 }),
       }),
-  },
-  incidencias: {
-      list: (id) => request(`/equipos/${id}/incidencias`),
-    },
-    caracteristicas: {
-      get: (id) => request(`/equipos/${id}/caracteristicas`),
-      save: (id, data) => request(`/equipos/${id}/caracteristicas`, { method: 'PUT', body: JSON.stringify(data) }),
-    },
-    componentes: {
-      list: (id) => request(`/equipos/${id}/componentes`),
-      add: (id, data) => request(`/equipos/${id}/componentes`, { method: 'POST', body: JSON.stringify(data) }),
-      remove: (id, idMov, motivo) => request(`/equipos/${id}/componentes/${idMov}`, { method: 'DELETE', body: JSON.stringify({ motivo }) }),
-    },
   },
   trabajadores: {
     search: (params) => request(`/trabajadores?${new URLSearchParams(params)}`),

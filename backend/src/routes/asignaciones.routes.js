@@ -43,12 +43,14 @@ router.post('/', roleMiddleware('ADMIN', 'TECNICO'), validate(asignacionCreateSc
     });
 
     if (actaResult.success) {
+      console.log(`[Actas] Acta generada para asignación ${id}`);
       res.status(201).json({
         id,
         message: 'Equipo asignado correctamente',
         acta: actaResult.acta,
       });
     } else {
+      console.error(`[Actas] Error al generar acta para asignación ${id}: ${actaResult.error}`);
       res.status(201).json({
         id,
         message: 'Equipo asignado correctamente',
@@ -63,6 +65,24 @@ router.post('/', roleMiddleware('ADMIN', 'TECNICO'), validate(asignacionCreateSc
 router.post('/bulk', roleMiddleware('ADMIN', 'TECNICO'), async (req, res, next) => {
   try {
     const results = await AsignacionesService.asignarMulti(req.body, req.usuario.id);
+    for (const r of results) {
+      if (r.success && r.idAsig) {
+        const actaResult = await ActasService.generarAutomatica({
+          idMovEquipoAsignacion: r.idAsig,
+          tipoActa: 'ENTREGA',
+          idUsuarioGenera: req.usuario.id,
+        });
+        r.actaGenerada = actaResult.success;
+        if (actaResult.success) {
+          r.acta = actaResult.acta;
+          r.urlFirma = actaResult.acta.urlFirma;
+          console.log(`[Actas] Acta generada para asignación ${r.idAsig}`);
+        } else {
+          r.warning = `Acta no generada: ${actaResult.error}`;
+          console.error(`[Actas] Error al generar acta para asignación ${r.idAsig}: ${actaResult.error}`);
+        }
+      }
+    }
     res.status(201).json({ success: true, results });
   } catch (e) { next(e); }
 });
@@ -81,8 +101,10 @@ router.post('/con-accesorios', roleMiddleware('ADMIN', 'TECNICO'), async (req, r
     });
 
     if (actaResult.success) {
+      console.log(`[Actas] Acta generada para asignación ${result.idAsig}`);
       res.status(201).json({ success: true, ...result, acta: actaResult.acta });
     } else {
+      console.error(`[Actas] Error al generar acta para asignación ${result.idAsig}: ${actaResult.error}`);
       res.status(201).json({
         success: true,
         ...result,
@@ -105,8 +127,10 @@ router.post('/:id/cesar', roleMiddleware('ADMIN', 'TECNICO'), validate(asignacio
     });
 
     if (actaResult.success) {
+      console.log(`[Actas] Acta generada para cesar asignación ${req.params.id}`);
       res.json({ message: 'Asignación finalizada', acta: actaResult.acta });
     } else {
+      console.error(`[Actas] Error al generar acta para cesar asignación ${req.params.id}: ${actaResult.error}`);
       res.json({
         message: 'Asignación finalizada',
         actaGenerada: false,
