@@ -15,7 +15,7 @@ const trxRows = async (trx, sqlText, params = {}) => {
 };
 
 const trxExec = async (trx, sqlText, params = {}) => {
-  await createRequest(trx, params).query(sqlText);
+  return createRequest(trx, params).query(sqlText);
 };
 
 
@@ -111,39 +111,35 @@ export const AsignacionesService = {
     if (!asig) throw new Error('Asignación no encontrada');
     if (asig.Estado !== 'VIGENTE') throw new Error('La asignación ya fue cesada o no está vigente');
 
-    const motivo = (data?.Motivo || '').trim();
-    const obsTexto = (data?.Obs || '').trim();
-    const obsCombinada = [motivo, obsTexto].filter(Boolean).join(' — ');
-
-    const estadoMap = {
+    const ESTADO_POR_MOTIVO = {
       DEVOLUCION: 'DISPONIBLE',
-      DISPONIBLE: 'DISPONIBLE',
       RENUNCIA: 'DISPONIBLE',
       CAMBIO: 'DISPONIBLE',
       TRASLADO: 'DISPONIBLE',
-      DAÑADO: 'MANTENIMIENTO',
-      DAÑO: 'MANTENIMIENTO',
-      ROTO: 'MANTENIMIENTO',
+      DANADO: 'MANTENIMIENTO',
       MANTENIMIENTO: 'MANTENIMIENTO',
       PERDIDO: 'BAJA',
-      PERDIDA: 'BAJA',
       ROBADO: 'BAJA',
-      ROBO: 'BAJA',
       EXTRAVIADO: 'BAJA',
-      BAJA: 'BAJA',
     };
 
-    const palabra = Object.keys(estadoMap).find(k =>
-      motivo.toUpperCase().includes(k)
-    );
-    const estadoNuevo = estadoMap[palabra] || 'DISPONIBLE';
+    const estadoNuevo = ESTADO_POR_MOTIVO[data.Motivo] || 'DISPONIBLE';
+    const obsTexto = (data?.Obs || '').trim();
+    const obsCombinada = [`Motivo: ${data.Motivo}`, obsTexto].filter(Boolean).join(' — ');
 
     return withTransaction(DB, async (trx) => {
-      await trxExec(trx, `
+      const updResult = await trxExec(trx, `
         UPDATE Tab_EQ_MovEquiposAsignaciones
         SET Estado = 'CESADO', FecCese = GETDATE(), Obs = @obs
-        WHERE IdMovEquipoAsignacion = @id
+        WHERE IdMovEquipoAsignacion = @id AND Estado = 'VIGENTE'
       `, { id, obs: obsCombinada || null });
+
+      if (updResult.rowsAffected?.[0] !== 1) {
+        const err = new Error('La asignación ya fue cesada o no está vigente');
+        err.statusCode = 409;
+        throw err;
+      }
+
       await trxExec(trx, `UPDATE Tab_EQ_MaeEquipos SET Estado = @estado WHERE IdMaeEquipo = @id`, { estado: estadoNuevo, id: asig.IdMaeEquipo });
       await trxExec(trx, `
         INSERT INTO Tab_EQ_MovEstadosEquipos (IdMaeEquipo, EstadoAnterior, EstadoNuevo, IdUsuario, Obs)

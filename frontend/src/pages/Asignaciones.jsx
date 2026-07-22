@@ -16,6 +16,7 @@ import {
 import { Plus, XCircle, Check, Printer } from 'lucide-react';
 import { formatDate } from '../lib/utils';
 import AsignacionDetalleDrawer from '../components/asignaciones/AsignacionDetalleDrawer';
+import CesarAsignacionDialog from '../components/asignaciones/CesarAsignacionDialog';
 
 const TABS = [
   { key: 'VIGENTE', label: 'Vigentes' },
@@ -50,13 +51,6 @@ const columns = [
   },
 ];
 
-const ACC_OPTIONS = [
-  { value: 'DISPONIBLE', label: 'Devolver a disponible' },
-  { value: 'MANTENER', label: 'Mantener asignado al trabajador' },
-  { value: 'BAJA', label: 'Dar de baja' },
-  { value: 'PERDIDO', label: 'Marcar como perdido/dañado' },
-];
-
 export default function Asignaciones() {
   const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
@@ -89,57 +83,8 @@ export default function Asignaciones() {
     enabled: detalleOpen && !!selectedAsignacionId,
   });
 
-  const cesarMutation = useMutation({
-    mutationFn: ({ id, accesorios }) => api.asignaciones.cesar(id, accesorios, {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['asignaciones'] });
-      queryClient.invalidateQueries({ queryKey: ['equipos'] });
-      queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
-      queryClient.invalidateQueries({ queryKey: ['asignacion-detalle'] });
-      setShowCesarDialog(false);
-      setCesarTarget(null);
-      setAccActions([]);
-      Swal.fire({ icon: 'success', title: 'Asignación finalizada', text: 'El equipo fue desasignado correctamente', timer: 2000, showConfirmButton: false });
-    },
-    onError: (err) => {
-      Swal.fire({ icon: 'error', title: 'Error al cesar', text: 'No se pudo cesar la asignación.' });
-      console.error('Error al cesar:', err);
-    },
-  });
-
   const [showCesarDialog, setShowCesarDialog] = useState(false);
   const [cesarTarget, setCesarTarget] = useState(null);
-  const [accActions, setAccActions] = useState([]);
-
-  const { data: cesarAccs } = useQuery({
-    queryKey: ['cesar-accesorios', cesarTarget?.IdMovEquipoAsignacion],
-    queryFn: () => api.asignaciones.linkedAccs(cesarTarget?.IdMovEquipoAsignacion),
-    enabled: !!cesarTarget && showCesarDialog,
-  });
-
-  const confirmCesar = async (row) => {
-    setCesarTarget(row);
-
-    try {
-      const accs = await api.asignaciones.linkedAccs(row.IdMovEquipoAsignacion);
-      if (accs?.length) {
-        setAccActions(accs.map((a) => ({ idMovAccesorio: a.IdMovAccesorio, accion: 'DISPONIBLE' })));
-      } else {
-        setAccActions([]);
-      }
-    } catch {
-      setAccActions([]);
-    }
-
-    setShowCesarDialog(true);
-  };
-
-  const handleCesar = () => {
-    cesarMutation.mutate({
-      id: cesarTarget.IdMovEquipoAsignacion,
-      accesorios: accActions.length ? accActions : undefined,
-    });
-  };
 
   const abrirActa = async (id) => {
     try {
@@ -163,12 +108,13 @@ export default function Asignaciones() {
   };
 
   const handleCesarFromDrawer = (id, equipo, trabajador) => {
-    confirmCesar({
+    setCesarTarget({
       IdMovEquipoAsignacion: id,
       IdMaeEquipo: equipo.IdMaeEquipo,
       CodEquipo: equipo.CodEquipo,
       TrabajadorNombre: trabajador?.NombreTrabajador,
     });
+    setShowCesarDialog(true);
   };
 
   const rows = asignaciones?.rows || [];
@@ -209,7 +155,7 @@ export default function Asignaciones() {
             render: (row) => (
               <div className="flex gap-1">
                 {row.Estado === 'VIGENTE' && (
-                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); confirmCesar(row); }}>
+                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setCesarTarget(row); setShowCesarDialog(true); }}>
                     <XCircle className="w-3 h-3" /> Cesar
                   </Button>
                 )}
@@ -259,56 +205,17 @@ export default function Asignaciones() {
         navigate={navigate}
       />
 
-      <Dialog open={showCesarDialog} onOpenChange={(v) => { setShowCesarDialog(v); if (!v) { setCesarTarget(null); setAccActions([]); } }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Cesar asignación</DialogTitle>
-            <DialogDescription>
-              Finalizar asignación de <strong>{cesarTarget?.CodEquipo}</strong>
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2">
-            <p className="text-sm text-muted-foreground">
-              El equipo volverá a estado <strong>DISPONIBLE</strong>.
-            </p>
-
-            {accActions.length > 0 && (
-              <>
-                <p className="text-sm font-medium pt-2 border-t border-border">Accesorios vinculados a esta entrega:</p>
-                {accActions.map((aa, i) => {
-                  const acc = cesarAccs?.[i];
-                  return (
-                    <div key={aa.idMovAccesorio} className="flex items-center gap-2 text-sm">
-                      <span className="flex-1 text-muted-foreground">{acc?.CodComponente || `ID ${aa.idMovAccesorio}`}</span>
-                      <Select
-                        value={aa.accion}
-                        onValueChange={(v) => setAccActions((prev) => prev.map((a) => a.idMovAccesorio === aa.idMovAccesorio ? { ...a, accion: v } : a))}
-                      >
-                        <SelectTrigger className="w-44">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {ACC_OPTIONS.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  );
-                })}
-              </>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowCesarDialog(false); setCesarTarget(null); setAccActions([]); }}>Cancelar</Button>
-            <Button variant="destructive" onClick={handleCesar} disabled={cesarMutation.isPending}>
-              {cesarMutation.isPending ? 'Cesando...' : 'Cesar'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CesarAsignacionDialog
+        open={showCesarDialog}
+        onOpenChange={(v) => { setShowCesarDialog(v); if (!v) setCesarTarget(null); }}
+        cesarTarget={cesarTarget}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['asignaciones'] });
+          queryClient.invalidateQueries({ queryKey: ['equipos'] });
+          queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
+          queryClient.invalidateQueries({ queryKey: ['asignacion-detalle'] });
+        }}
+      />
     </div>
   );
 }

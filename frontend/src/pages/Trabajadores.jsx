@@ -47,13 +47,13 @@ export default function Trabajadores() {
     queryFn: api.trabajadores.areas,
   });
 
-  const { data, isLoading, isError, error } = useQuery({
+  const { data, isLoading, isFetching, isError, error } = useQuery({
     queryKey: ['trabajadores', search, areaFiltro, page, pageSize],
     queryFn: () => api.trabajadores.search({ search, area: areaFiltro, page, pageSize }),
     placeholderData: (prev) => prev,
   });
 
-  const { data: stats } = useQuery({
+  const statsQuery = useQuery({
     queryKey: ['trabajadores-stats'],
     queryFn: api.trabajadores.stats,
   });
@@ -63,6 +63,10 @@ export default function Trabajadores() {
     queryFn: () => api.asignaciones.activasTrabajador(expandedId),
     enabled: !!expandedId,
   });
+
+  const stats = statsQuery.data;
+  const statsError = statsQuery.isError;
+  const areasError = false;
 
   if (isError) {
     return (
@@ -106,7 +110,20 @@ export default function Trabajadores() {
         </Button>
       </PageHeader>
 
-      {stats ? (
+      {statsError ? (
+        <div className="grid grid-cols-3 gap-3">
+          {statCards.map((c) => (
+            <Card key={c.key} className="border-destructive/30">
+              <CardContent className="p-4 flex items-center justify-center h-24">
+                <div className="flex items-center gap-2 text-sm text-destructive">
+                  <AlertTriangle className="w-4 h-4" />
+                  Error al cargar
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : stats ? (
         <div className="grid grid-cols-3 gap-3">
           {statCards.map(({ key, label, icon: Icon, color }) => (
             <Card key={key} className="border-border">
@@ -154,6 +171,13 @@ export default function Trabajadores() {
           </SelectContent>
         </Select>
       </div>
+
+      {isFetching && !isLoading && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="w-3 h-3 rounded-full border-2 border-muted-foreground border-t-transparent animate-spin" />
+          Actualizando…
+        </div>
+      )}
 
       <DataTable
         columns={[

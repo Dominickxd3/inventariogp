@@ -1,72 +1,451 @@
-# InventarioGP
+# InventarioGP — Sistema de Gestión de Inventario Tecnológico
 
-Sistema de inventario patrimonial para gestión de equipos, componentes, trabajadores, asignaciones e incidencias.
+Sistema web para administrar equipos tecnológicos, componentes, asignaciones a trabajadores, incidencias e intervenciones técnicas del **Grupo Pecuario**. Desarrollado para el área de sistemas/informática.
 
-## Tecnologías
+---
+
+## Stack Tecnológico
 
 | Capa | Tecnología |
-|------|-----------|
-| Frontend | React 19, Vite, Tailwind CSS v4 |
-| Backend | Node.js, Express |
-| Base de datos | SQL Server |
-| Autenticación | JWT (jsonwebtoken) |
-| Validación | Zod |
-| Seguridad | Helmet, CORS, express-rate-limit |
+|---|---|
+| Frontend | React 19, Vite 8, Tailwind CSS 4, shadcn/ui |
+| Backend | Node.js 24, Express 4, mssql 11 |
+| BD | SQL Server (2019+) |
+| Autenticación | JWT (8h expiración) |
+| HTTP Client | @tanstack/react-query 5 |
+| Tablas | @tanstack/react-table 8 |
+| QR | qrcode.react + html5-qrcode |
 
-## Requisitos
+---
 
-- Node.js 22+
-- SQL Server 2019+ (o Azure SQL)
-- npm 10+
+## Arquitectura
 
-## Estructura del proyecto
+```
+┌─────────────┐     HTTP/JSON     ┌──────────────┐     SQL     ┌────────────┐
+│  Frontend   │ ────────────────→ │   Backend    │ ──────────→ │ SQL Server │
+│  (React)    │ ←──────────────── │  (Express)   │ ←────────── │            │
+│  :5173      │   JWT Bearer      │  :3001       │             │ InventarioGP │
+└─────────────┘                   └──────────────┘             └────────────┘
+```
+
+---
+
+## Estructura del Proyecto
 
 ```
 inventariogp/
 ├── backend/
 │   ├── src/
-│   │   ├── config/        # Configuración (DB, JWT, CORS)
-│   │   ├── middleware/     # Auth, validación, rate limiting, errores
-│   │   ├── repositories/  # Capa de datos (SQL directo)
-│   │   ├── routes/        # Definición de rutas Express
-│   │   ├── services/      # Lógica de negocio
-│   │   └── index.js       # Punto de entrada
-│   ├── migrations/        # Scripts SQL de migración
-│   ├── .env.example
-│   └── package.json
+│   │   ├── index.js              # Entry point (Express)
+│   │   ├── config/
+│   │   │   ├── index.js          # Env vars
+│   │   │   └── db.js             # Conexión mssql (pool/query/transaction)
+│   │   ├── middleware/
+│   │   │   ├── auth.js           # JWT + role guard
+│   │   │   ├── validate.js       # Zod validation middleware
+│   │   │   ├── validators.js     # Schemas Zod
+│   │   │   ├── rateLimiter.js    # Login rate limit
+│   │   │   └── errorHandler.js   # Error handling
+│   │   ├── routes/               # Express routers
+│   │   ├── services/             # Business logic
+│   │   └── repositories/         # SQL queries
+│   ├── migrations/               # SQL migration files
+│   └── create_core_tables.sql    # DDL principal
 ├── frontend/
-│   ├── src/
-│   │   ├── components/    # Componentes reutilizables
-│   │   ├── context/       # AuthContext (autenticación)
-│   │   ├── lib/           # Cliente API
-│   │   ├── pages/         # Páginas/vistas
-│   │   └── App.jsx        # Router principal
-│   ├── .env.example
-│   └── package.json
+│   └── src/
+│       ├── main.jsx              # Entry point (React)
+│       ├── App.jsx               # Routes
+│       ├── context/AuthContext.jsx
+│       ├── lib/
+│       │   ├── api.js            # API client (fetch + token)
+│       │   └── utils.js          # formatDate, cn, estadoColor
+│       ├── pages/                # Route-level pages
+│       └── components/           # Shared UI (shadcn + domain)
 └── README.md
 ```
 
-## Instalación
+---
 
-```bash
-# Clonar repositorio
-git clone https://github.com/Dominickxd3/inventariogp.git
-cd inventariogp
+## Base de Datos — InventarioGP
 
-# Instalar dependencias del backend
-cd backend
-npm install
+### Tablas Maestras
 
-# Instalar dependencias del frontend
-cd ../frontend
-npm install
+#### `Tab_EQ_TipodeEquipos`
+Catálogo de tipos de equipo (LAPTOP, MONITOR, CELULAR, IMPRESORA, etc.)
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| IdTipodeEquipo | INT PK | ID auto |
+| CodTipodeEquipo | VARCHAR(10) | Código corto |
+| DesTipodeEquipo | VARCHAR(100) | Nombre del tipo |
+| Estado | VARCHAR(20) | `ACTIVO` / otros |
+| FecCreacion | DATETIME | Default GETDATE() |
+
+#### `Tab_EQ_MaeEquipos`
+Catálogo principal de equipos.
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| IdMaeEquipo | INT PK | ID auto |
+| CodEquipo | VARCHAR(50) | Código interno (ej: LAP-000001) |
+| IdTipodeEquipo | INT FK | → `Tab_EQ_TipodeEquipos` |
+| NombreEquipo | VARCHAR(200) | Nombre opcional |
+| Marca | VARCHAR(100) | |
+| Modelo | VARCHAR(100) | |
+| Serie | VARCHAR(100) | N° de serie del fabricante |
+| SerieFabricante | VARCHAR(100) | Serie alternativa |
+| SinSerieVisible | BIT | Si no tiene serie visible |
+| CodBarra | VARCHAR(100) | Código de barras / QR |
+| Estado | VARCHAR(30) | `DISPONIBLE`, `ASIGNADO`, `MANTENIMIENTO`, `INCIDENCIA`, `BAJA` |
+| Obs | VARCHAR(MAX) | |
+| EsNuevo | BIT | |
+| FecCompra | DATE | |
+| GarantiaMeses | INT | |
+| FecFinGarantia | DATE | |
+| Proveedor | VARCHAR(150) | |
+| DocumentoCompra | VARCHAR(100) | |
+| FecCreacion | DATETIME | |
+| IdUsuarioCrea | INT | |
+| FecModificacion | DATETIME | |
+| IdUsuarioModifica | INT | |
+
+#### `Tab_EQ_TipodeComponentes`
+Catálogo de tipos de componente.
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| IdTipodeComponente | INT PK | |
+| CodTipodeComponente | VARCHAR(10) | |
+| DesTipodeComponente | VARCHAR(100) | Nombre |
+| Categoria | VARCHAR(50) | `REPUESTO_TECNICO`, `ACCESORIO`, `CONSUMIBLE` |
+| Estado | VARCHAR(20) | `ACTIVO` |
+| FecCreacion | DATETIME | |
+
+#### `Tab_EQ_Componentes`
+Inventario de componentes (RAM, SSD, cargadores, etc.).
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| IdComponente | INT PK | |
+| IdTipodeComponente | INT FK | → `Tab_EQ_TipodeComponentes` |
+| CodComponente | VARCHAR(50) | Código interno (ej: RAM-000001) |
+| DesComponente | VARCHAR(200) | Descripción |
+| Marca | VARCHAR(100) | |
+| Modelo | VARCHAR(100) | |
+| Serie | VARCHAR(100) | |
+| Lote | VARCHAR(100) | |
+| Capacidad | VARCHAR(100) | |
+| Obs | VARCHAR(MAX) | |
+| Estado | VARCHAR(20) | `DISPONIBLE`, `ASIGNADO`, `BAJA` |
+| IdUsuarioCrea | INT | |
+| FecCreacion | DATETIME | |
+
+#### `Tab_EQ_Trabajadores`
+Directorio de trabajadores (sincronizado desde RRHH vía `sp_sync_trabajadores_erp`).
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| IdTrabajador | INT PK | |
+| IdTrabajadorERP | INT | ID del sistema RRHH |
+| DOI | VARCHAR(20) | DNI |
+| Trabajador | VARCHAR(200) | Nombre completo |
+| Area | VARCHAR(100) | |
+| Ocupacion | VARCHAR(100) | Cargo |
+| Estado | VARCHAR(20) | `ACTIVO` |
+| Activo | VARCHAR(1) | `1`/`0` |
+
+#### `Tab_SYS_Usuarios`
+Usuarios del sistema (autenticación).
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| IdUsuario | INT PK | |
+| User_Logon | VARCHAR(50) | Usuario de red |
+| User_Fullname | VARCHAR(150) | Nombre completo |
+| User_Email | VARCHAR(100) | |
+| SwAcceso | VARCHAR(20) | |
+| Rol | VARCHAR(20) | `ADMIN`, `TECNICO` |
+| FecUltimoAcceso | DATETIME | |
+| FecCreacion | DATETIME | |
+
+### Tablas de Movimiento
+
+#### `Tab_EQ_MovEquiposAsignaciones`
+Asignaciones de equipos a trabajadores.
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| IdMovEquipoAsignacion | INT PK | |
+| IdMaeEquipo | INT FK | → `Tab_EQ_MaeEquipos` |
+| IdTrabajador | INT FK | → `Tab_EQ_Trabajadores` (referido como `IdReferente`) |
+| FecAsignacion | DATE | Default GETDATE() |
+| FecCese | DATE | Fecha de fin |
+| Estado | VARCHAR(20) | `VIGENTE`, `CESADO` |
+| Obs | VARCHAR(MAX) | Motivo + observaciones combinadas |
+| IdUsuarioCrea | INT | |
+| FecCreacion | DATETIME | |
+
+#### `Tab_EQ_MovEquiposComponentes`
+Vinculación de componentes a equipos (instalación/desinstalación).
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| IdMovComponente | INT PK | |
+| IdMaeEquipo | INT FK | |
+| IdComponente | INT FK | |
+| FecAsigComponente | DATE | |
+| FecBajaComponente | DATE | |
+| Estado | VARCHAR(20) | `VIGENTE`, `BAJA` |
+| OrigenVinculo | VARCHAR(50) | |
+| Motivo | VARCHAR(MAX) | Motivo de baja |
+| FecInstalacion | DATE | |
+| IdIntervencion | INT | → `Tab_EQ_IntervencionesTecnicas` |
+| Obs | VARCHAR(MAX) | |
+| IdUsuarioCrea | INT | |
+
+#### `Tab_EQ_MovAccesoriosTrabajador`
+Accesorios asignados directamente a trabajadores.
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| IdMovAccesorio | INT PK | |
+| IdComponente | INT FK | |
+| IdReferente | INT | → `Tab_EQ_Trabajadores` |
+| FecAsignacion | DATE | |
+| FecCese | DATE | |
+| Estado | VARCHAR(20) | `VIGENTE`, `CESADO` |
+| Obs | VARCHAR(MAX) | |
+| IdUsuarioCrea | INT | |
+| IdMovEquipoAsignacion | INT | Asignación relacionada |
+
+#### `Tab_EQ_MovEstadosEquipos`
+Historial de cambios de estado de equipos.
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| IdMovEstado | INT PK | |
+| IdMaeEquipo | INT FK | |
+| EstadoAnterior | VARCHAR(30) | |
+| EstadoNuevo | VARCHAR(30) | |
+| IdUsuario | INT | |
+| Obs | VARCHAR(MAX) | |
+| FecCambio | DATETIME | |
+
+#### `Tab_EQ_Incidencias`
+Reporte de incidencias sobre equipos.
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| IdIncidencia | INT PK | |
+| IdMaeEquipo | INT FK | |
+| IdReferente | INT | Trabajador que reporta |
+| TipoIncidencia | VARCHAR(50) | |
+| Descripcion | VARCHAR(MAX) | |
+| FecIncidencia | DATE | |
+| FecRegistro | DATETIME | |
+| Estado | VARCHAR(20) | `ABIERTO`, `CERRADO` |
+
+#### `Tab_EQ_IntervencionesTecnicas`
+Intervenciones técnicas realizadas a equipos.
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| IdIntervencion | INT PK | |
+| IdMaeEquipo | INT FK | |
+| IdIncidencia | INT FK | Opcional |
+| IdComponenteInstalado | INT FK | |
+| IdComponenteRetirado | INT FK | |
+| TipoIntervencion | VARCHAR(50) | `MANTENIMIENTO`, `REEMPLAZO`, `REPARACION`, etc. |
+| Descripcion | VARCHAR(MAX) | |
+| IdUsuario | INT FK | |
+| Estado | VARCHAR(20) | `REGISTRADO` |
+| PiezaAfectada | VARCHAR(200) | |
+| ComponenteRetiradoNoInventariado | BIT | |
+| Resultado | VARCHAR(MAX) | |
+| RequiereReparacion | BIT | |
+| SoftwareInstalado | VARCHAR(200) | |
+| Version | VARCHAR(50) | |
+| MotivoBaja | VARCHAR(MAX) | |
+| FecIntervencion | DATETIME | |
+
+#### `Tab_EQ_CaracteristicasEquipo`
+Pares clave-valor para atributos dinámicos por tipo de equipo.
+
+| Columna | Tipo |
+|---|---|
+| IdCaracteristica | INT PK |
+| IdMaeEquipo | INT FK |
+| Clave | VARCHAR(100) |
+| Valor | VARCHAR(500) |
+| IdPlantilla | INT |
+| FecRegistro | DATETIME |
+| IdUsuarioCrea | INT |
+| IdUsuarioModifica | INT |
+| FecModificacion | DATETIME |
+
+#### `Tab_EQ_PlantillaCaracteristicas`
+Plantilla que define qué características aplican a cada tipo de equipo.
+
+| Columna | Tipo |
+|---|---|
+| IdPlantilla | INT PK |
+| IdTipodeEquipo | INT FK |
+| Clave | VARCHAR(100) |
+| Etiqueta | VARCHAR(200) |
+| TipoDato | VARCHAR(50) |
+| Requerido | BIT |
+| Orden | INT |
+| Activo | BIT |
+
+#### `Tab_SYS_LoginAudit`
+Auditoría de intentos de inicio de sesión.
+
+| Columna | Tipo |
+|---|---|
+| IdAudit | INT PK |
+| User_Logon | VARCHAR(50) |
+| FechaIntento | DATETIME |
+| Exitoso | BIT |
+| DireccionIP | VARCHAR(50) |
+| UserAgent | VARCHAR(500) |
+| Mensaje | VARCHAR(MAX) |
+
+---
+
+## API — Endpoints
+
+### Autenticación (`/api/auth`)
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| POST | `/auth/login` | — | Login (rate limit 10/15min) |
+| GET | `/auth/me` | JWT | Usuario actual |
+| GET | `/auth/audit` | ADMIN | Intentos de login |
+
+### Equipos (`/api/equipos`)
+| Método | Ruta | Rol | Descripción |
+|---|---|---|---|
+| GET | `/equipos` | — | Listar (paginado, filtros: estado, tipo, search) |
+| GET | `/equipos/dashboard` | — | Estadísticas (total, por estado, por tipo) |
+| GET | `/equipos/tipos` | — | Tipos de equipo |
+| GET | `/equipos/tipos-asignables` | — | Tipos asignables (excluye accesorios) |
+| GET | `/equipos/scan/:codigo` | — | Buscar por código QR/barras |
+| GET | `/equipos/:id` | — | Detalle (incluye asig actual + componentes) |
+| GET | `/equipos/:id/timeline` | — | Línea de tiempo |
+| POST | `/equipos` | ADMIN/TECNICO | Crear |
+| POST | `/equipos/rapido` | ADMIN/TECNICO | Creación rápida con código auto-generado |
+| PUT | `/equipos/:id` | ADMIN/TECNICO | Actualizar |
+| POST | `/equipos/:id/baja` | ADMIN | Dar de baja |
+| POST | `/equipos/:id/qr` | — | Generar QR |
+| POST | `/equipos/tipos` | ADMIN | Crear tipo |
+| GET/PUT | `/equipos/:id/caracteristicas` | —/ADMIN+TECNICO | Características |
+| GET/POST/DELETE | `/equipos/:id/componentes` | —/ADMIN+TECNICO | Componentes del equipo |
+| POST | `/equipos/:id/estado` | ADMIN | Cambiar estado manual |
+| GET | `/equipos/:id/historial-estados` | — | Historial de estados |
+| GET | `/equipos/:id/incidencias` | — | Incidencias del equipo |
+| GET/POST | `/equipos/:id/intervenciones` | —/ADMIN+TECNICO | Intervenciones |
+
+### Trabajadores (`/api/trabajadores`)
+| Método | Ruta | Rol | Descripción |
+|---|---|---|---|
+| GET | `/trabajadores` | — | Listar/buscar (paginado, filtros: search, area) |
+| GET | `/trabajadores/stats` | — | Total / con equipos / sin equipos |
+| GET | `/trabajadores/areas` | — | Áreas disponibles |
+| GET | `/trabajadores/:id` | — | Detalle |
+| GET | `/trabajadores/dni/:dni` | — | Buscar por DNI |
+| POST | `/trabajadores/sync` | ADMIN | Sincronizar desde RRHH |
+
+### Asignaciones (`/api/asignaciones`)
+| Método | Ruta | Rol | Descripción |
+|---|---|---|---|
+| GET | `/asignaciones` | — | Listar (paginado, filtros: estado, equipo, trabajador, fechas) |
+| GET | `/asignaciones/:id` | — | Detalle |
+| GET | `/asignaciones/:id/detalle` | — | Detalle completo con timeline |
+| POST | `/asignaciones` | ADMIN/TECNICO | Asignar un equipo |
+| POST | `/asignaciones/bulk` | ADMIN/TECNICO | Asignar múltiples equipos a un trabajador |
+| POST | `/asignaciones/con-accesorios` | ADMIN/TECNICO | Asignar equipo + accesorios |
+| POST | `/asignaciones/:id/cesar` | ADMIN/TECNICO | Cesar asignación (requiere `Motivo` vía enum) |
+| GET | `/asignaciones/:id/accesorios` | — | Accesorios vinculados |
+| GET | `/asignaciones/:id/acta` | — | Acta de entrega (HTML) |
+| POST | `/asignaciones/cesar-trabajador/:id` | ADMIN | Cesar todas las activas de un trabajador |
+| GET | `/asignaciones/equipo/:id` | — | Historial por equipo |
+| GET | `/asignaciones/trabajador/:id` | — | Historial por trabajador |
+| GET | `/asignaciones/trabajador/:id/activas` | — | Asignaciones vigentes del trabajador |
+
+### Incidencias (`/api/incidencias`)
+| Método | Ruta | Rol | Descripción |
+|---|---|---|---|
+| GET | `/incidencias` | — | Listar (filtros: estado, tipo, search) |
+| GET | `/incidencias/:id` | — | Detalle |
+| POST | `/incidencias` | ADMIN/TECNICO | Crear (cambia equipo a INCIDENCIA) |
+| POST | `/incidencias/:id/cerrar` | ADMIN/TECNICO | Cerrar (restaura estado del equipo) |
+
+### Componentes (`/api/componentes`)
+| Método | Ruta | Rol | Descripción |
+|---|---|---|---|
+| GET | `/componentes` | — | Listar (filtros: estado, tipo, categoría, search) |
+| GET | `/componentes/tipos` | — | Tipos de componente |
+| GET | `/componentes/accesorios-disponibles` | — | Accesorios disponibles |
+| GET | `/componentes/accesorios-por-trabajador/:id` | — | Accesorios de un trabajador |
+| GET | `/componentes/:id` | — | Detalle |
+| GET | `/componentes/:id/detalle` | — | Detalle con timeline |
+| POST | `/componentes` | ADMIN/TECNICO | Crear |
+| POST | `/componentes/rapido` | ADMIN/TECNICO | Creación rápida |
+| PUT | `/componentes/:id` | ADMIN/TECNICO | Actualizar |
+| POST | `/componentes/:id/baja` | ADMIN/TECNICO | Dar de baja |
+| POST | `/componentes/tipos` | ADMIN | Crear tipo |
+
+---
+
+## Frontend — Páginas y Rutas
+
+| Ruta | Página | Descripción |
+|---|---|---|
+| `/login` | Login | Formulario de autenticación |
+| `/` | Dashboard | Stats, gráficos por tipo/estado, accesos rápidos |
+| `/equipos` | Equipos | CRUD de equipos, filtros, QR, registros rápido |
+| `/equipos/:id` | EquipoDetalle | Detalle con tabs (info, características, componentes, intervenciones, timeline, incidencias) |
+| `/equipos/scan/:codigo` | EquipoScan | Resultado de escaneo QR |
+| `/trabajadores` | Trabajadores | Directorio, búsqueda, filtro por área, sync RRHH |
+| `/trabajadores/:id` | TrabajadorDetalle | Info personal, asignaciones activas, histórico |
+| `/asignaciones` | Asignaciones | Gestión con wizard creación + detalle drawer + acta PDF |
+| `/incidencias` | Incidencias | Registro y cierre de incidencias |
+| `/componentes` | Componentes | Inventario con detalle drawer y timeline |
+| `/scan` | Scan | Escáner QR por cámara |
+
+---
+
+## Reglas de Negocio
+
+### Estados de equipo
+```
+DISPONIBLE → ASIGNADO (al asignar a trabajador)
+DISPONIBLE → INCIDENCIA (al reportar incidencia)
+ASIGNADO   → DISPONIBLE (cese por devolución/renuncia/cambio/traslado)
+ASIGNADO   → MANTENIMIENTO (cese por dañado)
+ASIGNADO   → BAJA (cese por perdido/robado/extraviado)
+ASIGNADO   → INCIDENCIA (incidencia mientras asignado)
+CUALQUIERA → BAJA (baja manual por admin)
 ```
 
-## Configuración
+### Ciclo de asignación
+1. **Crear**: equipo `DISPONIBLE` → `ASIGNADO`, se crea registro en `Tab_EQ_MovEquiposAsignaciones` con estado `VIGENTE`
+2. **Cesar**: se actualiza asignación a `CESADO` con `FecCese`, el equipo cambia según motivo:
+   - `DEVOLUCION`, `RENUNCIA`, `CAMBIO`, `TRASLADO` → `DISPONIBLE`
+   - `DANADO`, `MANTENIMIENTO` → `MANTENIMIENTO`
+   - `PERDIDO`, `ROBADO`, `EXTRAVIADO` → `BAJA`
 
-### Backend
+### Validaciones críticas
+- No asignar un equipo no disponible (verifica `Estado = 'DISPONIBLE'` y sin incidencias abiertas)
+- No cesar una asignación ya cesada (UPDATE condicional `WHERE Estado = 'VIGENTE'`)
+- Doble clic en cese: la transacción verifica `rowsAffected === 1`
+- Motivo de cese es obligatorio y debe ser uno del enum
+- Las intervenciones pueden instalar/retirar componentes del equipo
+- Al crear incidencia, el equipo pasa a estado `INCIDENCIA` (si estaba `ASIGNADO` o `DISPONIBLE`)
+- Al cerrar incidencia, restaura al estado anterior
 
-Copia `backend/.env.example` como `backend/.env` y completa los valores:
+---
+
+## Variables de Entorno (backend/.env)
 
 ```env
 PORT=3001
@@ -74,167 +453,64 @@ NODE_ENV=development
 
 DB_SERVER=127.0.0.1
 DB_USER=sa
-DB_PASSWORD=tu_contraseña_segura
+DB_PASSWORD=tu_password
 DB_INVENTARIO=InventarioGP
+DB_SIGA=SIGA_ASISTENCIA
+DB_GP2024=dbGP_2024_GP
 
-JWT_SECRET=genera_un_secreto_aleatorio_de_32_caracteres
+JWT_SECRET=tu_secret_jwt
 JWT_EXPIRES_IN=8h
 
 CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 ```
 
-### Frontend
+---
 
-Copia `frontend/.env.example` como `frontend/.env` (opcional, solo necesario si el backend está en otro dominio):
+## Instalación y Ejecución
 
-```env
-VITE_API_URL=
-```
-
-## Base de datos
-
-### Configurar SQL Server
-
-1. Asegúrate de que SQL Server esté corriendo y accesible.
-2. Crea la base de datos `InventarioGP` (o el nombre que configures en `.env`).
-
-### Ejecutar migraciones
-
-Las migraciones están en `backend/migrations/`. Ejecútalas en orden numérico:
-
-```bash
-# Conecta a SQL Server y ejecuta:
-# 1. backend/migrations/001_caracteristicas_equipo.sql
-# 2. backend/migrations/002_serie_garantia_equipos.sql
-```
-
-## Ejecución en desarrollo
+### Requisitos
+- Node.js 24+
+- SQL Server 2019+
+- npm
 
 ### Backend
-
 ```bash
 cd backend
-npm run dev
+npm install
+# Crear backend/.env con las variables de entorno
+# Ejecutar migraciones SQL en orden:
+#   1. create_core_tables.sql
+#   2. migrations/001_caracteristicas_equipo.sql
+#   3. migrations/002_serie_garantia_equipos.sql
+#   4. migrations/003_idplantilla_caracteristicas.sql
+npm run dev   # Desarrollo (puerto 3001)
 ```
 
 ### Frontend
-
 ```bash
 cd frontend
-npm run dev
+npm install
+npm run dev   # Desarrollo (puerto 5173)
 ```
 
-El frontend se abrirá en `http://localhost:5173` (el proxy de Vite redirige `/api` al backend en `http://localhost:3001`).
-
-## Build de producción
-
+### Build producción
 ```bash
 cd frontend
-npm run build
-# El resultado está en frontend/dist/
+npm run build   # Genera dist/
 ```
 
-Sirve `frontend/dist/` con un servidor web (Nginx, IIS, etc.) y configura un reverse proxy para `/api` hacia el backend.
+---
 
-## Despliegue
+## Convenciones de Código
 
-### Windows (IIS + PM2 o IISNode)
+- **Backend**: ES modules (`"type": "module"`), arquitectura 3 capas (routes → services → repositories)
+- **Frontend**: Functional components + hooks, React Query para datos del servidor
+- **BD**: Tablas con prefijo `Tab_EQ_`, PKs con nombre `Id[NombreTabla]`
+- **Autenticación**: Token JWT en header `Authorization: Bearer <token>`
+- **Roles**: `ADMIN` (todo), `TECNICO` (operaciones, sin sync ni cambios masivos)
 
-1. Construye el frontend: `cd frontend && npm run build`
-2. Copia `frontend/dist/` a `C:\inetpub\wwwroot\inventario`
-3. Configura IIS URL Rewrite para redirigir `/api/*` al backend
-4. Para el backend, usa PM2: `pm2 start backend/src/index.js --name inventario-api`
+---
 
-### Linux (Nginx + PM2)
+## Componentes UI (shadcn + tailwind)
 
-```bash
-# Construir frontend
-cd frontend && npm run build
-
-# Configurar Nginx
-sudo nano /etc/nginx/sites-available/inventario
-
-# Servir frontend y redirigir /api al backend
-server {
-    listen 80;
-    server_name inventario.tudominio.com;
-
-    root /var/www/inventario/dist;
-    index index.html;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /api {
-        proxy_pass http://127.0.0.1:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-
-# Iniciar backend con PM2
-cd backend
-pm2 start src/index.js --name inventario-api
-pm2 save
-pm2 startup
-```
-
-## Seguridad
-
-### Antes de producción
-
-- [ ] **Rotar credenciales**: Cambiar la contraseña `sa` de SQL Server y el `JWT_SECRET`.
-- [ ] **Configurar `.env`**: No usar valores por defecto.
-- [ ] **CORS**: Limitar `CORS_ORIGINS` a los dominios específicos.
-- [ ] **HTTPS**: Configurar SSL/TLS en el reverse proxy.
-- [ ] **Rate limiting**: Ajustar los límites en `backend/src/middleware/rateLimiter.js`.
-- [ ] **JWT**: Ajustar `JWT_EXPIRES_IN` según la política de la empresa (ej: `2h`).
-- [ ] **Auditar logs**: No almacenar tokens ni contraseñas en logs.
-
-### Medidas implementadas
-
-- ✅ Helmet (cabeceras HTTP seguras)
-- ✅ CORS restringido por entorno
-- ✅ Rate limiting en login
-- ✅ JWT con expiración configurable
-- ✅ Errores SQL no exponen detalles internos
-- ✅ Contraseñas no viajan en texto plano (SQL Server)
-- ✅ Zod para validación de entrada
-- ✅ Autenticación en todas las rutas sensibles
-- ✅ Control de roles (ADMIN, TECNICO)
-
-## Roles de usuario
-
-| Rol | Acceso |
-|-----|--------|
-| ADMIN | CRUD completo, gestión de usuarios, sincronización, reportes |
-| TECNICO | CRUD de equipos, componentes, asignaciones, incidencias |
-| VISUALIZADOR | Solo lectura (si se implementa) |
-
-## API - Endpoints principales
-
-| Método | Ruta | Auth | Rol | Descripción |
-|--------|------|------|-----|-------------|
-| POST | `/api/auth/login` | No | - | Inicio de sesión |
-| GET | `/api/auth/me` | Sí | - | Datos del usuario actual |
-| GET | `/api/equipos` | Sí | - | Listar equipos |
-| POST | `/api/equipos` | Sí | ADMIN/TECNICO | Crear equipo |
-| POST | `/api/equipos/:id/baja` | Sí | ADMIN | Dar de baja |
-| GET | `/api/componentes` | Sí | - | Listar componentes |
-| GET | `/api/trabajadores` | Sí | - | Listar trabajadores |
-| GET | `/api/asignaciones` | Sí | - | Listar asignaciones |
-| POST | `/api/incidencias` | Sí | ADMIN/TECNICO | Registrar incidencia |
-
-## Troubleshooting
-
-| Problema | Solución |
-|----------|----------|
-| `EADDRINUSE` en backend | El puerto 3001 está ocupado. Cambia `PORT` en `.env` o detén el proceso existente. |
-| Error de conexión SQL Server | Verifica que SQL Server esté corriendo, que TCP/IP esté habilitado y que las credenciales en `.env` sean correctas. |
-| `Invalid column name` | Ejecuta las migraciones pendientes. La estructura de la BD no coincide con el código. |
-| Token inválido | El token expiró o el `JWT_SECRET` cambió. Vuelve a iniciar sesión. |
-| Pantalla en blanco en frontend | Abre la consola del navegador (F12) y verifica errores de red o de JavaScript. |
+El frontend usa Tailwind CSS 4 con componentes shadcn/ui (`#components/ui/*.jsx`). Los componentes compartidos de dominio están en `src/components/`. Las páginas están en `src/pages/` y cada una se mapea a una ruta en `App.jsx`.

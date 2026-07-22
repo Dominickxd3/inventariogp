@@ -17,6 +17,7 @@ import {
 import { useState, useMemo } from 'react';
 import ComponentSearchSelect from '../components/ComponentSearchSelect';
 import IncidenciaSelect from '../components/IncidenciaSelect';
+import CesarAsignacionDialog from '../components/asignaciones/CesarAsignacionDialog';
 import {
   ArrowLeft, QrCode, Eye, Pencil, Save, X, Plus, Trash2, Monitor, Search, Cpu, Wrench, Hammer, AlertTriangle, Clock,
   Download, Copy, Check,
@@ -48,8 +49,7 @@ export default function EquipoDetalle() {
   };
   const [intervForm, setIntervForm] = useState({ ...initialIntervForm });
   const [cesarOpen, setCesarOpen] = useState(false);
-  const [cesarMotivo, setCesarMotivo] = useState('');
-  const [cesarObs, setCesarObs] = useState('');
+  const [cesarTarget, setCesarTarget] = useState(null);
   const [incidenciaOpen, setIncidenciaOpen] = useState(false);
   const [incidenciaForm, setIncidenciaForm] = useState({ TipoIncidencia: 'DAÑO', Descripcion: '', Prioridad: '', Obs: '' });
 
@@ -154,22 +154,6 @@ export default function EquipoDetalle() {
       refetchComp();
       queryClient.invalidateQueries({ queryKey: ['equipo', id] });
       Swal.fire({ icon: 'success', title: 'Componente quitado', timer: 1500, showConfirmButton: false });
-    },
-    onError: (err) => Swal.fire({ icon: 'error', title: 'Error', text: err.message }),
-  });
-
-  const cesarMutation = useMutation({
-    mutationFn: ({ idAsig, Motivo, Obs }) => api.asignaciones.cesar(idAsig, [], { Motivo, Obs }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipo', id] });
-      queryClient.invalidateQueries({ queryKey: ['historial-equipo', id] });
-      queryClient.invalidateQueries({ queryKey: ['timeline-equipo', id] });
-      queryClient.invalidateQueries({ queryKey: ['equipos'] });
-      queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
-      setCesarOpen(false);
-      setCesarMotivo('');
-      setCesarObs('');
-      Swal.fire({ icon: 'success', title: 'Asignación finalizada', timer: 1500, showConfirmButton: false });
     },
     onError: (err) => Swal.fire({ icon: 'error', title: 'Error', text: err.message }),
   });
@@ -680,7 +664,17 @@ export default function EquipoDetalle() {
             <div className="flex items-center justify-between">
               <CardTitle>Asignación Actual</CardTitle>
               {!esBaja && (
-                <Button variant="outline" size="sm" onClick={() => setCesarOpen(true)}>
+                <Button variant="outline" size="sm" onClick={() => {
+                  const asig = equipo?.asignacion;
+                  if (asig?.IdMovEquipoAsignacion) {
+                    setCesarTarget({
+                      IdMovEquipoAsignacion: asig.IdMovEquipoAsignacion,
+                      CodEquipo: equipo.CodEquipo,
+                      TrabajadorNombre: asig.TrabajadorNombre,
+                    });
+                    setCesarOpen(true);
+                  }
+                }}>
                   <X className="w-3.5 h-3.5" /> Cesar asignación
                 </Button>
               )}
@@ -1150,66 +1144,18 @@ export default function EquipoDetalle() {
         </DialogContent>
       </Dialog>
 
-      {/* Cesar asignación confirmación */}
-      <Dialog open={cesarOpen} onOpenChange={(v) => { setCesarOpen(v); if (!v) { setCesarMotivo(''); setCesarObs(''); } }}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Finalizar asignación</DialogTitle>
-            <DialogDescription>
-              ¿Estás seguro de cesar la asignación de <strong>{equipo.asignacion?.TrabajadorNombre || 'este trabajador'}</strong>?
-              <span className="block mt-2 text-sm text-muted-foreground">
-                El equipo pasará a estado DISPONIBLE y se registrará en el historial.
-              </span>
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Motivo <span className="text-destructive">*</span></label>
-              <textarea
-                value={cesarMotivo}
-                onChange={(e) => setCesarMotivo(e.target.value)}
-                className="w-full min-h-[60px] rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground"
-                placeholder="Ej: Renuncia, cambio de área, equipo reemplazado..."
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Observación <span className="text-muted-foreground text-xs">(opcional)</span></label>
-              <textarea
-                value={cesarObs}
-                onChange={(e) => setCesarObs(e.target.value)}
-                className="w-full min-h-[60px] rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground"
-                placeholder="Detalles adicionales..."
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setCesarOpen(false); setCesarMotivo(''); setCesarObs(''); }}>
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                if (!cesarMotivo.trim()) {
-                  Swal.fire({ icon: 'warning', title: 'Motivo requerido', text: 'Ingresa el motivo del cese' });
-                  return;
-                }
-                if (!equipo?.asignacion?.IdMovEquipoAsignacion) {
-                  Swal.fire({ icon: 'error', title: 'Error', text: 'No hay asignación vigente para cesar' });
-                  return;
-                }
-                cesarMutation.mutate({
-                  idAsig: equipo.asignacion.IdMovEquipoAsignacion,
-                  Motivo: cesarMotivo.trim(),
-                  Obs: cesarObs.trim(),
-                });
-              }}
-              disabled={cesarMutation.isPending}
-            >
-              {cesarMutation.isPending ? 'Finalizando...' : 'Finalizar asignación'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CesarAsignacionDialog
+        open={cesarOpen}
+        onOpenChange={(v) => { setCesarOpen(v); if (!v) setCesarTarget(null); }}
+        cesarTarget={cesarTarget}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['equipo', id] });
+          queryClient.invalidateQueries({ queryKey: ['historial-equipo', id] });
+          queryClient.invalidateQueries({ queryKey: ['timeline-equipo', id] });
+          queryClient.invalidateQueries({ queryKey: ['equipos'] });
+          queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
+        }}
+      />
 
       {/* Nueva incidencia */}
       <Dialog open={incidenciaOpen} onOpenChange={(v) => { setIncidenciaOpen(v); if (!v) setIncidenciaForm({ TipoIncidencia: 'DAÑO', Descripcion: '', Prioridad: '', Obs: '' }); }}>

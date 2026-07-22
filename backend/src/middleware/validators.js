@@ -73,10 +73,17 @@ export const asignacionCreateSchema = z.object({
 });
 
 export const asignacionCesarSchema = z.object({
-  FechaCese: z.string().optional(),
-  Obs: z.string().optional(),
-  Motivo: z.string().optional(),
-}).passthrough();
+  Motivo: z.enum([
+    'DEVOLUCION', 'RENUNCIA', 'CAMBIO', 'TRASLADO',
+    'DANADO', 'MANTENIMIENTO',
+    'PERDIDO', 'ROBADO', 'EXTRAVIADO',
+  ]),
+  Obs: z.string().trim().max(500).optional(),
+  accesorios: z.array(z.object({
+    idMovAccesorio: z.number().int().positive(),
+    accion: z.enum(['DISPONIBLE', 'MANTENER', 'BAJA', 'PERDIDO']),
+  })).optional(),
+});
 
 export const incidenciaCreateSchema = z.object({
   IdMaeEquipo: z.number().int().positive('Equipo requerido'),

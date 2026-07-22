@@ -27,9 +27,11 @@ export class ErrorBoundary extends Component {
           <p className="text-muted-foreground mb-6 max-w-md">
             Ocurrió un error inesperado. Podés recargar la página para intentar de nuevo.
           </p>
-          <div className="text-xs text-muted-foreground mb-6 max-w-md truncate font-mono bg-muted p-2 rounded">
-            {this.state.error?.message}
-          </div>
+          {import.meta.env.DEV && this.state.error?.message && (
+            <div className="text-xs text-muted-foreground mb-6 max-w-md truncate font-mono bg-muted p-2 rounded">
+              {this.state.error.message}
+            </div>
+          )}
           <div className="flex gap-3">
             <button
               onClick={() => window.location.reload()}

@@ -201,7 +201,7 @@ export default function DataTable({
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
-            <span>{serverTotal > 0 ? `1–${Math.min(currentPageSize, serverTotal)} de ${serverTotal} registros` : '0 registros'}</span>
+            <span>{(() => { const start = serverTotal === 0 ? 0 : (serverPage - 1) * currentPageSize + 1; const end = Math.min(serverPage * currentPageSize, serverTotal); return `${start}–${end} de ${serverTotal} registros`; })()}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">
