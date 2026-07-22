@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
 import SignaturePad from '../components/actas/SignaturePad'
 
@@ -11,29 +10,32 @@ const ESTADOS = {
   error: 'error',
 }
 
+function obtenerTokenInicial() {
+  const hash = window.location.hash
+  if (hash) {
+    const token = new URLSearchParams(hash.slice(1)).get('token')
+    if (token) return token
+  }
+  const params = new URLSearchParams(window.location.search)
+  return params.get('token') || ''
+}
+
 export default function FirmarActa() {
-  const [searchParams] = useSearchParams()
-  const [token, setToken] = useState('')
-  const [estado, setEstado] = useState(ESTADOS.loading)
+  const [token] = useState(obtenerTokenInicial)
+  const [estado, setEstado] = useState(token ? ESTADOS.validar : ESTADOS.error)
   const [actaData, setActaData] = useState(null)
   const [ultimosCuatroDni, setUltimosCuatroDni] = useState('')
   const [acepta, setAcepta] = useState(false)
   const [firmaBase64, setFirmaBase64] = useState('')
-  const [errorMsg, setErrorMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState(token ? '' : 'Enlace inválido: no se encontró el token de firma.')
   const [submitting, setSubmitting] = useState(false)
   const [resultado, setResultado] = useState(null)
 
   useEffect(() => {
-    const hashToken = window.location.hash.replace(/^#token=/, '')
-    if (hashToken) {
-      setToken(hashToken)
+    if (token) {
       window.history.replaceState(null, '', window.location.pathname)
-      setEstado(ESTADOS.validar)
-    } else {
-      setErrorMsg('Enlace inválido: no se encontró el token de firma.')
-      setEstado(ESTADOS.error)
     }
-  }, [])
+  }, [token])
 
   async function handleValidar(e) {
     e.preventDefault()
