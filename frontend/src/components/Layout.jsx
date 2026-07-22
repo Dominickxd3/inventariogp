@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Laptop, Users, ClipboardList,
   AlertTriangle, Package, ScanLine, Menu, X, QrCode, LogOut, User,
-  ChevronDown,
+  ChevronDown, FileText,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '#lib/utils.js';
@@ -23,6 +23,7 @@ const navSections = [
       { to: '/asignaciones', icon: ClipboardList, label: 'Asignaciones' },
       { to: '/componentes', icon: Package, label: 'Componentes' },
       { to: '/incidencias', icon: AlertTriangle, label: 'Incidencias' },
+      { to: '/actas', icon: FileText, label: 'Actas' },
     ],
   },
   {

@@ -111,4 +111,16 @@ export const AsignacionesRepository = {
       ORDER BY t.DesTipodeEquipo, e.CodEquipo
     `, { id: idTrabajador });
   },
+
+  async getAccsByAsignacion(id) {
+    return query(DB, `
+      SELECT m.*, c.CodComponente, c.DesComponente, c.Marca, c.Modelo,
+             tc.DesTipodeComponente
+      FROM Tab_EQ_MovAccesoriosTrabajador m
+      JOIN Tab_EQ_Componentes c ON m.IdComponente = c.IdComponente
+      LEFT JOIN Tab_EQ_TipodeComponentes tc ON c.IdTipodeComponente = tc.IdTipodeComponente
+      WHERE m.IdMovEquipoAsignacion = @id
+      ORDER BY m.FecAsignacion DESC
+    `, { id });
+  },
 };

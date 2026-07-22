@@ -12,6 +12,8 @@ import Incidencias from './pages/Incidencias'
 import Componentes from './pages/Componentes'
 import EquipoScan from './pages/EquipoScan'
 import Scan from './pages/Scan'
+import FirmarActa from './pages/FirmarActa'
+import ActasList from './pages/ActasList'
 
 function ProtectedRoute({ children }) {
   const { usuario, loading } = useAuth()
@@ -27,6 +29,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/firmar-acta" element={<FirmarActa />} />
       <Route path="/*" element={
         <ProtectedRoute>
           <Layout>
@@ -41,6 +44,7 @@ export default function App() {
               <Route path="/componentes" element={<Componentes />} />
               <Route path="/equipos/scan/:codigo" element={<EquipoScan />} />
               <Route path="/scan" element={<Scan />} />
+              <Route path="/actas" element={<ActasList />} />
             </Routes>
           </Layout>
         </ProtectedRoute>

@@ -9,6 +9,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@pdf-lib/fontkit": "^1.1.1",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -18,6 +19,7 @@
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.10.0",
     "mssql": "^11.0.1",
+    "pdf-lib": "^1.17.1",
     "qrcode": "^1.5.4",
     "uuid": "^10.0.0",
     "zod": "^3.23.8"

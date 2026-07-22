@@ -50,7 +50,28 @@ export const api = {
       list: (id) => request(`/equipos/${id}/intervenciones`),
       create: (id, data) => request(`/equipos/${id}/intervenciones`, { method: 'POST', body: JSON.stringify(data) }),
     },
-    incidencias: {
+  actas: {
+    list: (params) => request(`/actas?${new URLSearchParams(params)}`),
+    get: (id) => request(`/actas/${id}`),
+    getPdf: (id) => request(`/actas/${id}/pdf`),
+    regenerarEnlace: (id) => request(`/actas/${id}/regenerar-enlace`, { method: 'POST' }),
+    anular: (id, motivo) => request(`/actas/${id}/anular`, { method: 'POST', body: JSON.stringify({ motivo }) }),
+    asignacionEstado: (idAsig) => request(`/asignaciones/${idAsig}/acta/estado`),
+    reintentar: (idAsig) => request(`/asignaciones/${idAsig}/acta/reintentar`, { method: 'POST' }),
+  },
+  public: {
+    validarActa: (token, ultimosCuatroDni) =>
+      request('/public/actas/validar', {
+        method: 'POST',
+        body: JSON.stringify({ token, ultimosCuatroDni }),
+      }),
+    firmarActa: (token, ultimosCuatroDni, aceptaCondiciones, firmaBase64) =>
+      request('/public/actas/firmar', {
+        method: 'POST',
+        body: JSON.stringify({ token, ultimosCuatroDni, aceptaCondiciones, firmaBase64 }),
+      }),
+  },
+  incidencias: {
       list: (id) => request(`/equipos/${id}/incidencias`),
     },
     caracteristicas: {
