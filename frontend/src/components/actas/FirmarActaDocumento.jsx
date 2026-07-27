@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
 import SignatureCanvas from 'react-signature-canvas'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
@@ -32,7 +32,9 @@ export default function FirmarActaDocumento({
 }) {
   const firmaRef = useRef(null)
   const contenedorRef = useRef(null)
+  const zonaFirmaRef = useRef(null)
   const [anchoPagina, setAnchoPagina] = useState(760)
+  const [dimFirma, setDimFirma] = useState({ w: 0, h: 0 })
 
   const posicion =
     tipoActa === 'DEVOLUCION'
@@ -49,6 +51,31 @@ export default function FirmarActaDocumento({
     window.addEventListener('resize', ajustarAncho)
     return () => window.removeEventListener('resize', ajustarAncho)
   }, [])
+
+  useEffect(() => {
+    const node = zonaFirmaRef.current
+    if (!node) return
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect
+      if (width > 0 && height > 0) {
+        setDimFirma({ w: Math.round(width), h: Math.round(height) })
+      }
+    })
+    ro.observe(node)
+    return () => ro.disconnect()
+  }, [])
+
+  useEffect(() => {
+    if (!firmaRef.current || dimFirma.w === 0) return
+    const canvas = firmaRef.current.getCanvas()
+    const dpr = window.devicePixelRatio || 1
+    canvas.width = dimFirma.w * dpr
+    canvas.height = dimFirma.h * dpr
+    canvas.style.width = `${dimFirma.w}px`
+    canvas.style.height = `${dimFirma.h}px`
+    const ctx = canvas.getContext('2d')
+    ctx.scale(dpr, dpr)
+  }, [dimFirma])
 
   function limpiarFirma() {
     firmaRef.current?.clear()
@@ -94,7 +121,8 @@ export default function FirmarActaDocumento({
           </Document>
 
           <div
-            className="absolute border border-dashed border-transparent"
+            ref={zonaFirmaRef}
+            className="absolute"
             style={{
               left: `${posicion.left}%`,
               top: `${posicion.top}%`,
@@ -107,6 +135,7 @@ export default function FirmarActaDocumento({
               penColor="black"
               minWidth={0.7}
               maxWidth={2}
+              clearOnResize={false}
               canvasProps={{
                 className:
                   'h-full w-full touch-none bg-transparent cursor-crosshair',

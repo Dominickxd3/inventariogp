@@ -24,6 +24,30 @@ function formatearFecha(fecha) {
   }).format(new Date(fecha));
 }
 
+function calcularTamano(texto, font, campo) {
+  let size = campo.size;
+  const minSize = campo.minSize ?? 6;
+  if (!campo.maxWidth) return size;
+  while (size > minSize && font.widthOfTextAtSize(texto, size) > campo.maxWidth) {
+    size -= 0.5;
+  }
+  return size;
+}
+
+function escribirInteligente(page, font, texto, campo) {
+  if (!texto || !campo) return;
+  const valor = String(texto);
+  const size = calcularTamano(valor, font, campo);
+  page.drawText(valor, {
+    x: campo.x,
+    y: campo.y,
+    size,
+    font,
+    color: rgb(0, 0, 0),
+    maxWidth: campo.maxWidth ?? 400,
+  });
+}
+
 function dibujarAccesorios(page, font, accesorios = [], layout) {
   for (let i = 0; i < accesorios.length; i++) {
     const a = accesorios[i];
@@ -31,7 +55,14 @@ function dibujarAccesorios(page, font, accesorios = [], layout) {
     const texto = `${a.codigo || ''}  ${descripcion}`;
     const y = layout.y - i * layout.lineHeight;
     if (y < layout.minY) break;
-    page.drawText(texto, { x: layout.x, y, size: layout.size, font, maxWidth: layout.maxWidth });
+    const size = calcularTamano(texto, font, layout);
+    page.drawText(texto, {
+      x: layout.x,
+      y,
+      size,
+      font,
+      maxWidth: layout.maxWidth,
+    });
   }
 }
 
@@ -44,36 +75,25 @@ export async function generarActaPdf(snapshot) {
   const font = await cargarFuente(pdfDoc);
   const layout = getLayout(snapshot.tipoActa, snapshot.plantilla);
 
-  const escribir = (valor, campo) => {
-    if (!valor || !campo) return;
-    page.drawText(String(valor), {
-      x: campo.x,
-      y: campo.y,
-      size: campo.size,
-      font,
-      color: rgb(0, 0, 0),
-      maxWidth: campo.maxWidth ?? 400,
-    });
-  };
+  const e = (v, c) => escribirInteligente(page, font, v, c);
 
-  escribir(snapshot.trabajador.nombre, layout.asignado);
-  escribir(snapshot.equipo.marca, layout.marca);
-  escribir(snapshot.equipo.modelo, layout.modelo);
-  escribir(snapshot.equipo.color, layout.color);
-  escribir(snapshot.equipo.ram, layout.ram);
-  escribir(snapshot.equipo.capacidad, layout.capacidad);
-  escribir(snapshot.equipo.serie, layout.serie);
+  e(snapshot.trabajador.nombre, layout.asignado);
+  e(snapshot.equipo.marca, layout.marca);
+  e(snapshot.equipo.modelo, layout.modelo);
+  e(snapshot.equipo.color, layout.color);
+  e(snapshot.equipo.ram, layout.ram);
+  e(snapshot.equipo.capacidad, layout.capacidad);
+  e(snapshot.equipo.serie, layout.serie);
 
-  escribir(snapshot.trabajador.nombre, layout.nombreFirmante);
+  e(formatearFecha(snapshot.fechaDocumento), layout.fecha);
 
-  escribir(snapshot.trabajador.dni, layout.dniFirmante);
-
-  escribir(formatearFecha(snapshot.fechaDocumento), layout.fecha);
+  e(snapshot.trabajador.nombre, layout.nombreFirmante);
+  e(snapshot.trabajador.dni, layout.dniFirmante);
 
   dibujarAccesorios(page, font, snapshot.accesorios, layout.accesorios);
 
   if (snapshot.tipoActa === 'DEVOLUCION') {
-    escribir(snapshot.trabajador.nombre, layout.recibiDe);
+    e(snapshot.trabajador.nombre, layout.recibiDe);
   }
 
   return pdfDoc.save();
