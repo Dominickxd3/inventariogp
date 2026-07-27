@@ -11,16 +11,16 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 
 const POSICIONES_FIRMA = {
   ENTREGA: {
-    left: 8,
-    top: 76,
-    width: 42,
-    height: 9,
+    left: 12.6,
+    top: 19.6,
+    width: 30.3,
+    height: 5.9,
   },
   DEVOLUCION_COLABORADOR: {
-    left: 56,
-    top: 67,
-    width: 37,
-    height: 8,
+    left: 50.4,
+    top: 29.7,
+    width: 30.3,
+    height: 5.9,
   },
 }
 

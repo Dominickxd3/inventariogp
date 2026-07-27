@@ -7,6 +7,7 @@ import { TrabajadoresRepository } from '../repositories/trabajadores.repository.
 import { generarToken, hashSHA256, hashFile } from '../utils/crypto.js';
 import { generarActaPdf, incrustarFirma } from '../utils/actas-pdf.js';
 import { actasConfig } from '../config/actas.js';
+import { getLayout } from '../config/actas-layouts.js';
 
 function escapeJsonValue(v) {
   if (v === null || v === undefined) return null;
@@ -176,18 +177,35 @@ export const ActasService = {
         asignacion, trabajador, equipo, caracteristicas, accesorios, tipoActa,
       });
 
+      const datosActa = {
+        tipoActa,
+        fecha: new Date(),
+        trabajador: {
+          nombre: trabajador.Trabajador,
+          dni: trabajador.DOI,
+        },
+        equipo: {
+          marca: snapshot.equipo.marca,
+          modelo: snapshot.equipo.modelo,
+          color: snapshot.equipo.color,
+          ram: snapshot.equipo.ram,
+          capacidad: snapshot.equipo.capacidad,
+          serie: snapshot.equipo.serie,
+        },
+        accesorios: snapshot.accesorios,
+      };
+
       const codigoActa = generarCodigoActa(tipoActa, idMovEquipoAsignacion);
       const token = generarToken();
       const tokenHash = hashSHA256(token);
       const fechaExpiracion = generarFechaExpiracion();
 
       if (process.env.NODE_ENV === 'development') {
-        console.log('[Actas] snapshot.equipo:', JSON.stringify(snapshot.equipo, null, 2));
-        console.log('[Actas] snapshot.trabajador:', JSON.stringify(snapshot.trabajador, null, 2));
-        console.log('[Actas] snapshot.accesorios:', JSON.stringify(snapshot.accesorios, null, 2));
+        console.log('[Actas] datosActa.equipo:', JSON.stringify(datosActa.equipo, null, 2));
+        console.log('[Actas] datosActa.trabajador:', JSON.stringify(datosActa.trabajador, null, 2));
       }
 
-      const pdfBytes = await generarActaPdf(snapshot);
+      const pdfBytes = await generarActaPdf(datosActa);
       const fileName = `${codigoActa}.pdf`;
       const pdfRuta = buildFilePath(tipoActa, '', fileName);
       fs.writeFileSync(pdfRuta, pdfBytes);
@@ -415,7 +433,8 @@ export const ActasService = {
 
     const pdfOriginalBytes = fs.readFileSync(acta.PdfOriginalRuta);
 
-    const pdfFirmadoBytes = await incrustarFirma(pdfOriginalBytes, firmaBase64, acta.TipoActa);
+    const layout = getLayout(acta.TipoActa, snapshot.plantilla);
+    const pdfFirmadoBytes = await incrustarFirma(pdfOriginalBytes, firmaBase64, layout);
 
     const now = new Date();
     const fechaFirma = now.toISOString();

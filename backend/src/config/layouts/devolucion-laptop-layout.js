@@ -1,26 +1,17 @@
 const DEVOLUCION_LAPTOP_V1 = {
-  recibiDe: { x: 124, y: 538, size: 10, minSize: 7, maxWidth: 160 },
-
-  asignado: { x: 150, y: 504, size: 10, minSize: 7, maxWidth: 330 },
-  marca: { x: 150, y: 486, size: 10, minSize: 7, maxWidth: 330 },
-  modelo: { x: 150, y: 468, size: 10, minSize: 7, maxWidth: 330 },
-  color: { x: 150, y: 450, size: 10, minSize: 7, maxWidth: 330 },
-  ram: { x: 150, y: 433, size: 10, minSize: 7, maxWidth: 330 },
-  capacidad: { x: 150, y: 415, size: 10, minSize: 7, maxWidth: 330 },
-  serie: { x: 150, y: 397, size: 10, minSize: 7, maxWidth: 330 },
-
-  accesorios: {
-    x: 72,
-    y: 365,
-    size: 9,
-    lineHeight: 12,
-    maxWidth: 405,
-    minY: 280,
-  },
-
-  fecha: { x: 145, y: 365, size: 10, minSize: 8, maxWidth: 250 },
-  nombreFirmante: { x: 405, y: 261, size: 10, minSize: 7, maxWidth: 170 },
-  dniFirmante: { x: 405, y: 249, size: 10, minSize: 8, maxWidth: 120 },
+  recibiDe: { x: 120, y: 650, size: 9, maxWidth: 250 },
+  asignado: { x: 180, y: 520, size: 9 },
+  marca: { x: 180, y: 502, size: 9 },
+  modelo: { x: 180, y: 484, size: 9 },
+  color: { x: 180, y: 466, size: 9 },
+  ram: { x: 180, y: 448, size: 9 },
+  capacidad: { x: 180, y: 430, size: 9 },
+  serie: { x: 180, y: 412, size: 9 },
+  accesorios: { x: 75, y: 345, size: 9, lineHeight: 12, maxWidth: 350, minY: 300 },
+  fecha: { x: 230, y: 350, size: 9 },
+  nombreFirma: { x: 380, y: 220, size: 9, maxWidth: 180 },
+  dniFirma: { x: 380, y: 203, size: 9, maxWidth: 120 },
+  firmaColaborador: { x: 300, y: 250, width: 180, height: 50 },
 };
 
 export default DEVOLUCION_LAPTOP_V1;

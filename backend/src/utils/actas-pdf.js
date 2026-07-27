@@ -24,24 +24,12 @@ function formatearFecha(fecha) {
   }).format(new Date(fecha));
 }
 
-function calcularTamano(texto, font, campo) {
-  let size = campo.size;
-  const minSize = campo.minSize ?? 6;
-  if (!campo.maxWidth) return size;
-  while (size > minSize && font.widthOfTextAtSize(texto, size) > campo.maxWidth) {
-    size -= 0.5;
-  }
-  return size;
-}
-
-function escribirInteligente(page, font, texto, campo) {
+function escribir(page, font, texto, campo) {
   if (!texto || !campo) return;
-  const valor = String(texto);
-  const size = calcularTamano(valor, font, campo);
-  page.drawText(valor, {
+  page.drawText(String(texto), {
     x: campo.x,
     y: campo.y,
-    size,
+    size: campo.size,
     font,
     color: rgb(0, 0, 0),
     maxWidth: campo.maxWidth ?? 400,
@@ -55,51 +43,44 @@ function dibujarAccesorios(page, font, accesorios = [], layout) {
     const texto = `${a.codigo || ''}  ${descripcion}`;
     const y = layout.y - i * layout.lineHeight;
     if (y < layout.minY) break;
-    const size = calcularTamano(texto, font, layout);
-    page.drawText(texto, {
-      x: layout.x,
-      y,
-      size,
-      font,
-      maxWidth: layout.maxWidth,
-    });
+    page.drawText(texto, { x: layout.x, y, size: layout.size, font, maxWidth: layout.maxWidth });
   }
 }
 
-export async function generarActaPdf(snapshot) {
-  const rutaPlantilla = obtenerPlantilla(snapshot.tipoActa);
+export async function generarActaPdf(datosActa) {
+  const rutaPlantilla = obtenerPlantilla(datosActa.tipoActa);
   const plantillaBytes = await fs.readFile(rutaPlantilla);
 
   const pdfDoc = await PDFDocument.load(plantillaBytes);
   const page = pdfDoc.getPage(0);
   const font = await cargarFuente(pdfDoc);
-  const layout = getLayout(snapshot.tipoActa, snapshot.plantilla);
+  const layout = getLayout(datosActa.tipoActa);
 
-  const e = (v, c) => escribirInteligente(page, font, v, c);
+  const e = (v, c) => escribir(page, font, v, c);
 
-  e(snapshot.trabajador.nombre, layout.asignado);
-  e(snapshot.equipo.marca, layout.marca);
-  e(snapshot.equipo.modelo, layout.modelo);
-  e(snapshot.equipo.color, layout.color);
-  e(snapshot.equipo.ram, layout.ram);
-  e(snapshot.equipo.capacidad, layout.capacidad);
-  e(snapshot.equipo.serie, layout.serie);
+  e(datosActa.trabajador.nombre, layout.asignado);
+  e(datosActa.equipo.marca, layout.marca);
+  e(datosActa.equipo.modelo, layout.modelo);
+  e(datosActa.equipo.color, layout.color);
+  e(datosActa.equipo.ram, layout.ram);
+  e(datosActa.equipo.capacidad, layout.capacidad);
+  e(datosActa.equipo.serie, layout.serie);
 
-  e(formatearFecha(snapshot.fechaDocumento), layout.fecha);
+  e(formatearFecha(datosActa.fecha), layout.fecha);
 
-  e(snapshot.trabajador.nombre, layout.nombreFirmante);
-  e(snapshot.trabajador.dni, layout.dniFirmante);
+  e(datosActa.trabajador.nombre, layout.nombreFirma);
+  e(datosActa.trabajador.dni, layout.dniFirma);
 
-  dibujarAccesorios(page, font, snapshot.accesorios, layout.accesorios);
+  dibujarAccesorios(page, font, datosActa.accesorios, layout.accesorios);
 
-  if (snapshot.tipoActa === 'DEVOLUCION') {
-    e(snapshot.trabajador.nombre, layout.recibiDe);
+  if (datosActa.tipoActa === 'DEVOLUCION') {
+    e(datosActa.trabajador.nombre, layout.recibiDe);
   }
 
   return pdfDoc.save();
 }
 
-export async function incrustarFirma(pdfOriginalBytes, firmaBase64, tipoActa) {
+export async function incrustarFirma(pdfOriginalBytes, firmaBase64, layout) {
   const pdfDoc = await PDFDocument.load(pdfOriginalBytes);
   const page = pdfDoc.getPage(0);
 
@@ -111,12 +92,8 @@ export async function incrustarFirma(pdfOriginalBytes, firmaBase64, tipoActa) {
     throw Object.assign(new Error('La firma no es una imagen PNG válida'), { statusCode: 422 });
   }
 
-  const posicion =
-    tipoActa === 'DEVOLUCION'
-      ? { x: 334, y: 264, width: 175, height: 52 }
-      : { x: 70, y: 150, width: 175, height: 55 };
-
-  page.drawImage(firmaImage, posicion);
+  const fc = layout.firma || layout.firmaColaborador;
+  page.drawImage(firmaImage, { x: fc.x, y: fc.y, width: fc.width, height: fc.height });
 
   return pdfDoc.save();
 }
