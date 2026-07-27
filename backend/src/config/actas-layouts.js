@@ -1,16 +1,16 @@
 export const LAYOUTS = {
   ENTREGA_LAPTOP_V1: {
-    asignado: { x: 142, y: 583, size: 10, maxWidth: 330 },
-    marca: { x: 142, y: 565, size: 10, maxWidth: 330 },
-    modelo: { x: 142, y: 547, size: 10, maxWidth: 330 },
-    color: { x: 142, y: 529, size: 10, maxWidth: 330 },
-    ram: { x: 142, y: 512, size: 10, maxWidth: 330 },
-    capacidad: { x: 142, y: 494, size: 10, maxWidth: 330 },
-    serie: { x: 142, y: 476, size: 10, maxWidth: 330 },
+    asignado: { x: 150, y: 510, size: 10, maxWidth: 330 },
+    marca: { x: 150, y: 492, size: 10, maxWidth: 330 },
+    modelo: { x: 150, y: 474, size: 10, maxWidth: 330 },
+    color: { x: 150, y: 456, size: 10, maxWidth: 330 },
+    ram: { x: 150, y: 438, size: 10, maxWidth: 330 },
+    capacidad: { x: 150, y: 420, size: 10, maxWidth: 330 },
+    serie: { x: 150, y: 402, size: 10, maxWidth: 330 },
 
     accesorios: {
       x: 72,
-      y: 444,
+      y: 370,
       size: 9,
       lineHeight: 12,
       maxWidth: 405,
@@ -23,19 +23,19 @@ export const LAYOUTS = {
   },
 
   DEVOLUCION_LAPTOP_V1: {
-    recibiDe: { x: 124, y: 611, size: 10, maxWidth: 160 },
+    recibiDe: { x: 124, y: 538, size: 10, maxWidth: 160 },
 
-    asignado: { x: 155, y: 577, size: 10, maxWidth: 330 },
-    marca: { x: 155, y: 559, size: 10, maxWidth: 330 },
-    modelo: { x: 155, y: 541, size: 10, maxWidth: 330 },
-    color: { x: 155, y: 523, size: 10, maxWidth: 330 },
-    ram: { x: 155, y: 506, size: 10, maxWidth: 330 },
-    capacidad: { x: 155, y: 488, size: 10, maxWidth: 330 },
-    serie: { x: 155, y: 470, size: 10, maxWidth: 330 },
+    asignado: { x: 150, y: 504, size: 10, maxWidth: 330 },
+    marca: { x: 150, y: 486, size: 10, maxWidth: 330 },
+    modelo: { x: 150, y: 468, size: 10, maxWidth: 330 },
+    color: { x: 150, y: 450, size: 10, maxWidth: 330 },
+    ram: { x: 150, y: 433, size: 10, maxWidth: 330 },
+    capacidad: { x: 150, y: 415, size: 10, maxWidth: 330 },
+    serie: { x: 150, y: 397, size: 10, maxWidth: 330 },
 
     accesorios: {
       x: 72,
-      y: 438,
+      y: 365,
       size: 9,
       lineHeight: 12,
       maxWidth: 405,
