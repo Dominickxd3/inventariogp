@@ -1,12 +1,12 @@
 export const LAYOUTS = {
   ENTREGA_LAPTOP_V1: {
-    asignado: { x: 155, y: 583, size: 10, maxWidth: 330 },
-    marca: { x: 155, y: 565, size: 10, maxWidth: 330 },
-    modelo: { x: 155, y: 547, size: 10, maxWidth: 330 },
-    color: { x: 155, y: 529, size: 10, maxWidth: 330 },
-    ram: { x: 155, y: 512, size: 10, maxWidth: 330 },
-    capacidad: { x: 155, y: 494, size: 10, maxWidth: 330 },
-    serie: { x: 155, y: 476, size: 10, maxWidth: 330 },
+    asignado: { x: 142, y: 583, size: 10, maxWidth: 330 },
+    marca: { x: 142, y: 565, size: 10, maxWidth: 330 },
+    modelo: { x: 142, y: 547, size: 10, maxWidth: 330 },
+    color: { x: 142, y: 529, size: 10, maxWidth: 330 },
+    ram: { x: 142, y: 512, size: 10, maxWidth: 330 },
+    capacidad: { x: 142, y: 494, size: 10, maxWidth: 330 },
+    serie: { x: 142, y: 476, size: 10, maxWidth: 330 },
 
     accesorios: {
       x: 72,
@@ -17,16 +17,9 @@ export const LAYOUTS = {
       minY: 280,
     },
 
-    fecha: { x: 208, y: 233, size: 10 },
-    nombreFirmante: { x: 145, y: 162, size: 10 },
-    dniFirmante: { x: 159, y: 145, size: 10 },
-
-    firmaColaborador: {
-      x: 75,
-      y: 175,
-      width: 165,
-      height: 55,
-    },
+    fecha: { x: 145, y: 233, size: 10, maxWidth: 250 },
+    nombreFirmante: { x: 120, y: 162, size: 10, maxWidth: 200 },
+    dniFirmante: { x: 120, y: 145, size: 10, maxWidth: 120 },
   },
 
   DEVOLUCION_LAPTOP_V1: {
@@ -49,16 +42,9 @@ export const LAYOUTS = {
       minY: 280,
     },
 
-    fecha: { x: 208, y: 365, size: 10 },
-    nombreFirmante: { x: 375, y: 261, size: 10 },
-    dniFirmante: { x: 375, y: 249, size: 10 },
-
-    firmaColaborador: {
-      x: 325,
-      y: 276,
-      width: 150,
-      height: 50,
-    },
+    fecha: { x: 145, y: 365, size: 10, maxWidth: 250 },
+    nombreFirmante: { x: 405, y: 261, size: 10, maxWidth: 170 },
+    dniFirmante: { x: 405, y: 249, size: 10, maxWidth: 120 },
   },
 };
 

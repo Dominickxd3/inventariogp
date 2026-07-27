@@ -181,6 +181,12 @@ export const ActasService = {
       const tokenHash = hashSHA256(token);
       const fechaExpiracion = generarFechaExpiracion();
 
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Actas] snapshot.equipo:', JSON.stringify(snapshot.equipo, null, 2));
+        console.log('[Actas] snapshot.trabajador:', JSON.stringify(snapshot.trabajador, null, 2));
+        console.log('[Actas] snapshot.accesorios:', JSON.stringify(snapshot.accesorios, null, 2));
+      }
+
       const pdfBytes = await generarActaPdf(snapshot);
       const fileName = `${codigoActa}.pdf`;
       const pdfRuta = buildFilePath(tipoActa, '', fileName);

@@ -66,8 +66,7 @@ export async function generarActaPdf(snapshot) {
 
   escribir(snapshot.trabajador.nombre, layout.nombreFirmante);
 
-  const dniTexto = `DNI: ${snapshot.trabajador.dni || ''}`;
-  escribir(dniTexto, layout.dniFirmante);
+  escribir(snapshot.trabajador.dni, layout.dniFirmante);
 
   escribir(formatearFecha(snapshot.fechaDocumento), layout.fecha);
 
