@@ -17,6 +17,21 @@ router.post('/validar', loginLimiter, validate(actaValidarSchema), async (req, r
   }
 });
 
+router.post('/preview', async (req, res, next) => {
+  try {
+    const { token, ultimosCuatroDni } = req.body;
+    if (!token || !ultimosCuatroDni) {
+      return res.status(400).json({ error: 'Faltan campos requeridos' });
+    }
+    const ruta = await ActasService.obtenerPreview(token, ultimosCuatroDni);
+    res.sendFile(ruta);
+  } catch (e) {
+    const status = e.statusCode || 500;
+    if (status === 500) return next(e);
+    res.status(status).json({ error: e.message });
+  }
+});
+
 router.post('/firmar', loginLimiter, validate(actaFirmarSchema), async (req, res, next) => {
   try {
     const result = await ActasService.firmar(req.body.token, req.body.ultimosCuatroDni, req.body.firmaBase64);

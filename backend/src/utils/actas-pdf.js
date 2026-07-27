@@ -1,92 +1,88 @@
 import { PDFDocument, rgb } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
-import fs from 'fs';
-import { getLayout } from '../config/actas-layouts.js';
+import fs from 'node:fs/promises';
 import { actasConfig } from '../config/actas.js';
+import { getLayout } from '../config/actas-layouts.js';
 
-async function loadFont(pdfDoc) {
-  const fontPath = actasConfig.fontPath;
-  if (!fs.existsSync(fontPath)) {
-    throw new Error(`Fuente no encontrada en: ${fontPath}. Configura ACTAS_FONT_PATH`);
-  }
+async function cargarFuente(pdfDoc) {
   pdfDoc.registerFontkit(fontkit);
-  const fontBytes = fs.readFileSync(fontPath);
-  return pdfDoc.embedFont(fontBytes, { subset: true });
+  const bytes = await fs.readFile(actasConfig.fontPath);
+  return pdfDoc.embedFont(bytes, { subset: true });
 }
 
-function getTemplatePath(tipoActa) {
-  return tipoActa === 'ENTREGA' ? actasConfig.templateEntrega : actasConfig.templateDevolucion;
+function obtenerPlantilla(tipoActa) {
+  return tipoActa === 'ENTREGA'
+    ? actasConfig.templateEntrega
+    : actasConfig.templateDevolucion;
+}
+
+function formatearFecha(fecha) {
+  return new Intl.DateTimeFormat('es-PE', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(fecha));
+}
+
+function dibujarAccesorios(page, font, accesorios = [], layout) {
+  for (let i = 0; i < accesorios.length; i++) {
+    const a = accesorios[i];
+    const descripcion = [a.descripcion, a.marca, a.modelo].filter(Boolean).join(' ');
+    const texto = `${a.codigo || ''}  ${descripcion}`;
+    const y = layout.y - i * layout.lineHeight;
+    if (y < layout.minY) break;
+    page.drawText(texto, { x: layout.x, y, size: layout.size, font, maxWidth: layout.maxWidth });
+  }
 }
 
 export async function generarActaPdf(snapshot) {
-  const templatePath = getTemplatePath(snapshot.tipoActa);
-  if (!fs.existsSync(templatePath)) {
-    throw new Error(`Plantilla no encontrada: ${templatePath}`);
-  }
+  const rutaPlantilla = obtenerPlantilla(snapshot.tipoActa);
+  const plantillaBytes = await fs.readFile(rutaPlantilla);
 
-  const templateBytes = fs.readFileSync(templatePath);
-  const pdfDoc = await PDFDocument.load(templateBytes);
-  pdfDoc.registerFontkit(fontkit);
-  const font = await loadFont(pdfDoc);
-  const page = pdfDoc.getPages()[0];
-
-  const draw = (text, x, y, size = 11, color = rgb(0, 0, 0)) => {
-    page.drawText(String(text || ''), { x, y, size, font, color });
-  };
-
+  const pdfDoc = await PDFDocument.load(plantillaBytes);
+  const page = pdfDoc.getPage(0);
+  const font = await cargarFuente(pdfDoc);
   const layout = getLayout(snapshot.tipoActa, snapshot.plantilla);
 
-  const nombre = snapshot.trabajador.nombre || '';
-  const dni = snapshot.trabajador.dni || '';
+  const escribir = (valor, campo) => {
+    if (!valor || !campo) return;
+    page.drawText(String(valor), {
+      x: campo.x,
+      y: campo.y,
+      size: campo.size,
+      font,
+      color: rgb(0, 0, 0),
+      maxWidth: campo.maxWidth ?? 400,
+    });
+  };
 
-  draw(nombre, layout.trabajador.x, layout.trabajador.y, layout.trabajador.size);
-  draw(dni, layout.dni.x, layout.dni.y, layout.dni.size);
+  escribir(snapshot.trabajador.nombre, layout.asignado);
+  escribir(snapshot.equipo.marca, layout.marca);
+  escribir(snapshot.equipo.modelo, layout.modelo);
+  escribir(snapshot.equipo.color, layout.color);
+  escribir(snapshot.equipo.ram, layout.ram);
+  escribir(snapshot.equipo.capacidad, layout.capacidad);
+  escribir(snapshot.equipo.serie, layout.serie);
 
-  const labels = ['Tipo', 'Marca', 'Modelo', 'Color', 'Memoria RAM', 'Almacenamiento', 'N° de Serie', 'Código'];
-  const values = [
-    snapshot.equipo.tipoEquipo || '—',
-    snapshot.equipo.marca || '—',
-    snapshot.equipo.modelo || '—',
-    snapshot.equipo.color || '—',
-    snapshot.equipo.ram || '—',
-    snapshot.equipo.capacidad || '—',
-    snapshot.equipo.serie || '—',
-    snapshot.equipo.codigo || '—',
-  ];
+  escribir(snapshot.trabajador.nombre, layout.nombreFirmante);
 
-  const col2 = 220 + 68;
-  let rowY = layout.tabla.row1Y;
-  for (let i = 0; i < labels.length; i++) {
-    draw(values[i], col2, rowY, 9, rgb(0.1, 0.1, 0.1));
-    rowY -= layout.tabla.rowHeight;
+  const dniTexto = `DNI: ${snapshot.trabajador.dni || ''}`;
+  escribir(dniTexto, layout.dniFirmante);
+
+  escribir(formatearFecha(snapshot.fechaDocumento), layout.fecha);
+
+  dibujarAccesorios(page, font, snapshot.accesorios, layout.accesorios);
+
+  if (snapshot.tipoActa === 'DEVOLUCION') {
+    escribir(snapshot.trabajador.nombre, layout.recibiDe);
   }
 
-  if (snapshot.accesorios?.length) {
-    let accY = layout.accesorios.startY;
-    for (const acc of snapshot.accesorios) {
-      if (accY < layout.accesorios.minY) break;
-      draw(`${acc.codigo || ''}  ${acc.descripcion || ''}`, layout.accesorios.x, accY, 9, rgb(0.2, 0.2, 0.2));
-      accY -= layout.accesorios.lineHeight;
-    }
-  }
-
-  const fechaStr = new Date(snapshot.fechaDocumento).toLocaleDateString('es-PE', {
-    year: 'numeric', month: 'long', day: 'numeric',
-  });
-  draw(`Fecha: ${fechaStr}`, layout.fecha.x, layout.fecha.y, 9, rgb(0.3, 0.3, 0.3));
-
-  draw(nombre, layout.nombreFirma.x, layout.nombreFirma.y, layout.nombreFirma.size);
-  draw(`DNI: ${dni}`, layout.dniFirma.x, layout.dniFirma.y, layout.dniFirma.size);
-
-  const pdfBytes = await pdfDoc.save();
-  return pdfBytes;
+  return pdfDoc.save();
 }
 
-export async function incrustarFirma(pdfOriginalBytes, firmaBase64, layout) {
+export async function incrustarFirma(pdfOriginalBytes, firmaBase64, tipoActa) {
   const pdfDoc = await PDFDocument.load(pdfOriginalBytes);
-  pdfDoc.registerFontkit(fontkit);
-  const font = await loadFont(pdfDoc);
-  const page = pdfDoc.getPages()[0];
+  const page = pdfDoc.getPage(0);
 
   const firmaBuffer = Buffer.from(firmaBase64.replace(/^data:image\/png;base64,/, ''), 'base64');
   let firmaImage;
@@ -96,13 +92,12 @@ export async function incrustarFirma(pdfOriginalBytes, firmaBase64, layout) {
     throw Object.assign(new Error('La firma no es una imagen PNG válida'), { statusCode: 422 });
   }
 
-  page.drawImage(firmaImage, {
-    x: layout.firmaLinea.x,
-    y: layout.firmaLinea.yLine - 60,
-    width: 180,
-    height: 60,
-  });
+  const posicion =
+    tipoActa === 'DEVOLUCION'
+      ? { x: 334, y: 264, width: 175, height: 52 }
+      : { x: 70, y: 150, width: 175, height: 55 };
 
-  const pdfBytes = await pdfDoc.save();
-  return pdfBytes;
+  page.drawImage(firmaImage, posicion);
+
+  return pdfDoc.save();
 }

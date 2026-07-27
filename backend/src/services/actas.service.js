@@ -7,7 +7,6 @@ import { TrabajadoresRepository } from '../repositories/trabajadores.repository.
 import { generarToken, hashSHA256, hashFile } from '../utils/crypto.js';
 import { generarActaPdf, incrustarFirma } from '../utils/actas-pdf.js';
 import { actasConfig } from '../config/actas.js';
-import { getLayout } from '../config/actas-layouts.js';
 
 function escapeJsonValue(v) {
   if (v === null || v === undefined) return null;
@@ -409,9 +408,8 @@ export const ActasService = {
     }
 
     const pdfOriginalBytes = fs.readFileSync(acta.PdfOriginalRuta);
-    const layout = getLayout(acta.TipoActa, snapshot.plantilla);
 
-    const pdfFirmadoBytes = await incrustarFirma(pdfOriginalBytes, firmaBase64, layout);
+    const pdfFirmadoBytes = await incrustarFirma(pdfOriginalBytes, firmaBase64, acta.TipoActa);
 
     const now = new Date();
     const fechaFirma = now.toISOString();
@@ -448,5 +446,36 @@ export const ActasService = {
         fechaFirma,
       },
     };
+  },
+
+  async obtenerPreview(token, ultimosCuatroDni) {
+    const tokenHash = hashSHA256(token);
+    const acta = await ActasRepository.getByTokenHash(tokenHash);
+    if (!acta) {
+      throw Object.assign(new Error('Enlace inválido'), { statusCode: 404 });
+    }
+
+    if (acta.EstadoActa !== 'PENDIENTE_FIRMA') {
+      throw Object.assign(new Error('El documento no está pendiente de firma'), { statusCode: 422 });
+    }
+
+    let snapshot;
+    try {
+      snapshot = JSON.parse(acta.SnapshotJson);
+    } catch {
+      throw Object.assign(new Error('Error al leer los datos del acta'), { statusCode: 500 });
+    }
+
+    const dniCompleto = snapshot.trabajador?.dni || '';
+    const ultimosCuatro = dniCompleto.slice(-4);
+    if (ultimosCuatro !== ultimosCuatroDni) {
+      throw Object.assign(new Error('Los últimos 4 dígitos del DNI no coinciden'), { statusCode: 422 });
+    }
+
+    if (!acta.PdfOriginalRuta || !fs.existsSync(acta.PdfOriginalRuta)) {
+      throw Object.assign(new Error('No se encontró el archivo PDF'), { statusCode: 404 });
+    }
+
+    return acta.PdfOriginalRuta;
   },
 };

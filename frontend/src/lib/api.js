@@ -54,6 +54,27 @@ export async function requestBlob(path, options = {}) {
   return res.blob();
 }
 
+export async function publicRequestBlob(path, options = {}) {
+  const res = await fetch(`${BASE}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+  if (!res.ok) {
+    let message = 'No se pudo obtener el documento';
+    try {
+      const data = await res.json();
+      message = data.error || data.message || message;
+    } catch {}
+    throw new Error(message);
+  }
+
+  return res.blob();
+}
+
 export const api = {
   auth: {
     login: (usuario, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ usuario, password }) }),
@@ -111,6 +132,11 @@ export const api = {
       request('/public/actas/firmar', {
         method: 'POST',
         body: JSON.stringify({ token, ultimosCuatroDni, aceptaCondiciones, firmaBase64 }),
+      }),
+    previewActa: (token, ultimosCuatroDni) =>
+      publicRequestBlob('/public/actas/preview', {
+        method: 'POST',
+        body: JSON.stringify({ token, ultimosCuatroDni }),
       }),
   },
   trabajadores: {
