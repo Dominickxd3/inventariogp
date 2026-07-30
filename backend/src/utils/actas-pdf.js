@@ -67,18 +67,31 @@ export async function generarActaPdf(datosActa) {
   e(datosActa.equipo.serie, layout.serie);
 
   e(formatearFecha(datosActa.fecha), layout.fecha);
-
-  e(datosActa.trabajador.nombre, layout.nombreFirma);
-  e(datosActa.trabajador.dni, layout.dniFirma);
-
   dibujarAccesorios(page, font, datosActa.accesorios, layout.accesorios);
 
-  if (datosActa.tipoActa === 'DEVOLUCION') {
-    e(datosActa.trabajador.nombre, layout.recibiDe);
-  }
+ if (datosActa.tipoActa === 'ENTREGA') {
 
-  return pdfDoc.save();
+  e(
+    datosActa.trabajador.nombre,
+    layout.nombreFirmante
+  );
+
+  e(
+    datosActa.trabajador.dni,
+    layout.dniFirmante
+  );
+
 }
+
+
+if (datosActa.tipoActa === 'DEVOLUCION') {
+
+  e(
+    datosActa.trabajador.nombre,
+    layout.recibiDe
+  );
+}
+
 
 export async function incrustarFirma(pdfOriginalBytes, firmaBase64, layout) {
   const pdfDoc = await PDFDocument.load(pdfOriginalBytes);
@@ -92,8 +105,8 @@ export async function incrustarFirma(pdfOriginalBytes, firmaBase64, layout) {
     throw Object.assign(new Error('La firma no es una imagen PNG válida'), { statusCode: 422 });
   }
 
-  const fc = layout.firma || layout.firmaColaborador;
-  page.drawImage(firmaImage, { x: fc.x, y: fc.y, width: fc.width, height: fc.height });
+  page.drawImage(firmaImage, { x: layout.firma.x, y: layout.firma.y, width: layout.firma.width, height: layout.firma.height });
 
   return pdfDoc.save();
+  }
 }
