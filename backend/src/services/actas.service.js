@@ -7,7 +7,6 @@ import { TrabajadoresRepository } from '../repositories/trabajadores.repository.
 import { generarToken, hashSHA256, hashFile } from '../utils/crypto.js';
 import { generarActaPdf, incrustarFirma } from '../utils/actas-pdf.js';
 import { actasConfig } from '../config/actas.js';
-import { getLayout } from '../config/actas-layouts.js';
 
 function escapeJsonValue(v) {
   if (v === null || v === undefined) return null;
@@ -433,8 +432,7 @@ export const ActasService = {
 
     const pdfOriginalBytes = fs.readFileSync(acta.PdfOriginalRuta);
 
-    const layout = getLayout(acta.TipoActa, snapshot.plantilla);
-    const pdfFirmadoBytes = await incrustarFirma(pdfOriginalBytes, firmaBase64, layout);
+    const pdfFirmadoBytes = await incrustarFirma(pdfOriginalBytes, firmaBase64);
 
     const now = new Date();
     const fechaFirma = now.toISOString();
