@@ -69,29 +69,15 @@ export async function generarActaPdf(datosActa) {
   e(formatearFecha(datosActa.fecha), layout.fecha);
   dibujarAccesorios(page, font, datosActa.accesorios, layout.accesorios);
 
- if (datosActa.tipoActa === 'ENTREGA') {
+  e(datosActa.trabajador.nombre, layout.nombreFirmante);
+  e(datosActa.trabajador.dni, layout.dniFirmante);
 
-  e(
-    datosActa.trabajador.nombre,
-    layout.nombreFirmante
-  );
+  if (datosActa.tipoActa === 'DEVOLUCION') {
+    e(datosActa.trabajador.nombre, layout.recibiDe);
+  }
 
-  e(
-    datosActa.trabajador.dni,
-    layout.dniFirmante
-  );
-
+  return pdfDoc.save();
 }
-
-
-if (datosActa.tipoActa === 'DEVOLUCION') {
-
-  e(
-    datosActa.trabajador.nombre,
-    layout.recibiDe
-  );
-}
-
 
 export async function incrustarFirma(pdfOriginalBytes, firmaBase64, layout) {
   const pdfDoc = await PDFDocument.load(pdfOriginalBytes);
@@ -108,5 +94,4 @@ export async function incrustarFirma(pdfOriginalBytes, firmaBase64, layout) {
   page.drawImage(firmaImage, { x: layout.firma.x, y: layout.firma.y, width: layout.firma.width, height: layout.firma.height });
 
   return pdfDoc.save();
-  }
 }
