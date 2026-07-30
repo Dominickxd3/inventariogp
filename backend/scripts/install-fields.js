@@ -32,8 +32,13 @@ const CAMPOS_DEVOLUCION = [
   { nombre: 'imgFirma', x: 350, y: 180, w: 180, h: 50, esFirma: true },
 ];
 
+function ocultarWidget(widget) {
+  const bs = widget.getOrCreateBorderStyle();
+  bs.setWidth(0);
+}
+
 async function instalarCampos(rutaSrc, rutaDst, campos) {
-  const bytes = await fs.readFile(rutaSrc);
+  let bytes = await fs.readFile(rutaSrc);
   const pdfDoc = await PDFDocument.load(bytes);
   const page = pdfDoc.getPage(0);
   const form = pdfDoc.getForm();
@@ -41,22 +46,21 @@ async function instalarCampos(rutaSrc, rutaDst, campos) {
   for (const c of campos) {
     if (c.esFirma) {
       const btn = form.createButton(c.nombre);
-      btn.addToPage('', page, { x: c.x, y: c.y, width: c.w, height: c.h, backgroundColor: undefined, borderWidth: 0 });
+      btn.addToPage('', page, { x: c.x, y: c.y, width: c.w, height: c.h });
+      ocultarWidget(btn.acroField.getWidgets()[0]);
     } else {
       const tf = form.createTextField(c.nombre);
       tf.addToPage(page, { x: c.x, y: c.y, width: c.w, height: c.h });
+      ocultarWidget(tf.acroField.getWidgets()[0]);
       if (c.multiline) {
         tf.enableMultiline();
-        const opts = c.size <= 9 ? { fontSize: c.size } : {};
-        tf.setFontSize(opts.fontSize || c.size);
-      } else {
-        tf.setFontSize(c.size);
       }
+      tf.setFontSize(c.size);
     }
   }
 
-  const out = await pdfDoc.save();
-  await fs.writeFile(rutaDst, Buffer.from(out));
+  bytes = await pdfDoc.save();
+  await fs.writeFile(rutaDst, Buffer.from(bytes));
   console.log(`Campos instalados: ${rutaDst} (${campos.length} campos)`);
 }
 

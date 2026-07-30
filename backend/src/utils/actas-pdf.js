@@ -57,6 +57,8 @@ export async function generarActaPdf(datosActa) {
     form.getTextField('txtRecibiDe').setText(datosActa.trabajador.nombre);
   }
 
+  form.updateFieldAppearances(font);
+
   return pdfDoc.save();
 }
 
