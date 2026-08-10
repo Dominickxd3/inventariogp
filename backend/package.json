@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@pdf-lib/fontkit": "^1.1.1",
+    "@swc-node/register": "^1.12.1",
+    "@swc/core": "^1.15.47",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -22,6 +24,8 @@
     "pdf-lib": "^1.17.1",
     "puppeteer": "^25.5.0",
     "qrcode": "^1.5.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "uuid": "^10.0.0",
     "zod": "^3.23.8"
   },
