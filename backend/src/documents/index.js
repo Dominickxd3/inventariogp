@@ -1,28 +1,31 @@
-import { generatePdf, logoBase64, firmaResponsableBase64 } from './generate-pdf.js'
-import cargoLaptopHtml from './templates/cargo-laptop.js'
-import cargoDevolucionLaptopHtml from './templates/cargo-devolucion-laptop.js'
+import { generatePdf } from './generate-pdf.js'
+import { renderCargoLaptopHtml, renderCargoDevolucionHtml } from './render.js'
+import { readBase64 } from './read-logos.js'
 import { mapAsignacionToCargoLaptop } from './mappers/cargo-laptop.js'
 import { mapAsignacionToCargoDevolucion } from './mappers/cargo-devolucion-laptop.js'
 import { EMPRESA, RESPONSABLE } from '../config/empresa.js'
 
+const logoSrc = readBase64('logo.png')
+const firmaResponsableSrc = readBase64('firmasistemas.png')
+
 function buildHtml(snapshot, firmaBase64) {
-  const logoSrc = logoBase64 || '/logo.png'
+  const logo = logoSrc || '/logo.png'
 
   if (snapshot.tipoActa === 'DEVOLUCION') {
     const doc = mapAsignacionToCargoDevolucion(snapshot, EMPRESA, RESPONSABLE)
-    return cargoDevolucionLaptopHtml({
+    return renderCargoDevolucionHtml({
       ...doc,
-      logoSrc,
-      firmaResponsableSrc: firmaResponsableBase64 || '/firmasistemas.png',
-      ...(firmaBase64 ? { firma: firmaBase64 } : {}),
+      logoSrc: logo,
+      firmaResponsableSrc: firmaResponsableSrc || '/firmasistemas.png',
+      ...(firmaBase64 ? { firmaSrc: firmaBase64 } : {}),
     })
   }
 
   const doc = mapAsignacionToCargoLaptop(snapshot, EMPRESA)
-  return cargoLaptopHtml({
+  return renderCargoLaptopHtml({
     ...doc,
-    logoSrc,
-    ...(firmaBase64 ? { firma: firmaBase64 } : {}),
+    logoSrc: logo,
+    ...(firmaBase64 ? { firmaSrc: firmaBase64 } : {}),
   })
 }
 
