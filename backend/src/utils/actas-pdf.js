@@ -1,19 +1,4 @@
-import { PDFDocument } from 'pdf-lib';
-import fontkit from '@pdf-lib/fontkit';
-import fs from 'node:fs/promises';
-import { actasConfig } from '../config/actas.js';
-
-async function cargarFuente(pdfDoc) {
-  pdfDoc.registerFontkit(fontkit);
-  const bytes = await fs.readFile(actasConfig.fontPath);
-  return pdfDoc.embedFont(bytes, { subset: true });
-}
-
-function obtenerPlantilla(tipoActa) {
-  return tipoActa === 'ENTREGA'
-    ? actasConfig.templateEntrega
-    : actasConfig.templateDevolucion;
-}
+const DOCUMENTOS_PDF_URL = process.env.DOCUMENTOS_PDF_URL || 'http://localhost:3002';
 
 function formatearFecha(fecha) {
   return new Intl.DateTimeFormat('es-PE', {
@@ -23,65 +8,54 @@ function formatearFecha(fecha) {
   }).format(new Date(fecha));
 }
 
-function textoAccesorios(accesorios = []) {
-  if (!accesorios.length) return '';
-  return accesorios
-    .map(a => {
-      const partes = [a.codigo, a.descripcion, a.marca, a.modelo].filter(Boolean);
-      return partes.join('  ');
-    })
-    .join('\n');
+function buildBody(datosActa, firmaBase64) {
+  const body = {
+    nombre: datosActa.trabajador.nombre,
+    dni: datosActa.trabajador.dni,
+    marca: datosActa.equipo.marca || '',
+    modelo: datosActa.equipo.modelo || '',
+    color: datosActa.equipo.color || '',
+    ram: datosActa.equipo.ram || '',
+    capacidad: datosActa.equipo.capacidad || '',
+    serie: datosActa.equipo.serie || '',
+    accesorios: (datosActa.accesorios || [])
+      .map(a => [a.codigo, a.descripcion].filter(Boolean).join(' '))
+      .join(', '),
+    fecha: formatearFecha(datosActa.fecha),
+  };
+
+  if (firmaBase64) {
+    body.firma = firmaBase64;
+  }
+
+  return body;
+}
+
+function endpoint(tipoActa) {
+  return tipoActa === 'ENTREGA' ? 'api/pdf' : 'api/pdf/devolucion';
+}
+
+async function fetchPdf(body, tipoActa) {
+  const url = `${DOCUMENTOS_PDF_URL}/${endpoint(tipoActa)}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Error generando PDF (${res.status}): ${text.slice(0, 200)}`);
+  }
+
+  const bytes = await res.arrayBuffer();
+  return Buffer.from(bytes);
 }
 
 export async function generarActaPdf(datosActa) {
-  const rutaPlantilla = obtenerPlantilla(datosActa.tipoActa);
-  const plantillaBytes = await fs.readFile(rutaPlantilla);
-
-  const pdfDoc = await PDFDocument.load(plantillaBytes);
-  const font = await cargarFuente(pdfDoc);
-  const form = pdfDoc.getForm();
-
-  form.getTextField('txtAsignado').setText(datosActa.trabajador.nombre);
-  form.getTextField('txtMarca').setText(datosActa.equipo.marca);
-  form.getTextField('txtModelo').setText(datosActa.equipo.modelo);
-  form.getTextField('txtColor').setText(datosActa.equipo.color);
-  form.getTextField('txtRam').setText(datosActa.equipo.ram);
-  form.getTextField('txtCapacidad').setText(datosActa.equipo.capacidad);
-  form.getTextField('txtSerie').setText(datosActa.equipo.serie);
-  form.getTextField('txtAccesorios').setText(textoAccesorios(datosActa.accesorios));
-  form.getTextField('txtFecha').setText(formatearFecha(datosActa.fecha));
-  form.getTextField('txtNombreFirmante').setText(datosActa.trabajador.nombre);
-  form.getTextField('txtDniFirmante').setText(datosActa.trabajador.dni);
-
-  if (datosActa.tipoActa === 'DEVOLUCION') {
-    form.getTextField('txtRecibiDe').setText(datosActa.trabajador.nombre);
-  }
-
-  form.updateFieldAppearances(font);
-
-  return pdfDoc.save();
+  return fetchPdf(buildBody(datosActa), datosActa.tipoActa);
 }
 
-export async function incrustarFirma(pdfOriginalBytes, firmaBase64) {
-  const pdfDoc = await PDFDocument.load(pdfOriginalBytes);
-  const page = pdfDoc.getPage(0);
-  const form = pdfDoc.getForm();
-
-  const btn = form.getButton('imgFirma');
-  const widget = btn.acroField.getWidgets()[0];
-  const rect = widget.getRectangle();
-
-  const firmaBuffer = Buffer.from(firmaBase64.replace(/^data:image\/png;base64,/, ''), 'base64');
-  let firmaImage;
-  try {
-    firmaImage = await pdfDoc.embedPng(firmaBuffer);
-  } catch {
-    throw Object.assign(new Error('La firma no es una imagen PNG válida'), { statusCode: 422 });
-  }
-
-  page.drawImage(firmaImage, { x: rect.x, y: rect.y, width: rect.width, height: rect.height });
-
-  form.flatten();
-
-  return pdfDoc.save();
+export async function incrustarFirma(datosActa, firmaBase64) {
+  return fetchPdf(buildBody(datosActa, firmaBase64), datosActa.tipoActa);
 }

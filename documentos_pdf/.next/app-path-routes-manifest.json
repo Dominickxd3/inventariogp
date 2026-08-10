@@ -1,0 +1,11 @@
+{
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/api/documentos/enviar/route": "/api/documentos/enviar",
+  "/api/pdf/devolucion/route": "/api/pdf/devolucion",
+  "/api/pdf/route": "/api/pdf",
+  "/documentos/cargo-devolucion/page": "/documentos/cargo-devolucion",
+  "/documentos/cargo-laptop/page": "/documentos/cargo-laptop",
+  "/favicon.ico/route": "/favicon.ico",
+  "/page": "/"
+}

@@ -1,0 +1,11 @@
+{
+  "/_global-error/page": "app/_global-error/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/documentos/enviar/route": "app/api/documentos/enviar/route.js",
+  "/api/pdf/devolucion/route": "app/api/pdf/devolucion/route.js",
+  "/api/pdf/route": "app/api/pdf/route.js",
+  "/documentos/cargo-devolucion/page": "app/documentos/cargo-devolucion/page.js",
+  "/documentos/cargo-laptop/page": "app/documentos/cargo-laptop/page.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/page": "app/page.js"
+}

@@ -430,9 +430,22 @@ export const ActasService = {
       throw Object.assign(new Error('La firma debe ser una imagen PNG válida'), { statusCode: 422 });
     }
 
-    const pdfOriginalBytes = fs.readFileSync(acta.PdfOriginalRuta);
+    const datosActa = {
+      tipoActa: acta.TipoActa,
+      fecha: new Date(),
+      trabajador: { nombre: snapshot.trabajador.nombre, dni: snapshot.trabajador.dni },
+      equipo: {
+        marca: snapshot.equipo.marca || '',
+        modelo: snapshot.equipo.modelo || '',
+        color: snapshot.equipo.color || '',
+        ram: snapshot.equipo.ram || '',
+        capacidad: snapshot.equipo.capacidad || '',
+        serie: snapshot.equipo.serie || '',
+      },
+      accesorios: snapshot.accesorios || [],
+    };
 
-    const pdfFirmadoBytes = await incrustarFirma(pdfOriginalBytes, firmaBase64);
+    const pdfFirmadoBytes = await incrustarFirma(datosActa, firmaBase64);
 
     const now = new Date();
     const fechaFirma = now.toISOString();

@@ -1,0 +1,99 @@
+{
+  "version": 3,
+  "pages404": true,
+  "appType": "app",
+  "caseSensitive": false,
+  "basePath": "",
+  "redirects": [
+    {
+      "source": "/:path+/",
+      "destination": "/:path+",
+      "internal": true,
+      "priority": true,
+      "statusCode": 308,
+      "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$"
+    }
+  ],
+  "headers": [],
+  "onMatchHeaders": [],
+  "rewrites": {
+    "beforeFiles": [],
+    "afterFiles": [],
+    "fallback": []
+  },
+  "dynamicRoutes": [],
+  "staticRoutes": [
+    {
+      "page": "/",
+      "regex": "^/(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/(?:/)?$"
+    },
+    {
+      "page": "/_global-error",
+      "regex": "^/_global\\-error(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_global\\-error(?:/)?$"
+    },
+    {
+      "page": "/_not-found",
+      "regex": "^/_not\\-found(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_not\\-found(?:/)?$"
+    },
+    {
+      "page": "/api/documentos/enviar",
+      "regex": "^/api/documentos/enviar(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/documentos/enviar(?:/)?$"
+    },
+    {
+      "page": "/api/pdf",
+      "regex": "^/api/pdf(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/pdf(?:/)?$"
+    },
+    {
+      "page": "/api/pdf/devolucion",
+      "regex": "^/api/pdf/devolucion(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/pdf/devolucion(?:/)?$"
+    },
+    {
+      "page": "/documentos/cargo-devolucion",
+      "regex": "^/documentos/cargo\\-devolucion(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/documentos/cargo\\-devolucion(?:/)?$"
+    },
+    {
+      "page": "/documentos/cargo-laptop",
+      "regex": "^/documentos/cargo\\-laptop(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/documentos/cargo\\-laptop(?:/)?$"
+    },
+    {
+      "page": "/favicon.ico",
+      "regex": "^/favicon\\.ico(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/favicon\\.ico(?:/)?$"
+    }
+  ],
+  "dataRoutes": [],
+  "rsc": {
+    "header": "rsc",
+    "varyHeader": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+    "prefetchHeader": "next-router-prefetch",
+    "didPostponeHeader": "x-nextjs-postponed",
+    "contentTypeHeader": "text/x-component",
+    "suffix": ".rsc",
+    "prefetchSegmentHeader": "next-router-segment-prefetch",
+    "prefetchSegmentSuffix": ".segment.rsc",
+    "prefetchSegmentDirSuffix": ".segments",
+    "clientParamParsing": false,
+    "dynamicRSCPrerender": false
+  },
+  "rewriteHeaders": {
+    "pathHeader": "x-nextjs-rewritten-path",
+    "queryHeader": "x-nextjs-rewritten-query"
+  }
+}
