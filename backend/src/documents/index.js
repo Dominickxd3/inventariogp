@@ -1,40 +1,82 @@
-import { generatePdf } from './generate-pdf.js'
-import { renderCargoLaptopHtml, renderCargoDevolucionHtml } from './render.js'
-import { readBase64 } from './read-logos.js'
 import { mapAsignacionToCargoLaptop } from './mappers/cargo-laptop.js'
 import { mapAsignacionToCargoDevolucion } from './mappers/cargo-devolucion-laptop.js'
 import { EMPRESA, RESPONSABLE } from '../config/empresa.js'
 
-const logoSrc = readBase64('logo.png')
-const firmaResponsableSrc = readBase64('firmasistemas.png')
+const DOCS_URL = process.env.DOCUMENTOS_PDF_URL || 'http://localhost:3000'
 
-function buildHtml(snapshot, firmaBase64) {
-  const logo = logoSrc || '/logo.png'
-
-  if (snapshot.tipoActa === 'DEVOLUCION') {
-    const doc = mapAsignacionToCargoDevolucion(snapshot, EMPRESA, RESPONSABLE)
-    return renderCargoDevolucionHtml({
-      ...doc,
-      logoSrc: logo,
-      firmaResponsableSrc: firmaResponsableSrc || '/firmasistemas.png',
-      ...(firmaBase64 ? { firmaSrc: firmaBase64 } : {}),
-    })
-  }
-
-  const doc = mapAsignacionToCargoLaptop(snapshot, EMPRESA)
-  return renderCargoLaptopHtml({
-    ...doc,
-    logoSrc: logo,
-    ...(firmaBase64 ? { firmaSrc: firmaBase64 } : {}),
+async function callApi(endpoint, body) {
+  const url = `${DOCS_URL}${endpoint}`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
   })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`Error generando PDF (${res.status}): ${text.slice(0, 200)}`)
+  }
+  const bytes = await res.arrayBuffer()
+  return Buffer.from(bytes)
+}
+
+function buildEntregaBody(snapshot, firmaBase64) {
+  const doc = mapAsignacionToCargoLaptop(snapshot, EMPRESA)
+  return {
+    empresaNombre: doc.empresa.nombre,
+    empresaRuc: doc.empresa.ruc,
+    empresaDireccion: doc.empresa.direccion,
+    empresaTelefonos: doc.empresa.telefonos,
+    nombre: doc.empleado.nombre,
+    dni: doc.empleado.dni,
+    marca: doc.equipo.marca,
+    modelo: doc.equipo.modelo,
+    color: doc.equipo.color,
+    ram: doc.equipo.ram,
+    capacidad: doc.equipo.capacidad,
+    serie: doc.equipo.serie,
+    accesorios: doc.equipo.accesorios,
+    fecha: doc.fecha,
+    ...(firmaBase64 ? { firma: firmaBase64 } : {}),
+  }
+}
+
+function buildDevolucionBody(snapshot, firmaBase64) {
+  const doc = mapAsignacionToCargoDevolucion(snapshot, EMPRESA, RESPONSABLE)
+  return {
+    empresaNombre: doc.empresa.nombre,
+    empresaRuc: doc.empresa.ruc,
+    empresaDireccion: doc.empresa.direccion,
+    empresaTelefonos: doc.empresa.telefonos,
+    empresaCorreo1: doc.empresa.correo1 || '',
+    empresaCorreo2: doc.empresa.correo2 || '',
+    nombre: doc.empleado.nombre,
+    dni: doc.empleado.dni,
+    responsableNombre: doc.responsable.nombre,
+    responsableDni: doc.responsable.dni,
+    marca: doc.equipo.marca,
+    modelo: doc.equipo.modelo,
+    color: doc.equipo.color,
+    ram: doc.equipo.ram,
+    capacidad: doc.equipo.capacidad,
+    serie: doc.equipo.serie,
+    accesorios: doc.equipo.accesorios,
+    fecha: doc.fecha,
+    ...(firmaBase64 ? { firma: firmaBase64 } : {}),
+  }
 }
 
 export async function generarActaPdf(datosActa) {
-  const html = buildHtml(datosActa.snapshot)
-  return generatePdf(html)
+  const endpoint = datosActa.tipoActa === 'ENTREGA' ? '/api/pdf' : '/api/pdf/devolucion'
+  const body = datosActa.tipoActa === 'ENTREGA'
+    ? buildEntregaBody(datosActa.snapshot)
+    : buildDevolucionBody(datosActa.snapshot)
+  return callApi(endpoint, body)
 }
 
 export async function incrustarFirma(datosActa, firmaBase64) {
-  const html = buildHtml(datosActa.snapshot, firmaBase64)
-  return generatePdf(html)
+  const endpoint = datosActa.tipoActa === 'ENTREGA' ? '/api/pdf' : '/api/pdf/devolucion'
+  const body = datosActa.tipoActa === 'ENTREGA'
+    ? buildEntregaBody(datosActa.snapshot, firmaBase64)
+    : buildDevolucionBody(datosActa.snapshot, firmaBase64)
+  return callApi(endpoint, body)
 }
