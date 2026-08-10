@@ -1,8 +1,8 @@
-import { generatePdf, logoBase64, firmaResponsableBase64 } from '../documents/generate-pdf.js'
-import cargoLaptopHtml from '../documents/templates/cargo-laptop.js'
-import cargoDevolucionLaptopHtml from '../documents/templates/cargo-devolucion-laptop.js'
-import { mapAsignacionToCargoLaptop } from '../documents/mappers/cargo-laptop.js'
-import { mapAsignacionToCargoDevolucion } from '../documents/mappers/cargo-devolucion-laptop.js'
+import { generatePdf, logoBase64, firmaResponsableBase64 } from './generate-pdf.js'
+import cargoLaptopHtml from './templates/cargo-laptop.js'
+import cargoDevolucionLaptopHtml from './templates/cargo-devolucion-laptop.js'
+import { mapAsignacionToCargoLaptop } from './mappers/cargo-laptop.js'
+import { mapAsignacionToCargoDevolucion } from './mappers/cargo-devolucion-laptop.js'
 import { EMPRESA, RESPONSABLE } from '../config/empresa.js'
 
 function buildHtml(snapshot, firmaBase64) {

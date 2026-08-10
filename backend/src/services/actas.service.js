@@ -5,7 +5,7 @@ import { AsignacionesRepository } from '../repositories/asignaciones.repository.
 import { EquiposRepository } from '../repositories/equipos.repository.js';
 import { TrabajadoresRepository } from '../repositories/trabajadores.repository.js';
 import { generarToken, hashSHA256, hashFile } from '../utils/crypto.js';
-import { generarActaPdf, incrustarFirma } from '../utils/actas-pdf.js';
+import { generarActaPdf, incrustarFirma } from '../documents/index.js';
 import { actasConfig } from '../config/actas.js';
 
 function escapeJsonValue(v) {
