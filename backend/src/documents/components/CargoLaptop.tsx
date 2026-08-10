@@ -23,36 +23,13 @@ export default function CargoLaptop({
   ]
 
   return (
-    <div
-      id="cargo-laptop-document"
+    <div id="cargo-laptop-document"
       className="relative isolate w-[210mm] h-[297mm] bg-white text-black mx-auto overflow-hidden shadow-sm print:shadow-none"
-      style={{
-        fontFamily: '"Times New Roman", Times, serif',
-        fontSize: "11pt",
-        boxSizing: "border-box",
-        padding: "16mm 18mm 14mm 18mm",
-      }}
-    >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden"
-        style={{ zIndex: 0 }}
-      >
-        <img
-          src={logoSrc}
-          alt=""
-          draggable={false}
-          className="select-none object-contain"
-          style={{
-            width: "130mm",
-            maxWidth: "70%",
-            height: "auto",
-            opacity: 0.09,
-            mixBlendMode: "multiply",
-          }}
-        />
+      style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: "11pt", boxSizing: "border-box", padding: "16mm 18mm 14mm 18mm" }}>
+      <div aria-hidden className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden" style={{ zIndex: 0 }}>
+        <img src={logoSrc} alt="" draggable={false} className="select-none object-contain"
+          style={{ width: "130mm", maxWidth: "70%", height: "auto", opacity: 0.09, mixBlendMode: "multiply" }} />
       </div>
-
       <div className="relative flex h-full flex-col" style={{ zIndex: 1, isolation: "isolate" }}>
         <header className="flex items-start gap-4 bg-transparent">
           <img src={logoSrc} alt={`Logo ${empresa.nombre}`} className="w-[22mm] h-auto object-contain shrink-0 mt-0.5" />
@@ -80,9 +57,8 @@ export default function CargoLaptop({
           <p>Asimismo, está prohibido compartir el equipo e instalar aplicaciones que no se usan dentro del trabajo, caso contrario se le aplicará un memorandum por incumplimiento.</p>
           <p>Es mi responsabilidad ante cualquier siniestro (robo o hurto), la reposicion del equipo en el menor tiempo posible y razonable. Ademas de comunicar de forma inmediata al area de sistemas (922386045).</p>
         </div>
-        <div style={{ flex: 1 }} />
-        <p className="uppercase text-[11pt] mb-8">San Juan de Lurigancho, {fecha}</p>
-        <div id="signature-block" className="w-[58mm] text-center relative">
+        <p className="mt-7 uppercase text-[11pt]">San Juan de Lurigancho, {fecha}</p>
+        <div id="signature-block" className="mt-14 w-[58mm] text-center relative">
           <div id="signature-field" data-field="signature" className="relative mx-auto flex h-[18mm] w-full items-end justify-center">
             {firmaSrc ? (
               <img id="signature-image" src={firmaSrc} alt="Firma" className="max-h-[16mm] max-w-full object-contain" />
@@ -95,7 +71,7 @@ export default function CargoLaptop({
           </div>
           <p className="mt-2 uppercase text-[11pt]">DNI: {empleado.dni}</p>
         </div>
-        <footer className="mt-4 pt-4">
+        <footer className="mt-auto pt-8">
           <div className="border-t border-black w-full mb-2" />
           <p className="text-center text-[9.5pt] leading-tight">{empresa.direccion}{empresa.telefonos ? ` - ${empresa.telefonos}` : ""}</p>
         </footer>

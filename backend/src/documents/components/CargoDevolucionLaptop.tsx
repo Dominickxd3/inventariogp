@@ -25,25 +25,13 @@ export default function CargoDevolucionLaptop({
   ]
 
   return (
-    <div
-      id="cargo-devolucion-laptop-document"
+    <div id="cargo-devolucion-laptop-document"
       className="relative isolate w-[210mm] h-[297mm] bg-white text-black mx-auto overflow-hidden shadow-sm print:shadow-none"
-      style={{
-        fontFamily: '"Times New Roman", Times, serif',
-        fontSize: "11pt",
-        boxSizing: "border-box",
-        padding: "16mm 18mm 14mm 18mm",
-      }}
-    >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden"
-        style={{ zIndex: 0 }}
-      >
+      style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: "11pt", boxSizing: "border-box", padding: "16mm 18mm 14mm 18mm" }}>
+      <div aria-hidden className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden" style={{ zIndex: 0 }}>
         <img src={logoSrc} alt="" draggable={false} className="select-none object-contain"
           style={{ width: "130mm", maxWidth: "70%", height: "auto", opacity: 0.09, mixBlendMode: "multiply" }} />
       </div>
-
       <div className="relative flex h-full flex-col" style={{ zIndex: 10, isolation: "isolate" }}>
         <header className="flex items-start gap-4 bg-transparent">
           <img src={logoSrc} alt={`Logo ${empresa.nombre}`} className="w-[22mm] h-auto object-contain shrink-0 mt-0.5" />
@@ -67,9 +55,8 @@ export default function CargoDevolucionLaptop({
           </tbody>
         </table>
         <p className="mt-6 uppercase text-[11pt] text-justify">El equipo se recibió en condiciones aceptables.</p>
-        <div style={{ flex: 1 }} />
-        <p className="uppercase text-[11pt] mb-8">San Juan de Lurigancho, {fecha}</p>
-        <div className="flex justify-between gap-8">
+        <p className="mt-6 uppercase text-[11pt]">San Juan de Lurigancho, {fecha}</p>
+        <div className="mt-12 flex justify-between gap-8">
           <div className="w-[58mm] text-center relative">
             <div className="mx-auto flex h-[18mm] w-full items-end justify-center">
               {firmaResponsableSrc && (
@@ -95,7 +82,7 @@ export default function CargoDevolucionLaptop({
             <p className="mt-2 uppercase text-[11pt]">DNI: {empleado.dni}</p>
           </div>
         </div>
-        <footer className="mt-4 pt-4">
+        <footer className="mt-auto pt-8">
           <div className="border-t border-black w-full mb-2" />
           <p className="text-center text-[9.5pt] leading-tight">{empresa.direccion} - {empresa.telefonos}</p>
         </footer>
