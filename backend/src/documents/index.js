@@ -20,11 +20,13 @@ function buildHtml(snapshot, firmaBase64) {
 }
 
 export async function generarActaPdf(datosActa) {
+  console.log('[PDF] BACKEND: generando acta', datosActa.tipoActa, datosActa.snapshot?.trabajador?.nombre)
   const html = buildHtml(datosActa.snapshot)
   return generatePdf(html)
 }
 
 export async function incrustarFirma(datosActa, firmaBase64) {
+  console.log('[PDF] BACKEND: incrustando firma', datosActa.tipoActa, 'firmaSize:', firmaBase64?.length || 0)
   const html = buildHtml(datosActa.snapshot, firmaBase64)
   return generatePdf(html)
 }

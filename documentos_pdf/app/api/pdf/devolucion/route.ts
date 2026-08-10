@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    console.log('[PDF] NEXTJS: generando cargo-devolucion-laptop', body.nombre, body.dni)
     const pdf = await generateCargoDevolucionLaptopPdf(
       request.nextUrl.origin,
       body,
