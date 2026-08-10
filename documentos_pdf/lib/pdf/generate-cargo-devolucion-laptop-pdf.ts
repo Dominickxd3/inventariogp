@@ -130,14 +130,6 @@ export async function generateCargoDevolucionLaptopPdf(
         .catch(() => undefined);
     }
 
-    // DEBUG: identificar generador
-    await page.evaluate(() => {
-      const el = document.createElement('div');
-      el.textContent = 'NEXTJS';
-      el.style.cssText = 'position:fixed;bottom:3mm;right:3mm;font-size:6pt;color:#ccc;font-family:monospace;z-index:9999';
-      document.body.appendChild(el);
-    });
-
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true,

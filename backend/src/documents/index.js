@@ -10,23 +10,21 @@ function buildHtml(snapshot, firmaBase64) {
     return renderCargoDevolucionHtml({
       ...doc,
       ...(firmaBase64 ? { firmaSrc: firmaBase64 } : {}),
-    }).replace('</body>', '<div style="position:fixed;bottom:3mm;right:3mm;font-size:6pt;color:#ccc;font-family:monospace">BACKEND</div></body>')
+    })
   }
   const doc = mapAsignacionToCargoLaptop(snapshot, EMPRESA)
   return renderCargoLaptopHtml({
     ...doc,
     ...(firmaBase64 ? { firmaSrc: firmaBase64 } : {}),
-  }).replace('</body>', '<div style="position:fixed;bottom:3mm;right:3mm;font-size:6pt;color:#ccc;font-family:monospace">BACKEND</div></body>')
+  })
 }
 
 export async function generarActaPdf(datosActa) {
-  console.log('[PDF] BACKEND: generando acta', datosActa.tipoActa, datosActa.snapshot?.trabajador?.nombre)
   const html = buildHtml(datosActa.snapshot)
   return generatePdf(html)
 }
 
 export async function incrustarFirma(datosActa, firmaBase64) {
-  console.log('[PDF] BACKEND: incrustando firma', datosActa.tipoActa, 'firmaSize:', firmaBase64?.length || 0)
   const html = buildHtml(datosActa.snapshot, firmaBase64)
   return generatePdf(html)
 }
