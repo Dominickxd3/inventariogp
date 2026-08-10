@@ -124,7 +124,7 @@ export default function FirmarActaDocumento({ pdfUrl, tipoActa, onFirmar, envian
 
             <div
               ref={zonaFirmaRef}
-              className="absolute"
+              className="absolute z-10"
               style={{
                 left: `${posicion.left}%`,
                 top: `${posicion.top}%`,
