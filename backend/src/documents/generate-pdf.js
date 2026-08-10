@@ -7,7 +7,9 @@ export async function generatePdf(html) {
   })
   try {
     const page = await browser.newPage()
-    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30000 })
+    await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 1 })
+    await page.setContent(html, { waitUntil: 'load', timeout: 15000 })
+    await new Promise(r => setTimeout(r, 200))
     const pdf = await page.pdf({
       format: 'A4',
       printBackground: true,
