@@ -1,4 +1,4 @@
-"use client";
++"use client";
 
 import {
   forwardRef,
@@ -128,9 +128,49 @@ const InlineSignature = forwardRef<InlineSignatureHandle, Props>(
         onChange(null);
         return;
       }
+
+      const allPoints = strokes.current.flat();
+      if (allPoints.length === 0) {
+        skipValueSync.current = true;
+        onChange(null);
+        return;
+      }
+
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const p of allPoints) {
+        if (p.x < minX) minX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y > maxY) maxY = p.y;
+      }
+
+      const PAD = 4;
+      const LW = 2;
+      const dpr = window.devicePixelRatio || 1;
+      const cropX = Math.max(0, minX - PAD - LW);
+      const cropY = Math.max(0, minY - PAD - LW);
+      const cropW = Math.min(width - cropX, maxX - minX + (PAD + LW) * 2);
+      const cropH = Math.min(height - cropY, maxY - minY + (PAD + LW) * 2);
+
+      if (cropW <= 1 || cropH <= 1) {
+        skipValueSync.current = true;
+        onChange(canvas.toDataURL("image/png"));
+        return;
+      }
+
+      const tmp = document.createElement("canvas");
+      tmp.width = Math.ceil(cropW * dpr);
+      tmp.height = Math.ceil(cropH * dpr);
+      const tctx = tmp.getContext("2d")!;
+      tctx.drawImage(
+        canvas,
+        cropX * dpr, cropY * dpr, cropW * dpr, cropH * dpr,
+        0, 0, cropW * dpr, cropH * dpr,
+      );
+
       skipValueSync.current = true;
-      onChange(canvas.toDataURL("image/png"));
-    }, [onChange]);
+      onChange(tmp.toDataURL("image/png"));
+    }, [onChange, width, height]);
 
     const clear = useCallback(() => {
       strokes.current = [];
