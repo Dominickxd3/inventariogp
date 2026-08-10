@@ -24,9 +24,13 @@ function wrapHtml(body, css) {
 <html>
 <head>
 <meta charset="utf-8">
-<style>${css}</style>
+<style>
+  html, body { height: 100%; margin: 0; padding: 0; }
+  @page { size: A4; margin: 0; }
+${css}
+</style>
 </head>
-<body style="margin:0;padding:0;">
+<body>
 ${body}
 </body>
 </html>`
