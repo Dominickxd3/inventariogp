@@ -8,24 +8,6 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { closeAll } from './config/db.js';
 import { loginLimiter } from './middleware/rateLimiter.js';
 
-const DOCS_URL = process.env.DOCUMENTOS_PDF_URL || 'http://localhost:3000';
-let docsReady = false;
-
-async function checkDocsPdf() {
-  try {
-    const res = await fetch(`${DOCS_URL}/api/pdf`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre: 'check', dni: '0000', fecha: 'check', marca: '', modelo: '', color: '', ram: '', capacidad: '', serie: '', accesorios: '' }),
-      signal: AbortSignal.timeout(8000),
-    });
-    docsReady = res.ok || res.status === 500;
-    console.log(`[docs] documentos_pdf ${docsReady ? 'conectado' : 'no disponible'} en ${DOCS_URL}`);
-  } catch {
-    console.warn(`[docs] No se pudo conectar con documentos_pdf en ${DOCS_URL}`);
-  }
-}
-
 import equiposRoutes from './routes/equipos.routes.js';
 import trabajadoresRoutes from './routes/trabajadores.routes.js';
 import asignacionesRoutes from './routes/asignaciones.routes.js';
@@ -78,7 +60,6 @@ app.use(errorHandler);
 
 const server = app.listen(config.port, () => {
   console.log(`InventarioGP API corriendo en puerto ${config.port} [${config.env}]`);
-  checkDocsPdf();
 });
 
 process.on('SIGINT', async () => {
