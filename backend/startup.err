@@ -1,0 +1,8 @@
+[ERROR] Login failed for user 'sa'. ConnectionError: Login failed for user 'sa'.
+    at D:\inventariogp\backend\node_modules\mssql\lib\tedious\connection-pool.js:85:17
+    at Connection.onConnect (D:\inventariogp\backend\node_modules\tedious\lib\connection.js:849:9)
+    at Object.onceWrapper (node:events:623:26)
+    at Connection.emit (node:events:508:28)
+    at Connection.emit (D:\inventariogp\backend\node_modules\tedious\lib\connection.js:970:18)
+    at D:\inventariogp\backend\node_modules\tedious\lib\connection.js:2369:18
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
