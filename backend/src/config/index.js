@@ -25,6 +25,5 @@ export const config = {
     publicUrl: process.env.ACTAS_PUBLIC_URL || '',
     linkTtlHours: parseInt(process.env.ACTAS_LINK_TTL_HOURS || '72', 10),
     signatureMaxBytes: parseInt(process.env.ACTAS_SIGNATURE_MAX_BYTES || '500000', 10),
-    fontPath: process.env.ACTAS_FONT_PATH || '',
   },
 };

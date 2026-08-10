@@ -204,7 +204,7 @@ export const ActasService = {
         console.log('[Actas] datosActa.trabajador:', JSON.stringify(datosActa.trabajador, null, 2));
       }
 
-      const pdfBytes = await generarActaPdf(datosActa);
+      const pdfBytes = await generarActaPdf({ ...datosActa, snapshot });
       const fileName = `${codigoActa}.pdf`;
       const pdfRuta = buildFilePath(tipoActa, '', fileName);
       fs.writeFileSync(pdfRuta, pdfBytes);
@@ -433,16 +433,7 @@ export const ActasService = {
     const datosActa = {
       tipoActa: acta.TipoActa,
       fecha: new Date(),
-      trabajador: { nombre: snapshot.trabajador.nombre, dni: snapshot.trabajador.dni },
-      equipo: {
-        marca: snapshot.equipo.marca || '',
-        modelo: snapshot.equipo.modelo || '',
-        color: snapshot.equipo.color || '',
-        ram: snapshot.equipo.ram || '',
-        capacidad: snapshot.equipo.capacidad || '',
-        serie: snapshot.equipo.serie || '',
-      },
-      accesorios: snapshot.accesorios || [],
+      snapshot,
     };
 
     const pdfFirmadoBytes = await incrustarFirma(datosActa, firmaBase64);

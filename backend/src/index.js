@@ -3,23 +3,26 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import { spawn } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { config } from './config/index.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { closeAll } from './config/db.js';
 import { loginLimiter } from './middleware/rateLimiter.js';
-import { actasConfig } from './config/actas.js';
-import fs from 'fs';
 
-// Validar plantillas de actas al inicio
-for (const [tipo, ruta] of Object.entries({
-  ENTREGA: actasConfig.templateEntrega,
-  DEVOLUCION: actasConfig.templateDevolucion,
-})) {
-  if (!fs.existsSync(ruta)) {
-    console.error(`[Actas] Plantilla de ${tipo} no encontrada: ${ruta}`);
-    process.exit(1);
-  }
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const documentosDir = path.join(__dirname, '..', '..', 'documentos_pdf');
+
+function startDocumentosPdf() {
+  return spawn('cmd', ['/c', 'npx next dev -p 3000'], {
+    cwd: documentosDir,
+    stdio: 'pipe',
+    shell: false,
+  });
 }
+
+let docsProcess;
 
 import equiposRoutes from './routes/equipos.routes.js';
 import trabajadoresRoutes from './routes/trabajadores.routes.js';
@@ -73,16 +76,27 @@ app.use(errorHandler);
 
 const server = app.listen(config.port, () => {
   console.log(`InventarioGP API corriendo en puerto ${config.port} [${config.env}]`);
+
+  if (config.env === 'development') {
+    docsProcess = startDocumentosPdf();
+    docsProcess.stdout?.on('data', (d) => process.stdout.write(`[docs] ${d}`));
+    docsProcess.stderr?.on('data', (d) => process.stderr.write(`[docs] ${d}`));
+    docsProcess.on('exit', (code) => {
+      console.log(`[docs] Next.js dev server salió con código ${code}`);
+    });
+  }
 });
 
 process.on('SIGINT', async () => {
   console.log('Cerrando conexiones...');
+  if (docsProcess) { docsProcess.kill(); }
   await closeAll();
   server.close();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
+  if (docsProcess) { docsProcess.kill(); }
   await closeAll();
   server.close();
 });
