@@ -6,11 +6,19 @@ const DOCUMENTOS_PDF_URL = process.env.DOCUMENTOS_PDF_URL || 'http://localhost:3
 
 async function callApi(endpoint, body) {
   const url = `${DOCUMENTOS_PDF_URL}${endpoint}`
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
+  let res
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  } catch (err) {
+    throw new Error(
+      `No se pudo conectar con documentos_pdf (${DOCUMENTOS_PDF_URL}). ` +
+      `Asegurate de ejecutar: cd documentos_pdf && npm install && npm run dev`
+    )
+  }
 
   if (!res.ok) {
     const text = await res.text().catch(() => '')

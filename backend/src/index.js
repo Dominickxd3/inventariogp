@@ -3,26 +3,28 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import { spawn } from 'child_process';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { config } from './config/index.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { closeAll } from './config/db.js';
 import { loginLimiter } from './middleware/rateLimiter.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const documentosDir = path.join(__dirname, '..', '..', 'documentos_pdf');
+const DOCS_URL = process.env.DOCUMENTOS_PDF_URL || 'http://localhost:3000';
+let docsReady = false;
 
-function startDocumentosPdf() {
-  return spawn('cmd', ['/c', 'npx next dev -p 3000'], {
-    cwd: documentosDir,
-    stdio: 'pipe',
-    shell: false,
-  });
+async function checkDocsPdf() {
+  try {
+    const res = await fetch(`${DOCS_URL}/api/pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre: 'check', dni: '0000', fecha: 'check', marca: '', modelo: '', color: '', ram: '', capacidad: '', serie: '', accesorios: '' }),
+      signal: AbortSignal.timeout(8000),
+    });
+    docsReady = res.ok || res.status === 500;
+    console.log(`[docs] documentos_pdf ${docsReady ? 'conectado' : 'no disponible'} en ${DOCS_URL}`);
+  } catch {
+    console.warn(`[docs] No se pudo conectar con documentos_pdf en ${DOCS_URL}`);
+  }
 }
-
-let docsProcess;
 
 import equiposRoutes from './routes/equipos.routes.js';
 import trabajadoresRoutes from './routes/trabajadores.routes.js';
@@ -76,27 +78,17 @@ app.use(errorHandler);
 
 const server = app.listen(config.port, () => {
   console.log(`InventarioGP API corriendo en puerto ${config.port} [${config.env}]`);
-
-  if (config.env === 'development') {
-    docsProcess = startDocumentosPdf();
-    docsProcess.stdout?.on('data', (d) => process.stdout.write(`[docs] ${d}`));
-    docsProcess.stderr?.on('data', (d) => process.stderr.write(`[docs] ${d}`));
-    docsProcess.on('exit', (code) => {
-      console.log(`[docs] Next.js dev server salió con código ${code}`);
-    });
-  }
+  checkDocsPdf();
 });
 
 process.on('SIGINT', async () => {
   console.log('Cerrando conexiones...');
-  if (docsProcess) { docsProcess.kill(); }
   await closeAll();
   server.close();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  if (docsProcess) { docsProcess.kill(); }
   await closeAll();
   server.close();
 });
