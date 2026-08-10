@@ -12,8 +12,9 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 ).toString()
 
 const POSICIONES_FIRMA = {
-  ENTREGA: { left: 8.5, top: 80, width: 27.6, height: 6 },
-  DEVOLUCION: { left: 64, top: 80, width: 27.6, height: 6 },
+  ENTREGA: { left: 8.5, top: 82, width: 27.6, height: 10 },
+  DEVOLUCION_RESPONSABLE: { left: 8.5, top: 82, width: 27.6, height: 10 },
+  DEVOLUCION_COLABORADOR: { left: 64, top: 82, width: 27.6, height: 10 },
 }
 
 const ZOOM_MIN = 0.7
@@ -34,7 +35,7 @@ export default function FirmarActaDocumento({ pdfUrl, tipoActa, onFirmar, envian
 
   const posicion =
     tipoActa === 'DEVOLUCION'
-      ? POSICIONES_FIRMA.DEVOLUCION
+      ? POSICIONES_FIRMA.DEVOLUCION_COLABORADOR
       : POSICIONES_FIRMA.ENTREGA
 
   useEffect(() => {
