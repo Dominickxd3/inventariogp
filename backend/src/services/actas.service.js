@@ -38,6 +38,15 @@ function normalizarClave(clave) {
     'tipo': 'tipo',
     'tipo equipo': 'tipo',
     'tipo de equipo': 'tipo',
+    'imei': 'imei',
+    'imei 1': 'imei',
+    'imei1': 'imei',
+    'celular': 'nroCelular',
+    'nro celular': 'nroCelular',
+    'numero celular': 'nroCelular',
+    'número celular': 'nroCelular',
+    'telefono': 'nroCelular',
+    'telefono celular': 'nroCelular',
   };
   const limpia = clave
     .toLowerCase()
@@ -59,6 +68,8 @@ function buildSnapshot({ asignacion, trabajador, equipo, caracteristicas, acceso
     ram: '',
     capacidad: '',
     serie: equipo.SerieFabricante || equipo.CodBarra || '',
+    imei: '',
+    nroCelular: '',
   };
 
   const reconocidas = new Set();
@@ -80,6 +91,8 @@ function buildSnapshot({ asignacion, trabajador, equipo, caracteristicas, acceso
     if (mapCarac['capacidad']) eq.capacidad = mapCarac['capacidad'];
     if (mapCarac['serie']) eq.serie = mapCarac['serie'];
     if (mapCarac['tipo']) eq.tipoEquipo = mapCarac['tipo'];
+    if (mapCarac['imei']) eq.imei = mapCarac['imei'];
+    if (mapCarac['nroCelular']) eq.nroCelular = mapCarac['nroCelular'];
   }
 
   if (process.env.NODE_ENV === 'development' && caracteristicas?.length) {
@@ -117,6 +130,8 @@ function buildSnapshot({ asignacion, trabajador, equipo, caracteristicas, acceso
       ram: escapeJsonValue(eq.ram),
       capacidad: escapeJsonValue(eq.capacidad),
       serie: escapeJsonValue(eq.serie),
+      imei: escapeJsonValue(eq.imei),
+      nroCelular: escapeJsonValue(eq.nroCelular),
     },
     accesorios: accs.map(a => ({
       idComponente: a.idComponente,

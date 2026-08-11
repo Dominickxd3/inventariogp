@@ -12,16 +12,33 @@ export default function CargoLaptop({
   firmaSrc,
   signatureField = CARGO_LAPTOP_SIGNATURE_FIELD,
 }: any) {
-  const rows: { label: string; value: string }[] = [
-    { label: "ASIGNADO", value: empleado.nombre },
-    { label: "MARCA", value: equipo.marca },
-    { label: "MODELO", value: equipo.modelo },
-    { label: "COLOR", value: equipo.color },
-    { label: "RAM", value: equipo.ram },
-    { label: "CAPACIDAD", value: equipo.capacidad },
-    { label: "S/N", value: equipo.serie },
-    { label: "ACCESORIOS", value: equipo.accesorios },
-  ]
+  const esCelular = (equipo.tipo || '').toUpperCase().includes('CELULAR')
+
+  const rows: { label: string; value: string }[] = esCelular
+    ? [
+        { label: "ASIGNADO", value: empleado.nombre },
+        { label: "NRO CELULAR", value: equipo.nroCelular },
+        { label: "MARCA", value: equipo.marca },
+        { label: "MODELO", value: equipo.modelo },
+        { label: "COLOR", value: equipo.color },
+        { label: "RAM", value: equipo.ram },
+        { label: "CAPACIDAD", value: equipo.capacidad },
+        { label: "IMEI", value: equipo.imei },
+        { label: "S/N", value: equipo.serie },
+        { label: "ACCESORIOS", value: equipo.accesorios },
+      ]
+    : [
+        { label: "ASIGNADO", value: empleado.nombre },
+        { label: "MARCA", value: equipo.marca },
+        { label: "MODELO", value: equipo.modelo },
+        { label: "COLOR", value: equipo.color },
+        { label: "RAM", value: equipo.ram },
+        { label: "CAPACIDAD", value: equipo.capacidad },
+        { label: "S/N", value: equipo.serie },
+        { label: "ACCESORIOS", value: equipo.accesorios },
+      ]
+
+  const titulo = esCelular ? 'Cargo de entrega de equipo celular' : 'Cargo de entrega de equipo laptop'
 
   return (
     <div id="cargo-laptop-document"
@@ -41,7 +58,7 @@ export default function CargoLaptop({
           </div>
         </header>
         <hr className="my-4 border-0 border-t border-black" />
-        <h1 className="text-center font-bold underline uppercase text-[12pt] tracking-wide mb-6">Cargo de entrega de equipo laptop</h1>
+        <h1 className="text-center font-bold underline uppercase text-[12pt] tracking-wide mb-6">{titulo}</h1>
         <p className="leading-relaxed text-justify uppercase text-[11pt]">Recibí de <span className="font-bold">{empresa.nombre}</span> un equipo laptop con las siguientes características:</p>
         <table className="relative w-full mt-5 border-collapse text-[11pt]" style={{ zIndex: 2, backgroundColor: "transparent", border: "1px solid #000" }}>
           <tbody>
