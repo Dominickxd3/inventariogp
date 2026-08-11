@@ -330,36 +330,9 @@ export default function Componentes() {
               </Select>
             </div>
 
-            <div className="border-t pt-4">
-              <p className="text-sm font-semibold text-foreground mb-3">Detalles del componente</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-foreground">Nombre / descripción</label>
-                  <Input value={form.DesComponente} onChange={setField('DesComponente')} placeholder={typeConfig.descripcion} />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-foreground">{typeConfig.detalleLabel}</label>
-                  <Input value={form.Capacidad} onChange={setField('Capacidad')} placeholder={typeConfig.detalle} />
-                  {autoDescription && <p className="text-xs text-muted-foreground">Vista previa: {autoDescription}</p>}
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-foreground">Marca</label>
-                  <Input value={form.Marca} onChange={setField('Marca')} placeholder={typeConfig.marca} />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-foreground">Modelo</label>
-                  <Input value={form.Modelo} onChange={setField('Modelo')} placeholder={typeConfig.modelo} />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-foreground">Serie</label>
-                  <Input value={form.Serie} onChange={setField('Serie')} placeholder={typeConfig.serie} />
-                </div>
-              </div>
-            </div>
-
-            {compPlantilla && compPlantilla.length > 0 && (
+            {compPlantilla && compPlantilla.length > 0 ? (
               <div className="border-t pt-4">
-                <p className="text-sm font-semibold text-foreground mb-3">Características técnicas</p>
+                <p className="text-sm font-semibold text-foreground mb-3">Características</p>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                   {compPlantilla.map((c) => (
                     <div key={c.IdPlantilla} className="space-y-1">
@@ -374,6 +347,33 @@ export default function Componentes() {
                       />
                     </div>
                   ))}
+                </div>
+              </div>
+            ) : (
+              <div className="border-t pt-4">
+                <p className="text-sm font-semibold text-foreground mb-3">Detalles del componente</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-foreground">Nombre / descripción</label>
+                    <Input value={form.DesComponente} onChange={setField('DesComponente')} placeholder={typeConfig.descripcion} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-foreground">{typeConfig.detalleLabel}</label>
+                    <Input value={form.Capacidad} onChange={setField('Capacidad')} placeholder={typeConfig.detalle} />
+                    {autoDescription && <p className="text-xs text-muted-foreground">Vista previa: {autoDescription}</p>}
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-foreground">Marca</label>
+                    <Input value={form.Marca} onChange={setField('Marca')} placeholder={typeConfig.marca} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-foreground">Modelo</label>
+                    <Input value={form.Modelo} onChange={setField('Modelo')} placeholder={typeConfig.modelo} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-foreground">Serie</label>
+                    <Input value={form.Serie} onChange={setField('Serie')} placeholder={typeConfig.serie} />
+                  </div>
                 </div>
               </div>
             )}
