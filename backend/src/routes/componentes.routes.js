@@ -24,6 +24,31 @@ router.get('/tipos', authMiddleware, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.get('/tipos/:id/plantilla', authMiddleware, async (req, res, next) => {
+  try {
+    const result = await ComponentesService.getPlantillaByTipo(Number(req.params.id));
+    res.json(result || []);
+  } catch (e) { next(e); }
+});
+
+router.get('/:id/caracteristicas', authMiddleware, async (req, res, next) => {
+  try {
+    const result = await ComponentesService.getCaracteristicas(Number(req.params.id));
+    res.json(result || []);
+  } catch (e) { next(e); }
+});
+
+router.put('/:id/caracteristicas', authMiddleware, roleMiddleware('ADMIN', 'TECNICO'), async (req, res, next) => {
+  try {
+    const result = await ComponentesService.saveCaracteristicas(
+      Number(req.params.id),
+      req.body.caracteristicas || [],
+      req.usuario?.id,
+    );
+    res.json({ success: true, caracteristicas: result });
+  } catch (e) { next(e); }
+});
+
 router.get('/accesorios-disponibles', authMiddleware, async (req, res, next) => {
   try {
     const list = await ComponentesService.listAccDisponibles();

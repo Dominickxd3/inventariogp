@@ -101,8 +101,19 @@ export default function Componentes() {
   const [bajaId, setBajaId] = useState(null);
   const [categoriaNuevo, setCategoriaNuevo] = useState('');
   const [form, setForm] = useState({ ...initialForm });
+  const [compPlantilla, setCompPlantilla] = useState(null);
+  const [compCaracVals, setCompCaracVals] = useState({});
 
   const setField = (field) => (e) => setForm((prev) => ({ ...prev, [field]: e.target.value.toUpperCase() }));
+
+  const handleTipoCompChange = (v) => {
+    setForm((prev) => ({ ...prev, IdTipodeComponente: Number(v) }));
+    setCompCaracVals({});
+    if (!v) { setCompPlantilla(null); return; }
+    api.componentes.plantillaByTipo(Number(v))
+      .then(r => setCompPlantilla(r || []))
+      .catch(() => setCompPlantilla(null));
+  };
   const queryClient = useQueryClient();
 
   const params = { search };
@@ -138,11 +149,26 @@ export default function Componentes() {
   const categoriaLabel = categoriaNuevo ? formatCategoria(categoriaNuevo) : '';
 
   const createMutation = useMutation({
-    mutationFn: api.componentes.createQuick,
+    mutationFn: async (data) => {
+      const resp = await api.componentes.createQuick(data);
+      const id = resp.componente?.IdComponente || resp.IdComponente;
+      const cam = compPlantilla || [];
+      if (id && cam.length > 0) {
+        const vals = Object.entries(compCaracVals)
+          .filter(([_, v]) => v)
+          .map(([idPlantilla, valor]) => ({ IdPlantilla: Number(idPlantilla), Valor: valor }));
+        if (vals.length > 0) await api.componentes.saveCaracteristicas(id, vals);
+      }
+      return resp;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['componentes'] });
       setShowModal(false);
       setForm({ ...initialForm });
+      setCategoriaNuevo('');
+      setCompPlantilla(null);
+      setCompCaracVals({});
+    },
       setCategoriaNuevo('');
     },
   });
@@ -178,7 +204,7 @@ export default function Componentes() {
   return (
     <div className="space-y-6">
       <PageHeader title="Componentes / Accesorios" description="Gestión de repuestos y accesorios">
-        <Button onClick={() => { setForm({ ...initialForm }); setCategoriaNuevo(''); setShowModal(true); }}>
+        <Button onClick={() => { setForm({ ...initialForm }); setCategoriaNuevo(''); setCompPlantilla(null); setCompCaracVals({}); setShowModal(true); }}>
           <Plus className="w-4 h-4" /> Nuevo Componente
         </Button>
       </PageHeader>
@@ -287,7 +313,7 @@ export default function Componentes() {
               <label className="text-sm font-medium text-foreground">Tipo de componente <span className="text-destructive">*</span></label>
               <Select
                 value={form.IdTipodeComponente ? String(form.IdTipodeComponente) : ''}
-                onValueChange={(v) => setForm((prev) => ({ ...prev, IdTipodeComponente: Number(v) }))}
+                onValueChange={handleTipoCompChange}
                 disabled={!categoriaNuevo}
               >
                 <SelectTrigger className="w-full">
@@ -332,6 +358,27 @@ export default function Componentes() {
                 </div>
               </div>
             </div>
+
+            {compPlantilla && compPlantilla.length > 0 && (
+              <div className="border-t pt-4">
+                <p className="text-sm font-semibold text-foreground mb-3">Características técnicas</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                  {compPlantilla.map((c) => (
+                    <div key={c.IdPlantilla} className="space-y-1">
+                      <label className="text-sm font-medium text-foreground">
+                        {c.Etiqueta || c.Clave}
+                        {c.Requerido ? <span className="text-red-500 ml-0.5">*</span> : null}
+                      </label>
+                      <Input
+                        placeholder={c.Etiqueta || c.Clave}
+                        value={compCaracVals[c.IdPlantilla] || ''}
+                        onChange={(e) => setCompCaracVals((prev) => ({ ...prev, [c.IdPlantilla]: e.target.value.toUpperCase() }))}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-foreground">Observaciones</label>

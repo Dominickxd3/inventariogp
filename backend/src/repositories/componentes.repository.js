@@ -429,4 +429,35 @@ export const ComponentesRepository = {
       await query(DB, "UPDATE Tab_EQ_Componentes SET Estado = 'DISPONIBLE' WHERE IdComponente = @id", { id: comp[0].IdComponente });
     }
   },
+
+  async getPlantillaByComponenteTipo(idTipo) {
+    return query(DB, `
+      SELECT IdPlantilla, Clave, Etiqueta, TipoDato, Requerido, Orden
+      FROM Tab_Componente_PlantillaCaracteristicas
+      WHERE IdTipodeComponente = @idTipo AND Activo = 1
+      ORDER BY Orden
+    `, { idTipo });
+  },
+
+  async getCaracteristicasComponente(idComponente) {
+    return query(DB, `
+      SELECT c.IdCaracteristica, c.IdPlantilla, c.Clave, c.Valor
+      FROM Tab_Componente_Caracteristicas c
+      JOIN Tab_Componente_PlantillaCaracteristicas p ON c.IdPlantilla = p.IdPlantilla
+      WHERE c.IdComponente = @id
+    `, { id: idComponente });
+  },
+
+  async deleteCaracteristicasPorComponente(idComponente, transaction) {
+    const req = createRequest(transaction, { id: idComponente });
+    await req.query('DELETE FROM Tab_Componente_Caracteristicas WHERE IdComponente = @id');
+  },
+
+  async insertCaracteristicaComponente(idComponente, idPlantilla, clave, valor, idUsuario, transaction) {
+    const req = createRequest(transaction, { idComponente, idPlantilla, clave, valor, idUsuario });
+    await req.query(`
+      INSERT INTO Tab_Componente_Caracteristicas (IdComponente, IdPlantilla, Clave, Valor, IdUsuarioCrea)
+      VALUES (@idComponente, @idPlantilla, @clave, @valor, @idUsuario)
+    `);
+  },
 };

@@ -1,4 +1,5 @@
 import { ComponentesRepository } from '../repositories/componentes.repository.js';
+import { withTransaction, createRequest } from '../config/db.js';
 
 function normalizarTexto(valor) {
   return String(valor || '')
@@ -190,5 +191,41 @@ export const ComponentesService = {
       Capacidad: data.Capacidad || null,
       Obs: data.Obs || null,
     });
+  },
+  async getPlantillaByTipo(idTipo) {
+    return ComponentesRepository.getPlantillaByComponenteTipo(idTipo);
+  },
+
+  async getCaracteristicas(idComponente) {
+    return ComponentesRepository.getCaracteristicasComponente(idComponente);
+  },
+
+  async saveCaracteristicas(idComponente, caracteristicas, idUsuario) {
+    const comp = await ComponentesRepository.getById(idComponente);
+    if (!comp) throw Object.assign(new Error('Componente no encontrado'), { statusCode: 404 });
+
+    const plantilla = await ComponentesRepository.getPlantillaByComponenteTipo(comp[0].IdTipodeComponente);
+    const validIds = new Set(plantilla.map(p => p.IdPlantilla));
+
+    const invalidos = caracteristicas.filter(c => !validIds.has(c.IdPlantilla));
+    if (invalidos.length > 0) {
+      throw Object.assign(new Error(`IDs de plantilla inválidos: ${invalidos.map(c => c.IdPlantilla).join(', ')}`), { statusCode: 422 });
+    }
+
+    await withTransaction('InventarioGP', async (tx) => {
+      const req = createRequest(tx, { id: idComponente });
+      await req.query('DELETE FROM Tab_Componente_Caracteristicas WHERE IdComponente = @id');
+
+      for (const c of caracteristicas) {
+        const plant = plantilla.find(p => p.IdPlantilla === c.IdPlantilla);
+        const req2 = createRequest(tx, { idComponente, idPlantilla: c.IdPlantilla, clave: plant?.Clave || '', valor: c.Valor || '', idUsuario });
+        await req2.query(`
+          INSERT INTO Tab_Componente_Caracteristicas (IdComponente, IdPlantilla, Clave, Valor, IdUsuarioCrea)
+          VALUES (@idComponente, @idPlantilla, @clave, @valor, @idUsuario)
+        `);
+      }
+    });
+
+    return this.getCaracteristicas(idComponente);
   },
 };

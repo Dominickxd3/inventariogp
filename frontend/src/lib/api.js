@@ -186,5 +186,8 @@ export const api = {
       list: () => request('/componentes/tipos'),
       create: (data) => request('/componentes/tipos', { method: 'POST', body: JSON.stringify(data) }),
     },
+    plantillaByTipo: (idTipo) => request(`/componentes/tipos/${idTipo}/plantilla`),
+    saveCaracteristicas: (id, caracteristicas) =>
+      request(`/componentes/${id}/caracteristicas`, { method: 'PUT', body: JSON.stringify({ caracteristicas }) }),
   },
 };
