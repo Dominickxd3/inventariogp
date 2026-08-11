@@ -17,7 +17,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '#components/ui/alert-dialog.jsx';
 import ComponenteDetalleDrawer from '../components/componentes/ComponenteDetalleDrawer';
-import { Plus, Search, Cpu, Headphones, Pencil } from 'lucide-react';
+import { Plus, Search, Cpu, Headphones, Pencil, MoreHorizontal, Eye } from 'lucide-react';
 
 const componentTypeConfig = {
   'MEMORIA RAM': { descripcion: 'Ej: Memoria RAM DDR4', marca: 'Ej: Kingston', modelo: 'Ej: Fury Beast', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: 16 GB DDR4 3200 MHz' },
@@ -308,7 +308,7 @@ export default function Componentes() {
         </Select>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border">
+      <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
       <DataTable
         columns={tipoColumns
           ? [
@@ -319,12 +319,14 @@ export default function Componentes() {
               { key: 'Serie', label: 'Serie' },
               ...tipoColumns.map(c => ({ ...c, render: (r) => (r.caracteristicas || {})[c.key.replace('car_', '')] || '' })),
               { key: 'Estado', label: 'Estado', render: (r) => <StatusBadge status={r.Estado} /> },
-              { key: 'acciones', label: '', className: 'w-[100px]', render: (r) => (
+              { key: 'acciones', label: 'Acciones', className: 'w-[130px]', render: (r) => (
                 <div className="flex items-center gap-1">
                   <button onClick={(e) => { e.stopPropagation(); setDetalleId(r.IdComponente); setShowDetalle(true); }}
-                    className="text-xs px-2 py-1 rounded hover:bg-muted">Detalle</button>
+                    className="p-1.5 rounded hover:bg-muted" title="Ver detalle"><Eye className="w-3.5 h-3.5" /></button>
                   <button onClick={(e) => { e.stopPropagation(); openEdit(r); }}
-                    className="text-xs px-2 py-1 rounded hover:bg-muted"><Pencil className="w-3.5 h-3.5" /></button>
+                    className="p-1.5 rounded hover:bg-muted" title="Editar"><Pencil className="w-3.5 h-3.5" /></button>
+                  <button onClick={(e) => { e.stopPropagation(); openEdit(r); }}
+                    className="p-1.5 rounded hover:bg-muted" title="Más"><MoreHorizontal className="w-3.5 h-3.5" /></button>
                 </div>
               )},
             ]
@@ -335,12 +337,14 @@ export default function Componentes() {
               { key: 'Marca', label: 'Marca' },
               { key: 'Serie', label: 'Serie' },
               { key: 'Estado', label: 'Estado', render: (r) => <StatusBadge status={r.Estado} /> },
-              { key: 'acciones', label: '', className: 'w-[100px]', render: (r) => (
+              { key: 'acciones', label: 'Acciones', className: 'w-[130px]', render: (r) => (
                 <div className="flex items-center gap-1">
                   <button onClick={(e) => { e.stopPropagation(); setDetalleId(r.IdComponente); setShowDetalle(true); }}
-                    className="text-xs px-2 py-1 rounded hover:bg-muted">Detalle</button>
+                    className="p-1.5 rounded hover:bg-muted" title="Ver detalle"><Eye className="w-3.5 h-3.5" /></button>
                   <button onClick={(e) => { e.stopPropagation(); openEdit(r); }}
-                    className="text-xs px-2 py-1 rounded hover:bg-muted"><Pencil className="w-3.5 h-3.5" /></button>
+                    className="p-1.5 rounded hover:bg-muted" title="Editar"><Pencil className="w-3.5 h-3.5" /></button>
+                  <button onClick={(e) => { e.stopPropagation(); openEdit(r); }}
+                    className="p-1.5 rounded hover:bg-muted" title="Más"><MoreHorizontal className="w-3.5 h-3.5" /></button>
                 </div>
               )},
             ]
