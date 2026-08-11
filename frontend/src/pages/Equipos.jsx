@@ -63,8 +63,10 @@ export default function Equipos() {
   const [despuesDeGuardar, setDespuesDeGuardar] = useState('');
   const [caracteristicasVals, setCaracteristicasVals] = useState({});
   const [plantilla, setPlantilla] = useState(null);
+  const [tipoSeleccionado, setTipoSeleccionado] = useState('');
 
   const handleTipoChange = (v) => {
+    setTipoSeleccionado(v);
     form.setValue('IdTipodeEquipo', v);
     setCaracteristicasVals({});
     if (!v) { setPlantilla(null); return; }
@@ -280,13 +282,10 @@ export default function Equipos() {
               <label className="text-sm font-medium text-foreground">
                 Tipo de Equipo <span className="text-destructive">*</span>
               </label>
-              <Select value={form.watch('IdTipodeEquipo')} onValueChange={handleTipoChange}>
+              <Select value={tipoSeleccionado} onValueChange={handleTipoChange}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Seleccionar tipo de equipo...">
-                    {(() => {
-                      const id = form.watch('IdTipodeEquipo');
-                      return tiposAsignables?.find(t => String(t.IdTipodeEquipo) === id)?.DesTipodeEquipo;
-                    })()}
+                    {tiposAsignables?.find(t => String(t.IdTipodeEquipo) === tipoSeleccionado)?.DesTipodeEquipo}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
