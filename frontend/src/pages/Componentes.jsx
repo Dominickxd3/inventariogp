@@ -17,7 +17,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '#components/ui/alert-dialog.jsx';
 import ComponenteDetalleDrawer from '../components/componentes/ComponenteDetalleDrawer';
-import { Plus, Search, Cpu, Headphones } from 'lucide-react';
+import { Plus, Search, Cpu, Headphones, MoreHorizontal } from 'lucide-react';
 
 const componentTypeConfig = {
   'MEMORIA RAM': { descripcion: 'Ej: Memoria RAM DDR4', marca: 'Ej: Kingston', modelo: 'Ej: Fury Beast', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: 16 GB DDR4 3200 MHz' },
@@ -59,13 +59,6 @@ function CategoriaBadge({ categoria }) {
     </span>
   );
 }
-
-const CATEGORIA_TABS = [
-  { value: '', label: 'TODOS' },
-  { value: 'REPUESTO_TECNICO', label: 'Repuestos Técnicos' },
-  { value: 'ACCESORIO', label: 'Accesorios' },
-  { value: 'CONSUMIBLE', label: 'Consumibles' },
-];
 
 const ESTADO_FILTERS = [
   { value: '', label: 'TODOS' },
@@ -247,22 +240,15 @@ export default function Componentes() {
             {tipos?.map((t) => <SelectItem key={t.IdTipodeComponente} value={String(t.IdTipodeComponente)}>{t.DesTipodeComponente}</SelectItem>)}
           </SelectContent>
         </Select>
-      </div>
-
-      <div className="flex gap-1 border-b border-border pb-1">
-        {CATEGORIA_TABS.map((tab) => (
-          <button
-            key={tab.value}
-            onClick={() => setCategoria(tab.value)}
-            className={`px-3 py-1.5 text-sm rounded-t-md transition-colors ${
-              categoria === tab.value
-                ? 'bg-primary text-primary-foreground font-medium'
-                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+        <Select value={categoria} onValueChange={(v) => setCategoria(v === 'Todos' ? '' : v)}>
+          <SelectTrigger className="w-[160px]"><SelectValue placeholder="Categoría" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Todos">Todas</SelectItem>
+            <SelectItem value="REPUESTO_TECNICO">Repuestos Técnicos</SelectItem>
+            <SelectItem value="ACCESORIO">Accesorios</SelectItem>
+            <SelectItem value="CONSUMIBLE">Consumibles</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <DataTable
@@ -275,6 +261,11 @@ export default function Componentes() {
               { key: 'Serie', label: 'Serie' },
               ...tipoColumns.map(c => ({ ...c, render: (r) => (r.caracteristicas || {})[c.key.replace('car_', '')] || '' })),
               { key: 'Estado', label: 'Estado', render: (r) => <StatusBadge status={r.Estado} /> },
+              { key: 'acciones', label: '', render: (r) => (
+                <button onClick={(e) => { e.stopPropagation(); handleRowClick(r); }} className="p-1 hover:bg-muted rounded">
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
+              )},
             ]
           : [
               { key: 'CodComponente', label: 'Código' },
@@ -283,6 +274,11 @@ export default function Componentes() {
               { key: 'Marca', label: 'Marca' },
               { key: 'Serie', label: 'Serie' },
               { key: 'Estado', label: 'Estado', render: (r) => <StatusBadge status={r.Estado} /> },
+              { key: 'acciones', label: '', render: (r) => (
+                <button onClick={(e) => { e.stopPropagation(); handleRowClick(r); }} className="p-1 hover:bg-muted rounded">
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
+              )},
             ]
         }
         data={data}
