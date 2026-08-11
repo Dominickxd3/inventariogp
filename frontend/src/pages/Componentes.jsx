@@ -159,12 +159,12 @@ export default function Componentes() {
     e.preventDefault();
     createMutation.mutate({
       IdTipodeComponente: form.IdTipodeComponente,
-      DesComponente: form.DesComponente?.trim() || null,
-      Marca: form.Marca?.trim() || null,
-      Modelo: form.Modelo?.trim() || null,
-      Serie: form.Serie?.trim() || null,
-      Capacidad: form.Capacidad?.trim() || null,
-      Obs: form.Obs?.trim() || null,
+      DesComponente: form.DesComponente?.trim() || undefined,
+      Marca: form.Marca?.trim() || undefined,
+      Modelo: form.Modelo?.trim() || undefined,
+      Serie: form.Serie?.trim() || undefined,
+      Capacidad: form.Capacidad?.trim() || undefined,
+      Obs: form.Obs?.trim() || undefined,
     });
   };
 
