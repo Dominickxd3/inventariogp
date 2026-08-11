@@ -3,7 +3,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '#components/ui/dialog.jsx';
 import { EstadoBadge } from '../Badge';
-import { AlertTriangle, Trash2, Package, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, Trash2, Package, CheckCircle2, Pencil } from 'lucide-react';
 import { formatDate } from '../../lib/utils';
 
 const TITULOS_TIMELINE = {
@@ -39,6 +39,7 @@ export default function ComponenteDetalleDrawer({
   loading,
   error,
   onBaja,
+  onEdit,
 }) {
   const loadingState = (
     <div className="py-8 text-center text-muted-foreground text-sm">
@@ -66,14 +67,26 @@ export default function ComponenteDetalleDrawer({
             <DialogTitle>Error</DialogTitle>
           ) : (
             <>
-              <div className="flex items-center gap-2 flex-wrap">
-                <DialogTitle className="text-base">{c.CodComponente}</DialogTitle>
-                <EstadoBadge estado={c.Estado} />
-                <CategoriaBadge categoria={c.Categoria} />
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <DialogTitle className="text-base">{c.CodComponente}</DialogTitle>
+                    <EstadoBadge estado={c.Estado} />
+                    <CategoriaBadge categoria={c.Categoria} />
+                  </div>
+                  <DialogDescription>
+                    {c.TipoComponente || c.DesTipodeComponente}{c.DesComponente ? ` — ${c.DesComponente}` : ''}
+                  </DialogDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={() => onEdit?.(c)}>
+                    <Pencil className="w-3.5 h-3.5 mr-1" /> Editar
+                  </Button>
+                  <Button size="sm" variant="outline" className="text-red-600" onClick={() => onBaja?.(c.IdComponente)}>
+                    Dar baja
+                  </Button>
+                </div>
               </div>
-              <DialogDescription>
-                {c.TipoComponente || c.DesTipodeComponente}{c.DesComponente ? ` — ${c.DesComponente}` : ''}
-              </DialogDescription>
             </>
           )}
         </DialogHeader>

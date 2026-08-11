@@ -17,7 +17,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '#components/ui/alert-dialog.jsx';
 import ComponenteDetalleDrawer from '../components/componentes/ComponenteDetalleDrawer';
-import { Plus, Search, Cpu, Headphones, Pencil, MoreHorizontal, Eye } from 'lucide-react';
+import { Plus, Search, Cpu, Headphones } from 'lucide-react';
 
 const componentTypeConfig = {
   'MEMORIA RAM': { descripcion: 'Ej: Memoria RAM DDR4', marca: 'Ej: Kingston', modelo: 'Ej: Fury Beast', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: 16 GB DDR4 3200 MHz' },
@@ -88,7 +88,6 @@ export default function Componentes() {
   const [categoria, setCategoria] = useState('');
   const [estadoFilter, setEstadoFilter] = useState('');
   const [tipoFilter, setTipoFilter] = useState('');
-  const [accionesAbierto, setAccionesAbierto] = useState(null);
   const [tipoColumns, setTipoColumns] = useState(null);
 
   useEffect(() => {
@@ -320,22 +319,6 @@ export default function Componentes() {
               { key: 'Serie', label: 'Serie' },
               ...tipoColumns.map(c => ({ ...c, render: (r) => (r.caracteristicas || {})[c.key.replace('car_', '')] || '' })),
               { key: 'Estado', label: 'Estado', render: (r) => <StatusBadge status={r.Estado} /> },
-              { key: 'acciones', label: 'Acciones', className: 'w-[130px]', render: (r) => (
-                <div className="flex items-center gap-1 relative">
-                  <button onClick={(e) => { e.stopPropagation(); setDetalleId(r.IdComponente); setShowDetalle(true); }}
-                    className="p-1.5 rounded hover:bg-muted" title="Ver detalle"><Eye className="w-3.5 h-3.5" /></button>
-                  <button onClick={(e) => { e.stopPropagation(); openEdit(r); }}
-                    className="p-1.5 rounded hover:bg-muted" title="Editar"><Pencil className="w-3.5 h-3.5" /></button>
-                  <button onClick={(e) => { e.stopPropagation(); setAccionesAbierto(accionesAbierto === r.IdComponente ? null : r.IdComponente); }}
-                    className="p-1.5 rounded hover:bg-muted" title="Más"><MoreHorizontal className="w-3.5 h-3.5" /></button>
-                  {accionesAbierto === r.IdComponente && (
-                    <div className="absolute right-0 top-8 z-20 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-40">
-                      <button onClick={(e) => { e.stopPropagation(); setAccionesAbierto(null); setBajaId(r.IdComponente); }}
-                        className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted text-red-600">Dar baja</button>
-                    </div>
-                  )}
-                </div>
-              )},
             ]
           : [
               { key: 'CodComponente', label: 'Código' },
@@ -344,22 +327,6 @@ export default function Componentes() {
               { key: 'Marca', label: 'Marca' },
               { key: 'Serie', label: 'Serie' },
               { key: 'Estado', label: 'Estado', render: (r) => <StatusBadge status={r.Estado} /> },
-              { key: 'acciones', label: 'Acciones', className: 'w-[130px]', render: (r) => (
-                <div className="flex items-center gap-1 relative">
-                  <button onClick={(e) => { e.stopPropagation(); setDetalleId(r.IdComponente); setShowDetalle(true); }}
-                    className="p-1.5 rounded hover:bg-muted" title="Ver detalle"><Eye className="w-3.5 h-3.5" /></button>
-                  <button onClick={(e) => { e.stopPropagation(); openEdit(r); }}
-                    className="p-1.5 rounded hover:bg-muted" title="Editar"><Pencil className="w-3.5 h-3.5" /></button>
-                  <button onClick={(e) => { e.stopPropagation(); setAccionesAbierto(accionesAbierto === r.IdComponente ? null : r.IdComponente); }}
-                    className="p-1.5 rounded hover:bg-muted" title="Más"><MoreHorizontal className="w-3.5 h-3.5" /></button>
-                  {accionesAbierto === r.IdComponente && (
-                    <div className="absolute right-0 top-8 z-20 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-40">
-                      <button onClick={(e) => { e.stopPropagation(); setAccionesAbierto(null); setBajaId(r.IdComponente); }}
-                        className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted text-red-600">Dar baja</button>
-                    </div>
-                  )}
-                </div>
-              )},
             ]
         }
         data={data}
@@ -524,6 +491,7 @@ export default function Componentes() {
         loading={detalleLoading}
         error={!!detalleError}
         onBaja={(id) => setBajaId(id)}
+        onEdit={(comp) => { setShowDetalle(false); setTimeout(() => openEdit(comp), 100); }}
       />
 
       <AlertDialog open={!!bajaId} onOpenChange={(v) => { if (!v) setBajaId(null); }}>
