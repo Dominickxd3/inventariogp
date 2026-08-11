@@ -11,7 +11,20 @@ export function mapAsignacionToCargoLaptop(snapshot, empresa) {
     .map(a => [a.codigo, a.descripcion, a.marca].filter(Boolean).join(' '))
     .join(', ')
 
-  const tipo = String(snapshot.equipo?.tipoEquipo || '').toUpperCase()
+  const eq = snapshot.equipo || {}
+  const fixFields = [
+    ['marca', 'MARCA'],
+    ['modelo', 'MODELO'],
+    ['color', 'COLOR'],
+    ['ram', 'RAM'],
+    ['capacidad', 'CAPACIDAD'],
+    ['imei', 'IMEI'],
+    ['nroCelular', 'NRO CELULAR'],
+  ]
+
+  const caracteristicas = fixFields
+    .filter(([k]) => eq[k])
+    .map(([k, label]) => ({ clave: label, valor: String(eq[k]) }))
 
   return {
     empresa,
@@ -20,16 +33,10 @@ export function mapAsignacionToCargoLaptop(snapshot, empresa) {
       dni: String(snapshot.trabajador?.dni || ''),
     },
     equipo: {
-      tipo: tipo,
-      marca: String(snapshot.equipo?.marca || ''),
-      modelo: String(snapshot.equipo?.modelo || ''),
-      color: String(snapshot.equipo?.color || ''),
-      ram: String(snapshot.equipo?.ram || ''),
-      capacidad: String(snapshot.equipo?.capacidad || ''),
-      serie: String(snapshot.equipo?.serie || ''),
-      imei: String(snapshot.equipo?.imei || ''),
-      nroCelular: String(snapshot.equipo?.nroCelular || ''),
+      tipo: String(eq.tipoEquipo || ''),
+      serie: String(eq.serie || ''),
       accesorios: accs,
+      caracteristicas,
     },
     fecha: formatearFecha(snapshot.fechaDocumento || new Date()),
   }

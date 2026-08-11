@@ -12,33 +12,15 @@ export default function CargoLaptop({
   firmaSrc,
   signatureField = CARGO_LAPTOP_SIGNATURE_FIELD,
 }: any) {
-  const esCelular = (equipo.tipo || '').toUpperCase().includes('CELULAR')
+  const rows: { label: string; value: string }[] = [
+    { label: "ASIGNADO", value: empleado.nombre },
+    ...(equipo.caracteristicas || []).map((c: any) => ({ label: c.clave, value: c.valor })),
+    { label: "S/N", value: equipo.serie },
+    { label: "ACCESORIOS", value: equipo.accesorios },
+  ]
 
-  const rows: { label: string; value: string }[] = esCelular
-    ? [
-        { label: "ASIGNADO", value: empleado.nombre },
-        { label: "NRO CELULAR", value: equipo.nroCelular },
-        { label: "MARCA", value: equipo.marca },
-        { label: "MODELO", value: equipo.modelo },
-        { label: "COLOR", value: equipo.color },
-        { label: "RAM", value: equipo.ram },
-        { label: "CAPACIDAD", value: equipo.capacidad },
-        { label: "IMEI", value: equipo.imei },
-        { label: "S/N", value: equipo.serie },
-        { label: "ACCESORIOS", value: equipo.accesorios },
-      ]
-    : [
-        { label: "ASIGNADO", value: empleado.nombre },
-        { label: "MARCA", value: equipo.marca },
-        { label: "MODELO", value: equipo.modelo },
-        { label: "COLOR", value: equipo.color },
-        { label: "RAM", value: equipo.ram },
-        { label: "CAPACIDAD", value: equipo.capacidad },
-        { label: "S/N", value: equipo.serie },
-        { label: "ACCESORIOS", value: equipo.accesorios },
-      ]
-
-  const titulo = esCelular ? 'Cargo de entrega de equipo celular' : 'Cargo de entrega de equipo laptop'
+  const tipoEquipo = (equipo.tipo || 'laptop').toLowerCase()
+  const titulo = `Cargo de entrega de equipo ${tipoEquipo}`
 
   return (
     <div id="cargo-laptop-document"

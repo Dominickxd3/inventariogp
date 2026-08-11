@@ -148,6 +148,10 @@ export const EquiposService = {
     return EquiposRepository.getTiposAsignables();
   },
 
+  async getPlantillaByTipo(idTipo) {
+    return EquiposRepository.getPlantillaByTipo(idTipo);
+  },
+
   async getTimeline(id) {
     const equipo = await EquiposRepository.getById(id);
     if (!equipo) return [];

@@ -43,6 +43,13 @@ router.get('/tipos-asignables', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.get('/tipos/:id/plantilla', async (req, res, next) => {
+  try {
+    const plantilla = await EquiposService.getPlantillaByTipo(Number(req.params.id));
+    res.json(plantilla);
+  } catch (e) { next(e); }
+});
+
 router.get('/scan/:codigo', async (req, res, next) => {
   try {
     const equipo = await EquiposService.getByCodigo(req.params.codigo);
