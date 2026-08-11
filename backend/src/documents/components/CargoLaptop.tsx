@@ -57,7 +57,7 @@ export default function CargoLaptop({
           <p className="font-bold uppercase mb-2">ACCESORIOS ENTREGADOS:</p>
           {accs.length > 0
             ? accs.map((a: any, i: number) => (
-                <p key={i} className="ml-2 mb-1">{i + 1}. {a.nombre}{a.marca ? ` - ${a.marca}` : ''}{a.modelo ? ` - ${a.modelo}` : ''}</p>
+                <p key={i} className="ml-2 mb-1">• {a.nombre}{a.marca ? ` ${a.marca}` : ''}{a.modelo ? ` ${a.modelo}` : ''}</p>
               ))
             : <p className="ml-2">No se entregó accesorios</p>
           }
