@@ -72,7 +72,7 @@ export default function CargoLaptop({
           </div>
           <p className="mt-2 uppercase text-[11pt]">DNI: {empleado.dni}</p>
         </div>
-        <footer className="mt-auto pt-8">
+        <footer className="mt-auto pt-8 mb-6">
           <div className="border-t border-black w-full mb-2" />
           <p className="text-center text-[9.5pt] leading-tight">{empresa.direccion}{empresa.telefonos ? ` - ${empresa.telefonos}` : ""}</p>
         </footer>
