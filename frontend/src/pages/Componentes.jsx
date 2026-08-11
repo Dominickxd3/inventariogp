@@ -17,7 +17,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '#components/ui/alert-dialog.jsx';
 import ComponenteDetalleDrawer from '../components/componentes/ComponenteDetalleDrawer';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Cpu, Headphones } from 'lucide-react';
 
 const componentTypeConfig = {
   'MEMORIA RAM': { descripcion: 'Ej: Memoria RAM DDR4', marca: 'Ej: Kingston', modelo: 'Ej: Fury Beast', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: 16 GB DDR4 3200 MHz' },
@@ -37,7 +37,7 @@ const componentTypeConfig = {
 };
 
 const defaultTypeConfig = { descripcion: 'Ej: descripción del componente', marca: 'Ej: Kingston', modelo: 'Ej: modelo', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: especificación principal', ayuda: '' };
-const initialForm = { IdTipodeComponente: '', DesComponente: '', Marca: '', Modelo: '', Serie: '', Capacidad: '', Lote: '', Obs: '' };
+const initialForm = { IdTipodeComponente: '', DesComponente: '', Marca: '', Modelo: '', Serie: '', Capacidad: '', Obs: '' };
 
 const formatCategoria = (cat) => ({ REPUESTO_TECNICO: 'Repuesto técnico', ACCESORIO: 'Accesorio' }[cat] || 'Sin categoría');
 const CATEGORIA_OPTS = [
@@ -164,7 +164,6 @@ export default function Componentes() {
       Modelo: form.Modelo?.trim() || null,
       Serie: form.Serie?.trim() || null,
       Capacidad: form.Capacidad?.trim() || null,
-      Lote: form.Lote?.trim() || null,
       Obs: form.Obs?.trim() || null,
     });
   };
@@ -241,15 +240,45 @@ export default function Componentes() {
             <DialogDescription>Registra un nuevo componente o accesorio en el inventario</DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1.5">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">Categoría <span className="text-destructive">*</span></label>
-              <Select value={categoriaNuevo} onValueChange={(v) => { setCategoriaNuevo(v); setForm((prev) => ({ ...prev, IdTipodeComponente: '' })); }}>
-                <SelectTrigger className="w-full"><SelectValue placeholder="Seleccionar categoría">{categoriaLabel || null}</SelectValue></SelectTrigger>
-                <SelectContent>
-                  {CATEGORIA_OPTS.map((opt) => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setCategoriaNuevo('REPUESTO_TECNICO'); setForm((prev) => ({ ...prev, IdTipodeComponente: '' })); }}
+                  className={`flex items-center gap-3 rounded-xl border-2 p-4 text-left transition-all ${
+                    categoriaNuevo === 'REPUESTO_TECNICO'
+                      ? 'border-blue-500 bg-blue-50 shadow-sm'
+                      : 'border-muted bg-background hover:border-blue-200'
+                  }`}
+                >
+                  <div className={`rounded-lg p-2 ${categoriaNuevo === 'REPUESTO_TECNICO' ? 'bg-blue-100 text-blue-600' : 'bg-muted text-muted-foreground'}`}>
+                    <Cpu className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">Repuesto técnico</p>
+                    <p className="text-xs text-muted-foreground">RAM, SSD, pantalla, batería</p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setCategoriaNuevo('ACCESORIO'); setForm((prev) => ({ ...prev, IdTipodeComponente: '' })); }}
+                  className={`flex items-center gap-3 rounded-xl border-2 p-4 text-left transition-all ${
+                    categoriaNuevo === 'ACCESORIO'
+                      ? 'border-emerald-500 bg-emerald-50 shadow-sm'
+                      : 'border-muted bg-background hover:border-emerald-200'
+                  }`}
+                >
+                  <div className={`rounded-lg p-2 ${categoriaNuevo === 'ACCESORIO' ? 'bg-emerald-100 text-emerald-600' : 'bg-muted text-muted-foreground'}`}>
+                    <Headphones className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">Accesorio</p>
+                    <p className="text-xs text-muted-foreground">Cargador, mouse, mochila, teclado</p>
+                  </div>
+                </button>
+              </div>
             </div>
 
             <div className="space-y-1.5">
@@ -275,49 +304,37 @@ export default function Componentes() {
               </Select>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">Nombre / descripción corta</label>
-              <Input value={form.DesComponente} onChange={(e) => setForm({ ...form, DesComponente: e.target.value })} placeholder={typeConfig.descripcion} />
-              <p className="text-xs text-muted-foreground">Se generará automáticamente si lo dejas vacío.</p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-foreground">Marca</label>
-                <Input value={form.Marca} onChange={(e) => setForm({ ...form, Marca: e.target.value })} placeholder={typeConfig.marca} />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-foreground">Modelo</label>
-                <Input value={form.Modelo} onChange={(e) => setForm({ ...form, Modelo: e.target.value })} placeholder={typeConfig.modelo} />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-foreground">Serie</label>
-                <Input value={form.Serie} onChange={(e) => setForm({ ...form, Serie: e.target.value })} placeholder={typeConfig.serie} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-foreground">{typeConfig.detalleLabel}</label>
-                <Input value={form.Capacidad} onChange={(e) => setForm({ ...form, Capacidad: e.target.value })} placeholder={typeConfig.detalle} />
-                {typeConfig.ayuda ? (
-                  <p className="text-xs text-muted-foreground">{typeConfig.ayuda}</p>
-                ) : autoDescription ? (
-                  <p className="text-xs text-muted-foreground">Vista previa automática: {autoDescription}</p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">Selecciona un tipo para generar vista previa</p>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-foreground">Lote</label>
-                <Input value={form.Lote} onChange={(e) => setForm({ ...form, Lote: e.target.value })} placeholder="Opcional" />
+            <div className="border-t pt-4">
+              <p className="text-sm font-semibold text-foreground mb-3">Detalles del componente</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-foreground">Nombre / descripción</label>
+                  <Input value={form.DesComponente} onChange={(e) => setForm({ ...form, DesComponente: e.target.value })} placeholder={typeConfig.descripcion} />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-foreground">{typeConfig.detalleLabel}</label>
+                  <Input value={form.Capacidad} onChange={(e) => setForm({ ...form, Capacidad: e.target.value })} placeholder={typeConfig.detalle} />
+                  {autoDescription && <p className="text-xs text-muted-foreground">Vista previa: {autoDescription}</p>}
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-foreground">Marca</label>
+                  <Input value={form.Marca} onChange={(e) => setForm({ ...form, Marca: e.target.value })} placeholder={typeConfig.marca} />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-foreground">Modelo</label>
+                  <Input value={form.Modelo} onChange={(e) => setForm({ ...form, Modelo: e.target.value })} placeholder={typeConfig.modelo} />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-foreground">Serie</label>
+                  <Input value={form.Serie} onChange={(e) => setForm({ ...form, Serie: e.target.value })} placeholder={typeConfig.serie} />
+                </div>
               </div>
             </div>
 
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-foreground">Observaciones</label>
               <textarea value={form.Obs} onChange={(e) => setForm({ ...form, Obs: e.target.value })}
-                className="w-full min-h-[72px] rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground"
+                className="w-full min-h-[60px] rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground"
                 placeholder="Opcional" />
             </div>
 
