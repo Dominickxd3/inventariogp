@@ -64,6 +64,15 @@ export default function Equipos() {
   const [caracteristicasVals, setCaracteristicasVals] = useState({});
   const [plantilla, setPlantilla] = useState(null);
 
+  const handleTipoChange = (v) => {
+    form.setValue('IdTipodeEquipo', v);
+    setCaracteristicasVals({});
+    if (!v) { setPlantilla(null); return; }
+    api.equipos.plantillaByTipo(Number(v))
+      .then(r => setPlantilla(r || []))
+      .catch(() => setPlantilla(null));
+  };
+
   const { data: dashboard, isLoading: dashLoading } = useQuery({
     queryKey: ['equipos-dashboard'],
     queryFn: api.equipos.dashboard,
@@ -271,11 +280,7 @@ export default function Equipos() {
               <label className="text-sm font-medium text-foreground">
                 Tipo de Equipo <span className="text-destructive">*</span>
               </label>
-              <Select value={form.watch('IdTipodeEquipo')} onValueChange={(v) => {
-                form.setValue('IdTipodeEquipo', v);
-                setCaracteristicasVals({});
-                api.equipos.plantillaByTipo(Number(v)).then(setPlantilla).catch(() => setPlantilla(null));
-              }}>
+              <Select value={form.watch('IdTipodeEquipo')} onValueChange={handleTipoChange}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Seleccionar tipo de equipo...">
                     {(() => {
