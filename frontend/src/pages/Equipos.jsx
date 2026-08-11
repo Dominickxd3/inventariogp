@@ -61,6 +61,15 @@ export default function Equipos() {
   });
 
   const [despuesDeGuardar, setDespuesDeGuardar] = useState('');
+  const [caracteristicasVals, setCaracteristicasVals] = useState({});
+
+  const idTipoSeleccionado = form.watch('IdTipodeEquipo');
+
+  const { data: plantilla } = useQuery({
+    queryKey: ['plantilla', idTipoSeleccionado],
+    queryFn: () => api.equipos.plantillaByTipo(Number(idTipoSeleccionado)),
+    enabled: !!idTipoSeleccionado,
+  });
 
   const { data: dashboard, isLoading: dashLoading } = useQuery({
     queryKey: ['equipos-dashboard'],
@@ -101,10 +110,22 @@ export default function Equipos() {
   });
 
   const createRapidoMutation = useMutation({
-    mutationFn: api.equipos.rapido,
+    mutationFn: async (data) => {
+      const resp = await api.equipos.rapido(data);
+      const id = resp.equipo.IdMaeEquipo;
+      const cam = plantilla || [];
+      if (id && cam.length > 0) {
+        const vals = Object.entries(caracteristicasVals)
+          .filter(([_, v]) => v)
+          .map(([idPlantilla, valor]) => ({ IdPlantilla: Number(idPlantilla), Valor: valor }));
+        if (vals.length > 0) await api.equipos.saveCaracteristicas(id, vals);
+      }
+      return resp;
+    },
     onSuccess: (resp) => {
       queryClient.invalidateQueries({ queryKey: ['equipos'] });
       queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
+      setCaracteristicasVals({});
       Swal.fire({ icon: 'success', title: 'Equipo creado', timer: 1500, showConfirmButton: false });
 
       switch (despuesDeGuardar) {
@@ -290,6 +311,25 @@ export default function Equipos() {
                 placeholder="Opcional"
               />
             </div>
+
+            {plantilla && plantilla.length > 0 && (
+              <div className="space-y-3 pt-1">
+                <p className="text-sm font-semibold text-foreground border-b pb-1">Características</p>
+                {plantilla.map((c) => (
+                  <div key={c.IdPlantilla} className="space-y-1">
+                    <label className="text-sm font-medium text-foreground">
+                      {c.Etiqueta || c.Clave}
+                      {c.Requerido ? <span className="text-red-500 ml-0.5">*</span> : null}
+                    </label>
+                    <Input
+                      placeholder={c.Etiqueta || c.Clave}
+                      value={caracteristicasVals[c.IdPlantilla] || ''}
+                      onChange={(e) => setCaracteristicasVals((prev) => ({ ...prev, [c.IdPlantilla]: e.target.value }))}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div className="space-y-1.5 pt-1">
               <label className="text-sm font-medium text-foreground">Después de guardar:</label>

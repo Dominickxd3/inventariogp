@@ -96,6 +96,9 @@ export const api = {
       create: (data) => request('/equipos/tipos', { method: 'POST', body: JSON.stringify(data) }),
     },
     tiposAsignables: () => request('/equipos/tipos-asignables'),
+    plantillaByTipo: (idTipo) => request(`/equipos/tipos/${idTipo}/plantilla`),
+    saveCaracteristicas: (id, caracteristicas) =>
+      request(`/equipos/${id}/caracteristicas`, { method: 'PUT', body: JSON.stringify({ caracteristicas }) }),
     intervenciones: {
       list: (id) => request(`/equipos/${id}/intervenciones`),
       create: (id, data) => request(`/equipos/${id}/intervenciones`, { method: 'POST', body: JSON.stringify(data) }),
