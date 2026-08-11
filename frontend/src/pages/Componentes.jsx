@@ -321,7 +321,7 @@ export default function Componentes() {
               { key: 'Estado', label: 'Estado', render: (r) => <StatusBadge status={r.Estado} /> },
               { key: 'acciones', label: '', render: (r) => (
                 <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="p-1 hover:bg-muted rounded">
-                  <MoreHorizontal className="w-4 h-4" />
+                  <Pencil className="w-4 h-4" />
                 </button>
               )},
             ]
@@ -334,7 +334,7 @@ export default function Componentes() {
               { key: 'Estado', label: 'Estado', render: (r) => <StatusBadge status={r.Estado} /> },
               { key: 'acciones', label: '', render: (r) => (
                 <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="p-1 hover:bg-muted rounded">
-                  <MoreHorizontal className="w-4 h-4" />
+                  <Pencil className="w-4 h-4" />
                 </button>
               )},
             ]
