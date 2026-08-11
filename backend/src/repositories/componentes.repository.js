@@ -448,6 +448,14 @@ export const ComponentesRepository = {
     `, { id: idComponente });
   },
 
+  async getCaracteristicasByLote(idsCsv) {
+    return query(DB, `
+      SELECT c.IdComponente, c.Clave, c.Valor
+      FROM Tab_Componente_Caracteristicas c
+      WHERE c.IdComponente IN (${idsCsv})
+    `);
+  },
+
   async deleteCaracteristicasPorComponente(idComponente, transaction) {
     const req = createRequest(transaction, { id: idComponente });
     await req.query('DELETE FROM Tab_Componente_Caracteristicas WHERE IdComponente = @id');

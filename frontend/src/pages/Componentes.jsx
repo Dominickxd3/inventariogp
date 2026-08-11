@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { StatusBadge } from '../components/StatusBadge';
@@ -95,6 +95,18 @@ export default function Componentes() {
   const [search, setSearch] = useState('');
   const [categoria, setCategoria] = useState('');
   const [estadoFilter, setEstadoFilter] = useState('');
+  const [tipoFilter, setTipoFilter] = useState('');
+  const [tipoColumns, setTipoColumns] = useState(null);
+
+  useEffect(() => {
+    if (!tipoFilter) { setTipoColumns(null); return; }
+    api.componentes.plantillaByTipo(Number(tipoFilter))
+      .then(pl => {
+        if (!pl?.length) { setTipoColumns(null); return; }
+        setTipoColumns(pl.map(c => ({ key: `car_${c.Clave}`, label: c.Etiqueta || c.Clave })));
+      })
+      .catch(() => setTipoColumns(null));
+  }, [tipoFilter]);
   const [showModal, setShowModal] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [showDetalle, setShowDetalle] = useState(false);
@@ -119,6 +131,7 @@ export default function Componentes() {
   const params = { search };
   if (categoria) params.categoria = categoria;
   if (estadoFilter) params.estado = estadoFilter;
+  if (tipoFilter) params.idTipo = tipoFilter;
 
   const { data, isLoading } = useQuery({
     queryKey: ['componentes', params],
@@ -223,6 +236,13 @@ export default function Componentes() {
             {ESTADO_FILTERS.map((f) => <SelectItem key={f.value} value={f.value || 'Todos'}>{f.label}</SelectItem>)}
           </SelectContent>
         </Select>
+        <Select value={tipoFilter} onValueChange={(v) => { setTipoFilter(v === 'Todos' ? '' : v); }}>
+          <SelectTrigger className="w-[180px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Todos">Todos los tipos</SelectItem>
+            {tipos?.map((t) => <SelectItem key={t.IdTipodeComponente} value={String(t.IdTipodeComponente)}>{t.DesTipodeComponente}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="flex gap-1 border-b border-border pb-1">
@@ -242,14 +262,25 @@ export default function Componentes() {
       </div>
 
       <DataTable
-        columns={[
-          { key: 'CodComponente', label: 'Código' },
-          { key: 'DesComponente', label: 'Descripción' },
-          { key: 'DesTipodeComponente', label: 'Tipo' },
-          { key: 'Marca', label: 'Marca' },
-          { key: 'Serie', label: 'Serie' },
-          { key: 'Estado', label: 'Estado', render: (r) => <StatusBadge status={r.Estado} /> },
-        ]}
+        columns={tipoColumns
+          ? [
+              { key: 'CodComponente', label: 'Código' },
+              { key: 'DesComponente', label: 'Descripción' },
+              { key: 'Marca', label: 'Marca' },
+              { key: 'Modelo', label: 'Modelo' },
+              { key: 'Serie', label: 'Serie' },
+              ...tipoColumns.map(c => ({ ...c, render: (r) => (r.caracteristicas || {})[c.key.replace('car_', '')] || '' })),
+              { key: 'Estado', label: 'Estado', render: (r) => <StatusBadge status={r.Estado} /> },
+            ]
+          : [
+              { key: 'CodComponente', label: 'Código' },
+              { key: 'DesComponente', label: 'Descripción' },
+              { key: 'DesTipodeComponente', label: 'Tipo' },
+              { key: 'Marca', label: 'Marca' },
+              { key: 'Serie', label: 'Serie' },
+              { key: 'Estado', label: 'Estado', render: (r) => <StatusBadge status={r.Estado} /> },
+            ]
+        }
         data={data}
         onRowClick={handleRowClick}
         searchable={false}

@@ -73,7 +73,20 @@ function normalizeTypeName(value) {
 
 export const ComponentesService = {
   async list(filtros) {
-    return ComponentesRepository.listAll(filtros);
+    const result = await ComponentesRepository.listAll(filtros);
+    if (filtros.idTipo && result.rows?.length) {
+      const ids = result.rows.map(r => r.IdComponente).join(',');
+      if (ids) {
+        const caracs = await ComponentesRepository.getCaracteristicasByLote(ids);
+        const map = {};
+        for (const c of caracs) {
+          if (!map[c.IdComponente]) map[c.IdComponente] = {};
+          map[c.IdComponente][c.Clave] = c.Valor;
+        }
+        result.rows = result.rows.map(r => ({ ...r, caracteristicas: map[r.IdComponente] || {} }));
+      }
+    }
+    return result;
   },
 
   async getById(id) {
