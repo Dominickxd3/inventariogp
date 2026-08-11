@@ -169,8 +169,6 @@ export default function Componentes() {
       setCompPlantilla(null);
       setCompCaracVals({});
     },
-      setCategoriaNuevo('');
-    },
   });
 
   const bajaMutation = useMutation({
