@@ -309,14 +309,6 @@ export default function Equipos() {
               <p className="text-xs text-muted-foreground">Puedes dejarlo vacío si el equipo no tiene código visible.</p>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">Observaciones</label>
-              <textarea {...form.register('Obs')}
-                className="w-full min-h-[60px] rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground"
-                placeholder="Opcional"
-              />
-            </div>
-
             {plantilla && plantilla.length > 0 && (
               <div className="space-y-3 pt-1">
                 <p className="text-sm font-semibold text-foreground border-b pb-1">Características</p>
@@ -335,6 +327,14 @@ export default function Equipos() {
                 ))}
               </div>
             )}
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">Observaciones</label>
+              <textarea {...form.register('Obs')}
+                className="w-full min-h-[60px] rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground"
+                placeholder="Opcional"
+              />
+            </div>
 
             <div className="space-y-1.5 pt-1">
               <label className="text-sm font-medium text-foreground">Después de guardar:</label>
