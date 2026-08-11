@@ -332,6 +332,17 @@ export default function Componentes() {
 
             {compPlantilla && compPlantilla.length > 0 ? (
               <div className="border-t pt-4">
+                <div className="bg-muted/50 rounded-lg p-3 mb-4 border border-muted">
+                  <p className="text-xs text-muted-foreground mb-1">Vista previa en acta:</p>
+                  <p className="text-sm font-medium">
+                    {[
+                      selectedTipo?.DesTipodeComponente,
+                      form.Marca,
+                      form.Modelo,
+                      Object.values(compCaracVals).find(v => v) || form.Capacidad,
+                    ].filter(Boolean).join(' ')}
+                  </p>
+                </div>
                 <p className="text-sm font-semibold text-foreground mb-3">Características</p>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                   {compPlantilla.map((c) => (
