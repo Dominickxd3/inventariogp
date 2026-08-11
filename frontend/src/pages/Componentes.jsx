@@ -237,7 +237,11 @@ export default function Componentes() {
           </SelectContent>
         </Select>
         <Select value={tipoFilter} onValueChange={(v) => { setTipoFilter(v === 'Todos' ? '' : v); }}>
-          <SelectTrigger className="w-[180px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Tipo">
+              {tipoFilter ? (tipos?.find(t => String(t.IdTipodeComponente) === tipoFilter)?.DesTipodeComponente || tipoFilter) : null}
+            </SelectValue>
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="Todos">Todos los tipos</SelectItem>
             {tipos?.map((t) => <SelectItem key={t.IdTipodeComponente} value={String(t.IdTipodeComponente)}>{t.DesTipodeComponente}</SelectItem>)}
