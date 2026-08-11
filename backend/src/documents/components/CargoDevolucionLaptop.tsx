@@ -63,7 +63,7 @@ export default function CargoDevolucionLaptop({
             ))}
           </div>
         )}
-        <p className="mt-4 uppercase text-[11pt] text-justify">El equipo se recibió en condiciones aceptables.</p>
+        <p className="mt-6 uppercase text-[11pt] text-justify">El equipo se recibió en condiciones aceptables.</p>
         <p className="mt-4 uppercase text-[11pt]">San Juan de Lurigancho, {fecha}</p>
         <div className="mt-8 flex justify-between gap-8">
           <div className="w-[58mm] text-center relative">
