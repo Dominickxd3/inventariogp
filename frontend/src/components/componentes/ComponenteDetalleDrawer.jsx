@@ -54,6 +54,7 @@ export default function ComponenteDetalleDrawer({
 
   const c = detalle?.componente || detalle;
   const usoActual = detalle?.usoActual;
+  const caracteristicas = detalle?.caracteristicas || [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -89,14 +90,26 @@ export default function ComponenteDetalleDrawer({
                 {c.Marca && <div className="flex justify-between"><span className="text-muted-foreground">Marca</span><span>{c.Marca}</span></div>}
                 {c.Modelo && <div className="flex justify-between"><span className="text-muted-foreground">Modelo</span><span>{c.Modelo}</span></div>}
                 {c.Serie && <div className="flex justify-between"><span className="text-muted-foreground">Serie</span><span>{c.Serie}</span></div>}
-                {c.Lote && <div className="flex justify-between"><span className="text-muted-foreground">Lote</span><span>{c.Lote}</span></div>}
-                {c.Capacidad && <div className="flex justify-between"><span className="text-muted-foreground">Capacidad</span><span>{c.Capacidad}</span></div>}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Estado</span>
                   <EstadoBadge estado={c.Estado} />
                 </div>
               </div>
             </div>
+
+            {caracteristicas.length > 0 && (
+              <div>
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Características</h4>
+                <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1">
+                  {caracteristicas.map((car) => (
+                    <div key={car.IdCaracteristica} className="flex justify-between">
+                      <span className="text-muted-foreground">{car.Clave}</span>
+                      <span>{car.Valor}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div>
               <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Uso actual</h4>

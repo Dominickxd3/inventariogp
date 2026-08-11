@@ -140,6 +140,7 @@ export const ComponentesService = {
     if (!Number.isInteger(id) || id <= 0) throw businessError('ID de componente inválido', 400);
     const detalle = await ComponentesRepository.getDetalleById(id);
     if (!detalle?.componente) throw businessError('Componente no encontrado', 404);
+    detalle.caracteristicas = await ComponentesRepository.getCaracteristicasComponente(id);
     return detalle;
   },
 

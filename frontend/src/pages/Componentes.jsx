@@ -244,10 +244,9 @@ export default function Componentes() {
       <DataTable
         columns={[
           { key: 'CodComponente', label: 'Código' },
-          { key: 'Descripcion', label: 'Descripción', render: (r) => (
-            <span className="text-sm">{[r.DesComponente, r.DesTipodeComponente, r.Marca, r.Modelo].filter(Boolean).join(' ')}</span>
-          )},
-          { key: 'Categoria', label: 'Categoría', render: (r) => <CategoriaBadge categoria={r.Categoria} /> },
+          { key: 'DesComponente', label: 'Descripción' },
+          { key: 'DesTipodeComponente', label: 'Tipo' },
+          { key: 'Marca', label: 'Marca' },
           { key: 'Serie', label: 'Serie' },
           { key: 'Estado', label: 'Estado', render: (r) => <StatusBadge status={r.Estado} /> },
         ]}
