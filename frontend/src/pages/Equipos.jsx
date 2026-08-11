@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import Swal from 'sweetalert2';
@@ -62,14 +62,19 @@ export default function Equipos() {
 
   const [despuesDeGuardar, setDespuesDeGuardar] = useState('');
   const [caracteristicasVals, setCaracteristicasVals] = useState({});
+  const [plantilla, setPlantilla] = useState(null);
 
   const idTipoSeleccionado = form.watch('IdTipodeEquipo');
 
-  const { data: plantilla } = useQuery({
-    queryKey: ['plantilla', idTipoSeleccionado],
-    queryFn: () => api.equipos.plantillaByTipo(Number(idTipoSeleccionado)),
-    enabled: !!idTipoSeleccionado,
-  });
+  useEffect(() => {
+    if (!idTipoSeleccionado) { setPlantilla(null); return }
+    setCaracteristicasVals({})
+    let cancel = false
+    api.equipos.plantillaByTipo(Number(idTipoSeleccionado))
+      .then(r => { if (!cancel) setPlantilla(r) })
+      .catch(() => { if (!cancel) setPlantilla(null) })
+    return () => { cancel = true }
+  }, [idTipoSeleccionado])
 
   const { data: dashboard, isLoading: dashLoading } = useQuery({
     queryKey: ['equipos-dashboard'],
