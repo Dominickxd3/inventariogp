@@ -18,8 +18,9 @@ export default function CargoDevolucionLaptop({
     { label: "ASIGNADO", value: empleado.nombre },
     ...(equipo.caracteristicas || []).map((c: any) => ({ label: c.clave, value: c.valor })),
     { label: "S/N", value: equipo.serie },
-    { label: "ACCESORIOS", value: equipo.accesorios },
   ]
+
+  const accs = equipo.accesoriosDetalle || []
 
   const tipoEquipo = (equipo.tipo || 'laptop').toLowerCase()
   const titulo = `Cargo de devolución de equipo ${tipoEquipo}`
@@ -54,9 +55,17 @@ export default function CargoDevolucionLaptop({
             ))}
           </tbody>
         </table>
-        <p className="mt-6 uppercase text-[11pt] text-justify">El equipo se recibió en condiciones aceptables.</p>
-        <p className="mt-6 uppercase text-[11pt]">San Juan de Lurigancho, {fecha}</p>
-        <div className="mt-12 flex justify-between gap-8">
+        {accs.length > 0 && (
+          <div className="mt-4 text-[11pt]">
+            <p className="font-bold uppercase mb-2">ACCESORIOS ENTREGADOS:</p>
+            {accs.map((a: any, i: number) => (
+              <p key={i} className="ml-2 mb-1">{i + 1}. {a.nombre}{a.marca ? ` - ${a.marca}` : ''}{a.modelo ? ` - ${a.modelo}` : ''}</p>
+            ))}
+          </div>
+        )}
+        <p className="mt-4 uppercase text-[11pt] text-justify">El equipo se recibió en condiciones aceptables.</p>
+        <p className="mt-4 uppercase text-[11pt]">San Juan de Lurigancho, {fecha}</p>
+        <div className="mt-8 flex justify-between gap-8">
           <div className="w-[58mm] text-center relative">
             <div className="mx-auto flex h-[18mm] w-full items-end justify-center">
               {firmaResponsableSrc && (

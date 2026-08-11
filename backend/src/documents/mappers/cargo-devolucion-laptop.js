@@ -7,9 +7,14 @@ function formatearFecha(fecha) {
 }
 
 export function mapAsignacionToCargoDevolucion(snapshot, empresa, responsable) {
-  const accs = (snapshot.accesorios || [])
-    .map(a => [a.codigo, a.descripcion, a.marca].filter(Boolean).join(' '))
-    .join(', ')
+  const accs = (snapshot.accesorios || []).map(a => ({
+    codigo: a.codigo || '',
+    nombre: a.descripcion || '',
+    marca: a.marca || '',
+    modelo: a.modelo || '',
+  }))
+
+  const accsText = accs.map(a => [a.codigo, a.nombre, a.marca].filter(Boolean).join(' ')).join(', ')
 
   const eq = snapshot.equipo || {}
   const fixFields = [
@@ -36,7 +41,8 @@ export function mapAsignacionToCargoDevolucion(snapshot, empresa, responsable) {
     equipo: {
       tipo: String(eq.tipoEquipo || ''),
       serie: String(eq.serie || ''),
-      accesorios: accs,
+      accesorios: accsText,
+      accesoriosDetalle: accs,
       caracteristicas,
     },
     fecha: formatearFecha(snapshot.fechaDocumento || new Date()),

@@ -16,8 +16,9 @@ export default function CargoLaptop({
     { label: "ASIGNADO", value: empleado.nombre },
     ...(equipo.caracteristicas || []).map((c: any) => ({ label: c.clave, value: c.valor })),
     { label: "S/N", value: equipo.serie },
-    { label: "ACCESORIOS", value: equipo.accesorios },
   ]
+
+  const accs = equipo.accesoriosDetalle || []
 
   const tipoEquipo = (equipo.tipo || 'laptop').toLowerCase()
   const titulo = `Cargo de entrega de equipo ${tipoEquipo}`
@@ -52,7 +53,15 @@ export default function CargoLaptop({
             ))}
           </tbody>
         </table>
-        <div className="mt-6 text-justify leading-relaxed text-[11pt] space-y-3.5 uppercase">
+        {accs.length > 0 && (
+          <div className="mt-4 text-[11pt]">
+            <p className="font-bold uppercase mb-2">ACCESORIOS ENTREGADOS:</p>
+            {accs.map((a: any, i: number) => (
+              <p key={i} className="ml-2 mb-1">{i + 1}. {a.nombre}{a.marca ? ` - ${a.marca}` : ''}{a.modelo ? ` - ${a.modelo}` : ''}</p>
+            ))}
+          </div>
+        )}
+        <div className="mt-4 text-justify leading-relaxed text-[11pt] space-y-3.5 uppercase">
           <p>Considero que este equipo debe ser usado exclusivamente para trabajo, es mi obligación responder cada vez que me llamen por asuntos laborales.</p>
           <p>Asimismo, está prohibido compartir el equipo e instalar aplicaciones que no se usan dentro del trabajo, caso contrario se le aplicará un memorandum por incumplimiento.</p>
           <p>Es mi responsabilidad ante cualquier siniestro (robo o hurto), la reposicion del equipo en el menor tiempo posible y razonable. Ademas de comunicar de forma inmediata al area de sistemas (922386045).</p>
