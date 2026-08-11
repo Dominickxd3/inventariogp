@@ -312,21 +312,23 @@ export default function Equipos() {
             </div>
 
             {plantilla && plantilla.length > 0 && (
-              <div className="space-y-3 pt-1">
+              <div className="space-y-2 pt-1">
                 <p className="text-sm font-semibold text-foreground border-b pb-1">Características</p>
-                {plantilla.map((c) => (
-                  <div key={c.IdPlantilla} className="space-y-1">
-                    <label className="text-sm font-medium text-foreground">
-                      {c.Etiqueta || c.Clave}
-                      {c.Requerido ? <span className="text-red-500 ml-0.5">*</span> : null}
-                    </label>
-                    <Input
-                      placeholder={c.Etiqueta || c.Clave}
-                      value={caracteristicasVals[c.IdPlantilla] || ''}
-                      onChange={(e) => setCaracteristicasVals((prev) => ({ ...prev, [c.IdPlantilla]: e.target.value }))}
-                    />
-                  </div>
-                ))}
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                  {plantilla.map((c) => (
+                    <div key={c.IdPlantilla} className="space-y-1">
+                      <label className="text-sm font-medium text-foreground">
+                        {c.Etiqueta || c.Clave}
+                        {c.Requerido ? <span className="text-red-500 ml-0.5">*</span> : null}
+                      </label>
+                      <Input
+                        placeholder={c.Etiqueta || c.Clave}
+                        value={caracteristicasVals[c.IdPlantilla] || ''}
+                        onChange={(e) => setCaracteristicasVals((prev) => ({ ...prev, [c.IdPlantilla]: e.target.value }))}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
