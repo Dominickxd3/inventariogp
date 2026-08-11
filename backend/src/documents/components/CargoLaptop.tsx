@@ -1,3 +1,4 @@
+/// <reference types="react" />
 import React from "react"
 
 const CARGO_LAPTOP_SIGNATURE_FIELD = { page: 1, x: 30, y: 220, width: 150, height: 50 }
@@ -79,3 +80,4 @@ export default function CargoLaptop({
     </div>
   )
 }
+
