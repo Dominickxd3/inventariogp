@@ -55,14 +55,15 @@ export default function CargoDevolucionLaptop({
             ))}
           </tbody>
         </table>
-        {accs.length > 0 && (
-          <div className="mt-4 text-[11pt]">
-            <p className="font-bold uppercase mb-2">ACCESORIOS ENTREGADOS:</p>
-            {accs.map((a: any, i: number) => (
-              <p key={i} className="ml-2 mb-1">{i + 1}. {a.nombre}{a.marca ? ` - ${a.marca}` : ''}{a.modelo ? ` - ${a.modelo}` : ''}</p>
-            ))}
-          </div>
-        )}
+        <div className="mt-4 text-[11pt]">
+          <p className="font-bold uppercase mb-2">ACCESORIOS ENTREGADOS:</p>
+          {accs.length > 0
+            ? accs.map((a: any, i: number) => (
+                <p key={i} className="ml-2 mb-1">{i + 1}. {a.nombre}{a.marca ? ` - ${a.marca}` : ''}{a.modelo ? ` - ${a.modelo}` : ''}</p>
+              ))
+            : <p className="ml-2">No se entregó accesorios</p>
+          }
+        </div>
         <p className="mt-6 uppercase text-[11pt] text-justify">El equipo se recibió en condiciones aceptables.</p>
         <p className="mt-6 uppercase text-[11pt]">San Juan de Lurigancho, {fecha}</p>
         <div className="mt-8 flex justify-between gap-8">
