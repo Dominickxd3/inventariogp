@@ -101,6 +101,8 @@ export default function Componentes() {
   const [bajaId, setBajaId] = useState(null);
   const [categoriaNuevo, setCategoriaNuevo] = useState('');
   const [form, setForm] = useState({ ...initialForm });
+
+  const setField = (field) => (e) => setForm((prev) => ({ ...prev, [field]: e.target.value.toUpperCase() }));
   const queryClient = useQueryClient();
 
   const params = { search };
@@ -309,31 +311,31 @@ export default function Componentes() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-foreground">Nombre / descripción</label>
-                  <Input value={form.DesComponente} onChange={(e) => setForm({ ...form, DesComponente: e.target.value })} placeholder={typeConfig.descripcion} />
+                  <Input value={form.DesComponente} onChange={setField('DesComponente')} placeholder={typeConfig.descripcion} />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-foreground">{typeConfig.detalleLabel}</label>
-                  <Input value={form.Capacidad} onChange={(e) => setForm({ ...form, Capacidad: e.target.value })} placeholder={typeConfig.detalle} />
+                  <Input value={form.Capacidad} onChange={setField('Capacidad')} placeholder={typeConfig.detalle} />
                   {autoDescription && <p className="text-xs text-muted-foreground">Vista previa: {autoDescription}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-foreground">Marca</label>
-                  <Input value={form.Marca} onChange={(e) => setForm({ ...form, Marca: e.target.value })} placeholder={typeConfig.marca} />
+                  <Input value={form.Marca} onChange={setField('Marca')} placeholder={typeConfig.marca} />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-foreground">Modelo</label>
-                  <Input value={form.Modelo} onChange={(e) => setForm({ ...form, Modelo: e.target.value })} placeholder={typeConfig.modelo} />
+                  <Input value={form.Modelo} onChange={setField('Modelo')} placeholder={typeConfig.modelo} />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-foreground">Serie</label>
-                  <Input value={form.Serie} onChange={(e) => setForm({ ...form, Serie: e.target.value })} placeholder={typeConfig.serie} />
+                  <Input value={form.Serie} onChange={setField('Serie')} placeholder={typeConfig.serie} />
                 </div>
               </div>
             </div>
 
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-foreground">Observaciones</label>
-              <textarea value={form.Obs} onChange={(e) => setForm({ ...form, Obs: e.target.value })}
+              <textarea value={form.Obs} onChange={setField('Obs')}
                 className="w-full min-h-[60px] rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground"
                 placeholder="Opcional" />
             </div>
