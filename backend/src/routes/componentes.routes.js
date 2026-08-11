@@ -119,4 +119,18 @@ router.post('/tipos', authMiddleware, roleMiddleware('ADMIN'), validate(componen
   } catch (e) { next(e); }
 });
 
+router.post('/:id/qr', authMiddleware, async (req, res, next) => {
+  try {
+    const comp = await ComponentesService.getById(parseInt(req.params.id));
+    res.json({
+      id: comp.IdComponente,
+      codigo: comp.CodComponente,
+      tipo: comp.DesTipodeComponente,
+      marca: comp.Marca,
+      modelo: comp.Modelo,
+      url: `${req.protocol}://${req.get('host')}/api/componentes/${comp.IdComponente}`,
+    });
+  } catch (e) { next(e); }
+});
+
 export default router;

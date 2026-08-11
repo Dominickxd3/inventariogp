@@ -319,10 +319,13 @@ export default function Componentes() {
               { key: 'Serie', label: 'Serie' },
               ...tipoColumns.map(c => ({ ...c, render: (r) => (r.caracteristicas || {})[c.key.replace('car_', '')] || '' })),
               { key: 'Estado', label: 'Estado', render: (r) => <StatusBadge status={r.Estado} /> },
-              { key: 'acciones', label: '', render: (r) => (
-                <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="p-1 hover:bg-muted rounded">
-                  <Pencil className="w-4 h-4" />
-                </button>
+              { key: 'acciones', label: '', className: 'w-[100px]', render: (r) => (
+                <div className="flex items-center gap-1">
+                  <button onClick={(e) => { e.stopPropagation(); setDetalleId(r.IdComponente); setShowDetalle(true); }}
+                    className="text-xs px-2 py-1 rounded hover:bg-muted">Detalle</button>
+                  <button onClick={(e) => { e.stopPropagation(); openEdit(r); }}
+                    className="text-xs px-2 py-1 rounded hover:bg-muted"><Pencil className="w-3.5 h-3.5" /></button>
+                </div>
               )},
             ]
           : [
@@ -332,10 +335,13 @@ export default function Componentes() {
               { key: 'Marca', label: 'Marca' },
               { key: 'Serie', label: 'Serie' },
               { key: 'Estado', label: 'Estado', render: (r) => <StatusBadge status={r.Estado} /> },
-              { key: 'acciones', label: '', render: (r) => (
-                <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="p-1 hover:bg-muted rounded">
-                  <Pencil className="w-4 h-4" />
-                </button>
+              { key: 'acciones', label: '', className: 'w-[100px]', render: (r) => (
+                <div className="flex items-center gap-1">
+                  <button onClick={(e) => { e.stopPropagation(); setDetalleId(r.IdComponente); setShowDetalle(true); }}
+                    className="text-xs px-2 py-1 rounded hover:bg-muted">Detalle</button>
+                  <button onClick={(e) => { e.stopPropagation(); openEdit(r); }}
+                    className="text-xs px-2 py-1 rounded hover:bg-muted"><Pencil className="w-3.5 h-3.5" /></button>
+                </div>
               )},
             ]
         }
