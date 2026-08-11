@@ -135,6 +135,9 @@ export default function Equipos() {
       switch (despuesDeGuardar) {
         case 'registrar_otro':
           form.reset({ IdTipodeEquipo: '', CodBarra: '', Obs: '' });
+          setTipoSeleccionado('');
+          setPlantilla(null);
+          setCaracteristicasVals({});
           setTimeout(() => document.querySelector('[data-equipo-codbarra]')?.focus(), 150);
           break;
         case 'asignar_ahora':
@@ -165,6 +168,9 @@ export default function Equipos() {
         <Button onClick={() => {
           form.reset({ IdTipodeEquipo: '', CodBarra: '', Obs: '' });
           setDespuesDeGuardar('');
+          setTipoSeleccionado('');
+          setPlantilla(null);
+          setCaracteristicasVals({});
           setShowCreateOpen(true);
         }}>
           <Plus className="w-4 h-4" /> Nuevo Equipo
