@@ -61,7 +61,6 @@ function CategoriaBadge({ categoria }) {
 }
 
 const ESTADO_FILTERS = [
-  { value: '', label: 'TODOS' },
   { value: 'DISPONIBLE', label: 'Disponible' },
   { value: 'ASIGNADO', label: 'Asignado' },
   { value: 'BAJA', label: 'Baja' },
@@ -101,7 +100,8 @@ export default function Componentes() {
       .catch(() => setTipoColumns(null));
   }, [tipoFilter]);
   const [showModal, setShowModal] = useState(false);
-  const [selectedId, setSelectedId] = useState(null);
+  const [editId, setEditId] = useState(null);
+  const [detalleId, setDetalleId] = useState(null);
   const [showDetalle, setShowDetalle] = useState(false);
   const [bajaId, setBajaId] = useState(null);
   const [categoriaNuevo, setCategoriaNuevo] = useState('');
@@ -137,9 +137,9 @@ export default function Componentes() {
   });
 
   const { data: detalle, isLoading: detalleLoading, error: detalleError } = useQuery({
-    queryKey: ['componente-detalle', selectedId],
-    queryFn: () => api.componentes.detalle(selectedId),
-    enabled: !!selectedId && showDetalle,
+    queryKey: ['componente-detalle', detalleId],
+    queryFn: () => api.componentes.detalle(detalleId),
+    enabled: !!detalleId && showDetalle,
   });
 
   const tiposFiltrados = useMemo(() => {
@@ -170,12 +170,65 @@ export default function Componentes() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['componentes'] });
       setShowModal(false);
-      setForm({ ...initialForm });
-      setCategoriaNuevo('');
-      setCompPlantilla(null);
-      setCompCaracVals({});
+      resetForm();
     },
   });
+
+  const updateMutation = useMutation({
+    mutationFn: async (data) => {
+      await api.componentes.update(editId, data);
+      const cam = compPlantilla || [];
+      if (cam.length > 0) {
+        const vals = Object.entries(compCaracVals)
+          .filter(([_, v]) => v)
+          .map(([idPlantilla, valor]) => ({ IdPlantilla: Number(idPlantilla), Valor: valor }));
+        if (vals.length > 0) await api.componentes.saveCaracteristicas(editId, vals);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['componentes'] });
+      queryClient.invalidateQueries({ queryKey: ['componente-detalle'] });
+      setShowModal(false);
+      resetForm();
+    },
+  });
+
+  function resetForm() {
+    setForm({ ...initialForm });
+    setCategoriaNuevo('');
+    setCompPlantilla(null);
+    setCompCaracVals({});
+    setEditId(null);
+  }
+
+  async function openEdit(comp) {
+    setEditId(comp.IdComponente);
+    setForm({
+      IdTipodeComponente: comp.IdTipodeComponente || '',
+      DesComponente: comp.DesComponente || '',
+      Marca: comp.Marca || '',
+      Modelo: comp.Modelo || '',
+      Serie: comp.Serie || '',
+      Capacidad: comp.Capacidad || '',
+      Obs: comp.Obs || '',
+    });
+    setCategoriaNuevo(comp.Categoria || '');
+    setCompCaracVals({});
+    if (comp.IdTipodeComponente) {
+      api.componentes.plantillaByTipo(Number(comp.IdTipodeComponente))
+        .then(r => setCompPlantilla(r || []))
+        .catch(() => setCompPlantilla(null));
+      try {
+        const caracs = await api.componentes.detalle(comp.IdComponente);
+        const vals = {};
+        for (const c of (caracs?.caracteristicas || [])) {
+          vals[c.IdPlantilla] = c.Valor || '';
+        }
+        setCompCaracVals(vals);
+      } catch {}
+    }
+    setShowModal(true);
+  }
 
   const bajaMutation = useMutation({
     mutationFn: api.componentes.baja,
@@ -189,7 +242,7 @@ export default function Componentes() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    createMutation.mutate({
+    const payload = {
       IdTipodeComponente: form.IdTipodeComponente,
       DesComponente: form.DesComponente?.trim() || undefined,
       Marca: form.Marca?.trim() || undefined,
@@ -197,18 +250,23 @@ export default function Componentes() {
       Serie: form.Serie?.trim() || undefined,
       Capacidad: form.Capacidad?.trim() || undefined,
       Obs: form.Obs?.trim() || undefined,
-    });
+    };
+    if (editId) {
+      updateMutation.mutate(payload);
+    } else {
+      createMutation.mutate(payload);
+    }
   };
 
   const handleRowClick = (row) => {
-    setSelectedId(row.IdComponente);
+    setDetalleId(row.IdComponente);
     setShowDetalle(true);
   };
 
   return (
     <div className="space-y-6">
       <PageHeader title="Componentes / Accesorios" description="Gestión de repuestos y accesorios">
-        <Button onClick={() => { setForm({ ...initialForm }); setCategoriaNuevo(''); setCompPlantilla(null); setCompCaracVals({}); setShowModal(true); }}>
+        <Button onClick={() => { resetForm(); setShowModal(true); }}>
           <Plus className="w-4 h-4" /> Nuevo Componente
         </Button>
       </PageHeader>
@@ -223,27 +281,26 @@ export default function Componentes() {
             className="h-8 w-full rounded-lg border border-input bg-transparent pl-9 pr-2.5 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground"
           />
         </div>
-        <Select value={estadoFilter || 'Todos'} onValueChange={(v) => setEstadoFilter(v === 'Todos' ? '' : v)}>
+        <Select value={estadoFilter} onValueChange={setEstadoFilter}>
           <SelectTrigger className="w-[140px]"><SelectValue placeholder="Estado" /></SelectTrigger>
           <SelectContent>
-            {ESTADO_FILTERS.map((f) => <SelectItem key={f.value} value={f.value || 'Todos'}>{f.label}</SelectItem>)}
+            <SelectItem value="">Todos</SelectItem>
+            {ESTADO_FILTERS.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={tipoFilter} onValueChange={(v) => { setTipoFilter(v === 'Todos' ? '' : v); }}>
+        <Select value={tipoFilter} onValueChange={setTipoFilter}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Tipo">
               {tipoFilter ? (tipos?.find(t => String(t.IdTipodeComponente) === tipoFilter)?.DesTipodeComponente || tipoFilter) : null}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="Todos">Todos los tipos</SelectItem>
             {tipos?.map((t) => <SelectItem key={t.IdTipodeComponente} value={String(t.IdTipodeComponente)}>{t.DesTipodeComponente}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={categoria} onValueChange={(v) => setCategoria(v === 'Todos' ? '' : v)}>
+        <Select value={categoria} onValueChange={setCategoria}>
           <SelectTrigger className="w-[160px]"><SelectValue placeholder="Categoría" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="Todos">Todas</SelectItem>
             <SelectItem value="REPUESTO_TECNICO">Repuestos Técnicos</SelectItem>
             <SelectItem value="ACCESORIO">Accesorios</SelectItem>
             <SelectItem value="CONSUMIBLE">Consumibles</SelectItem>
@@ -262,7 +319,7 @@ export default function Componentes() {
               ...tipoColumns.map(c => ({ ...c, render: (r) => (r.caracteristicas || {})[c.key.replace('car_', '')] || '' })),
               { key: 'Estado', label: 'Estado', render: (r) => <StatusBadge status={r.Estado} /> },
               { key: 'acciones', label: '', render: (r) => (
-                <button onClick={(e) => { e.stopPropagation(); handleRowClick(r); }} className="p-1 hover:bg-muted rounded">
+                <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="p-1 hover:bg-muted rounded">
                   <MoreHorizontal className="w-4 h-4" />
                 </button>
               )},
@@ -275,7 +332,7 @@ export default function Componentes() {
               { key: 'Serie', label: 'Serie' },
               { key: 'Estado', label: 'Estado', render: (r) => <StatusBadge status={r.Estado} /> },
               { key: 'acciones', label: '', render: (r) => (
-                <button onClick={(e) => { e.stopPropagation(); handleRowClick(r); }} className="p-1 hover:bg-muted rounded">
+                <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="p-1 hover:bg-muted rounded">
                   <MoreHorizontal className="w-4 h-4" />
                 </button>
               )},
@@ -291,7 +348,7 @@ export default function Componentes() {
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Nuevo Componente</DialogTitle>
+            <DialogTitle>{editId ? 'Editar Componente' : 'Nuevo Componente'}</DialogTitle>
             <DialogDescription>Registra un nuevo componente o accesorio en el inventario</DialogDescription>
           </DialogHeader>
 
@@ -427,8 +484,8 @@ export default function Componentes() {
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
-              <Button type="submit" disabled={createMutation.isPending || !form.IdTipodeComponente}>
-                {createMutation.isPending ? 'Guardando...' : 'Guardar Componente'}
+               <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending || !form.IdTipodeComponente}>
+                {createMutation.isPending || updateMutation.isPending ? 'Guardando...' : editId ? 'Actualizar Componente' : 'Guardar Componente'}
               </Button>
             </DialogFooter>
           </form>
