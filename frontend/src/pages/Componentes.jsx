@@ -17,7 +17,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '#components/ui/alert-dialog.jsx';
 import ComponenteDetalleDrawer from '../components/componentes/ComponenteDetalleDrawer';
-import { Plus, Search, Cpu, Headphones, MoreHorizontal } from 'lucide-react';
+import { Plus, Search, Cpu, Headphones, Pencil } from 'lucide-react';
 
 const componentTypeConfig = {
   'MEMORIA RAM': { descripcion: 'Ej: Memoria RAM DDR4', marca: 'Ej: Kingston', modelo: 'Ej: Fury Beast', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: 16 GB DDR4 3200 MHz' },
@@ -308,6 +308,7 @@ export default function Componentes() {
         </Select>
       </div>
 
+      <div className="overflow-x-auto rounded-lg border">
       <DataTable
         columns={tipoColumns
           ? [
@@ -344,6 +345,7 @@ export default function Componentes() {
         loading={isLoading}
         emptyMessage="No se encontraron componentes"
       />
+      </div>
 
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="sm:max-w-2xl">
@@ -355,7 +357,7 @@ export default function Componentes() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">Categoría <span className="text-destructive">*</span></label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
                   type="button"
                   onClick={() => { setCategoriaNuevo('REPUESTO_TECNICO'); setForm((prev) => ({ ...prev, IdTipodeComponente: '' })); }}
