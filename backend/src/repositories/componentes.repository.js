@@ -432,7 +432,7 @@ export const ComponentesRepository = {
 
   async getPlantillaByComponenteTipo(idTipo) {
     return query(DB, `
-      SELECT IdPlantilla, Clave, Etiqueta, TipoDato, Requerido, Orden
+      SELECT IdPlantilla, Clave, Etiqueta, TipoDato, Requerido, Orden, Ejemplo
       FROM Tab_Componente_PlantillaCaracteristicas
       WHERE IdTipodeComponente = @idTipo AND Activo = 1
       ORDER BY Orden

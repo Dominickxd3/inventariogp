@@ -437,7 +437,7 @@ export default function Componentes() {
                         {c.Requerido ? <span className="text-red-500 ml-0.5">*</span> : null}
                       </label>
                       <Input
-                        placeholder={c.Etiqueta || c.Clave}
+                        placeholder={c.Ejemplo || c.Etiqueta || c.Clave}
                         value={compCaracVals[c.IdPlantilla] || ''}
                         onChange={(e) => setCompCaracVals((prev) => ({ ...prev, [c.IdPlantilla]: e.target.value.toUpperCase() }))}
                       />
