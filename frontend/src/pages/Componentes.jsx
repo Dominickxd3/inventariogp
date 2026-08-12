@@ -253,10 +253,8 @@ export default function Componentes() {
     e.preventDefault();
     const autoDesc = [
       selectedTipo?.DesTipodeComponente,
-      form.Marca,
-      form.Modelo,
       ...(compPlantilla || [])
-        .filter(c => c.MostrarEnActa)
+        .filter(c => c.MostrarEnDescripcion)
         .sort((a,b) => (a.OrdenDescripcion||99) - (b.OrdenDescripcion||99))
         .map(c => compCaracVals[c.IdPlantilla]),
     ].filter(Boolean).join(' ');
@@ -433,10 +431,8 @@ export default function Componentes() {
                   <p className="text-sm font-medium">
                     {[
                       selectedTipo?.DesTipodeComponente,
-                      form.Marca,
-                      form.Modelo,
                       ...compPlantilla
-                        .filter(c => c.MostrarEnActa)
+                        .filter(c => c.MostrarEnDescripcion)
                         .sort((a,b) => (a.OrdenDescripcion||99) - (b.OrdenDescripcion||99))
                         .map(c => compCaracVals[c.IdPlantilla]),
                     ].filter(Boolean).join(' ')}
