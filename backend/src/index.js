@@ -16,6 +16,7 @@ import componentesRoutes from './routes/componentes.routes.js';
 import authRoutes from './routes/auth.routes.js';
 import actasRoutes from './routes/actas.routes.js';
 import actasPublicRoutes from './routes/actas-public.routes.js';
+import catalogosRoutes from './routes/catalogos.routes.js';
 
 const app = express();
 
@@ -51,6 +52,7 @@ app.use('/api/componentes', componentesRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/actas', actasRoutes);
 app.use('/api/public/actas', actasPublicRoutes);
+app.use('/api/catalogos', catalogosRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
