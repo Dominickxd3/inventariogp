@@ -98,8 +98,9 @@ export default function Componentes() {
       .then(pl => {
         if (!pl?.length) { setTipoColumns(null); return; }
         setTipoColumns(pl
-          .filter(c => !['MARCA','MODELO','SERIE'].includes(c.Clave?.toUpperCase()))
-          .map(c => ({ key: `car_${c.Clave}`, label: c.Etiqueta || c.Clave })));
+          .filter(c => c.MostrarEnGrilla)
+          .sort((a, b) => (a.OrdenDescripcion || 99) - (b.OrdenDescripcion || 99))
+          .map(c => ({ clave: c.Clave, label: c.Etiqueta || c.Clave })));
       })
       .catch(() => setTipoColumns(null));
   }, [tipoFilter]);
@@ -331,10 +332,16 @@ export default function Componentes() {
           ? [
               { key: 'CodComponente', label: 'Código' },
               { key: 'DesComponente', label: 'Descripción' },
-              { key: 'Marca', label: 'Marca' },
-              { key: 'Modelo', label: 'Modelo' },
-              { key: 'Serie', label: 'Serie' },
-              ...tipoColumns.map(c => ({ ...c, render: (r) => (r.caracteristicas || {})[c.key.replace('car_', '')] || '' })),
+              ...tipoColumns.map(c => ({
+                key: `col_${c.clave}`,
+                label: c.label,
+                render: (r) => {
+                  if (c.clave === 'Marca') return r.Marca || ''
+                  if (c.clave === 'Modelo') return r.Modelo || ''
+                  if (c.clave === 'Serie') return r.Serie || ''
+                  return (r.caracteristicas || {})[c.clave] || ''
+                },
+              })),
               { key: 'Estado', label: 'Estado', render: (r) => <StatusBadge status={r.Estado} /> },
             ]
           : [
