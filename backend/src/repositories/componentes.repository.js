@@ -29,6 +29,16 @@ export const ComponentesRepository = {
     return rows[0] || null;
   },
 
+  async getByCodigo(cod) {
+    const rows = await query(DB, `
+      SELECT c.*, tc.DesTipodeComponente, tc.Categoria
+      FROM Tab_EQ_Componentes c
+      LEFT JOIN Tab_EQ_TipodeComponentes tc ON c.IdTipodeComponente = tc.IdTipodeComponente
+      WHERE c.CodComponente = @cod
+    `, { cod });
+    return rows[0] || null;
+  },
+
   async create(data) {
     const result = await query(DB, `
       INSERT INTO Tab_EQ_Componentes

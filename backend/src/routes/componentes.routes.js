@@ -133,4 +133,12 @@ router.post('/:id/qr', authMiddleware, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.get('/scan/:codigo', authMiddleware, async (req, res, next) => {
+  try {
+    const comp = await ComponentesRepository.getByCodigo(req.params.codigo);
+    if (!comp) return res.status(404).json({ error: 'Componente no encontrado' });
+    res.json(comp);
+  } catch (e) { next(e); }
+});
+
 export default router;
