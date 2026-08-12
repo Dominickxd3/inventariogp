@@ -443,7 +443,7 @@ export const ComponentesRepository = {
     return query(DB, `
       SELECT c.IdCaracteristica, c.IdPlantilla, c.Clave, c.Valor
       FROM Tab_Componente_Caracteristicas c
-      JOIN Tab_Componente_PlantillaCaracteristicas p ON c.IdPlantilla = p.IdPlantilla
+      LEFT JOIN Tab_Componente_PlantillaCaracteristicas p ON c.IdPlantilla = p.IdPlantilla
       WHERE c.IdComponente = @id
     `, { id: idComponente });
   },
