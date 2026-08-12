@@ -107,9 +107,7 @@ export default function ComponenteScan() {
                 <>
                   <div className="flex justify-between"><span className="text-muted-foreground">Asignado a</span><span className="font-medium">{uso.trabajador?.NombreTrabajador}</span></div>
                 </>
-              ) : (
-                <div className="flex justify-between"><span className="text-muted-foreground">Ubicación</span><span className="font-medium">Almacén TI</span></div>
-              )}
+              ) : null}
             </div>
           </div>
 
