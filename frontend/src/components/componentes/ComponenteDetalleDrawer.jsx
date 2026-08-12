@@ -106,19 +106,21 @@ export default function ComponenteDetalleDrawer({
               </div>
             </div>
 
-            {caracteristicas.length > 0 && (
-              <div>
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Características</h4>
+            <div>
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Características</h4>
+              {caracteristicas.length > 0 ? (
                 <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1">
                   {caracteristicas.map((car) => (
                     <div key={car.IdCaracteristica} className="flex justify-between">
-                      <span className="text-muted-foreground">{car.Clave}</span>
+                      <span className="text-muted-foreground">{car.Etiqueta || car.Clave}</span>
                       <span>{car.Valor}</span>
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <p className="text-sm text-muted-foreground">Sin características técnicas registradas</p>
+              )}
+            </div>
 
             <div>
               <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Uso actual</h4>

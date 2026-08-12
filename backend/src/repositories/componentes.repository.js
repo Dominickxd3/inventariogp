@@ -441,7 +441,7 @@ export const ComponentesRepository = {
 
   async getCaracteristicasComponente(idComponente) {
     return query(DB, `
-      SELECT c.IdCaracteristica, c.IdPlantilla, c.Clave, c.Valor
+      SELECT c.IdCaracteristica, c.IdPlantilla, c.Clave, c.Valor, p.Etiqueta
       FROM Tab_Componente_Caracteristicas c
       LEFT JOIN Tab_Componente_PlantillaCaracteristicas p ON c.IdPlantilla = p.IdPlantilla
       WHERE c.IdComponente = @id
