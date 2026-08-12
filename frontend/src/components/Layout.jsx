@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Laptop, Users, ClipboardList,
   AlertTriangle, Package, ScanLine, Menu, X, QrCode, LogOut, User,
-  ChevronDown, FileText,
+  ChevronDown, FileText, Settings,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '#lib/utils.js';
@@ -30,6 +30,12 @@ const navSections = [
     label: 'Herramientas',
     items: [
       { to: '/scan', icon: ScanLine, label: 'Escanear QR' },
+    ],
+  },
+  {
+    label: 'Configuración',
+    items: [
+      { to: '/catalogos', icon: Settings, label: 'Catálogos' },
     ],
   },
 ];
