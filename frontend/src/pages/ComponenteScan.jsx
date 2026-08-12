@@ -18,7 +18,6 @@ export default function ComponenteScan() {
   useEffect(() => {
     if (!codigo) { setError('Código no proporcionado'); setLoading(false); return }
     setLoading(true)
-    api.componentes.detalle(undefined).constructor.name // placeholder
     fetch(`/api/componentes/scan/${codigo}`)
       .then(r => r.json())
       .then(d => { if (d.error) throw new Error(d.error); setData(d); setLoading(false) })
