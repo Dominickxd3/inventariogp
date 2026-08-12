@@ -56,8 +56,6 @@ export default function ComponenteDetalleDrawer({
   const c = detalle?.componente || detalle;
   const usoActual = detalle?.usoActual;
   const caracteristicas = detalle?.caracteristicas || [];
-  console.log('[Drawer] detalle keys:', Object.keys(detalle||{}));
-  console.log('[Drawer] caracteristicas:', caracteristicas.length, caracteristicas);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

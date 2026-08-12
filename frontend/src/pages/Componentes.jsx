@@ -160,7 +160,7 @@ export default function Componentes() {
   const createMutation = useMutation({
     mutationFn: async (data) => {
       const resp = await api.componentes.createQuick(data);
-      const id = resp.componente?.IdComponente || resp.IdComponente;
+      const id = resp.componente?.IdComponente || resp.IdComponente || resp.id;
       const cam = compPlantilla || [];
       if (id && cam.length > 0) {
         const vals = Object.entries(compCaracVals)
