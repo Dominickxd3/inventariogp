@@ -79,9 +79,6 @@ export default function ComponenteDetalleDrawer({
                 <Button size="sm" variant="outline" onClick={() => onEdit?.(c)}>
                   <Pencil className="w-3.5 h-3.5 mr-1" /> Editar
                 </Button>
-                <Button size="sm" variant="outline" className="text-red-600" onClick={() => onBaja?.(c.IdComponente)}>
-                  Dar baja
-                </Button>
               </div>
             </>
           )}
