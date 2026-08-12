@@ -249,9 +249,18 @@ export default function Componentes() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    const autoDesc = [
+      selectedTipo?.DesTipodeComponente,
+      form.Marca,
+      form.Modelo,
+      ...(compPlantilla || [])
+        .filter(c => c.MostrarEnActa)
+        .sort((a,b) => (a.OrdenDescripcion||99) - (b.OrdenDescripcion||99))
+        .map(c => compCaracVals[c.IdPlantilla]),
+    ].filter(Boolean).join(' ');
     const payload = {
       IdTipodeComponente: form.IdTipodeComponente,
-      DesComponente: form.DesComponente?.trim() || undefined,
+      DesComponente: autoDesc || form.DesComponente?.trim() || undefined,
       Marca: form.Marca?.trim() || undefined,
       Modelo: form.Modelo?.trim() || undefined,
       Serie: form.Serie?.trim() || undefined,
@@ -418,13 +427,16 @@ export default function Componentes() {
             {compPlantilla && compPlantilla.length > 0 ? (
               <div className="border-t pt-4">
                 <div className="bg-muted/50 rounded-lg p-3 mb-4 border border-muted">
-                  <p className="text-xs text-muted-foreground mb-1">Vista previa en acta:</p>
+                  <p className="text-xs text-muted-foreground mb-1">Descripción automática (no editable):</p>
                   <p className="text-sm font-medium">
                     {[
                       selectedTipo?.DesTipodeComponente,
                       form.Marca,
                       form.Modelo,
-                      Object.values(compCaracVals).find(v => v) || form.Capacidad,
+                      ...compPlantilla
+                        .filter(c => c.MostrarEnActa)
+                        .sort((a,b) => (a.OrdenDescripcion||99) - (b.OrdenDescripcion||99))
+                        .map(c => compCaracVals[c.IdPlantilla]),
                     ].filter(Boolean).join(' ')}
                   </p>
                 </div>
