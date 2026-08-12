@@ -19,6 +19,7 @@ import {
 } from '#components/ui/alert-dialog.jsx';
 import ComponenteDetalleDrawer from '../components/componentes/ComponenteDetalleDrawer';
 import AutocompleteInput from '../components/AutocompleteInput';
+import { Combobox } from '../components/ui/combobox.jsx';
 import { Plus, Search, Cpu, Headphones } from 'lucide-react';
 
 const componentTypeConfig = {
@@ -140,6 +141,18 @@ export default function Componentes() {
     queryKey: ['componentes-tipos'],
     queryFn: api.componentes.tipos.list,
   });
+
+  const tiposPorCategoria = useMemo(() => {
+    if (!categoria || !Array.isArray(tipos)) return []
+    const cat = normalizarCategoria(categoria)
+    return tipos.filter(t => normalizarCategoria(t.Categoria) === cat)
+  }, [categoria, tipos])
+
+  const handleCategoriaChange = (v) => {
+    setCategoria(v)
+    setTipoFilter('')
+    setTipoColumns(null)
+  }
 
   const { data: detalle, isLoading: detalleLoading, error: detalleError } = useQuery({
     queryKey: ['componente-detalle', detalleId],
@@ -299,29 +312,31 @@ export default function Componentes() {
             className="h-8 w-full rounded-lg border border-input bg-transparent pl-9 pr-2.5 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground"
           />
         </div>
-        <Select value={estadoFilter} onValueChange={setEstadoFilter}>
-          <SelectTrigger className="w-[140px]"><SelectValue placeholder="Estado" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">Todos</SelectItem>
-            {ESTADO_FILTERS.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={tipoFilter} onValueChange={setTipoFilter}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Tipo">
-              {tipoFilter ? (tipos?.find(t => String(t.IdTipodeComponente) === tipoFilter)?.DesTipodeComponente || tipoFilter) : null}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {tipos?.map((t) => <SelectItem key={t.IdTipodeComponente} value={String(t.IdTipodeComponente)}>{t.DesTipodeComponente}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={categoria} onValueChange={setCategoria}>
+        <Select value={categoria} onValueChange={handleCategoriaChange}>
           <SelectTrigger className="w-[160px]"><SelectValue placeholder="Categoría" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="REPUESTO_TECNICO">Repuestos Técnicos</SelectItem>
             <SelectItem value="ACCESORIO">Accesorios</SelectItem>
             <SelectItem value="CONSUMIBLE">Consumibles</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="w-[180px]">
+          <Combobox
+            options={tiposPorCategoria.map(t => ({ value: String(t.IdTipodeComponente), label: t.DesTipodeComponente }))}
+            value={tipoFilter ? (tipos?.find(t => String(t.IdTipodeComponente) === tipoFilter)?.DesTipodeComponente || '') : ''}
+            onSelect={(v) => setTipoFilter(v)}
+            placeholder={categoria ? 'Seleccionar tipo...' : 'Primero selecciona categoría'}
+            searchPlaceholder="Buscar tipo..."
+            emptyText="Sin tipos"
+            disabled={!categoria}
+            className="h-8"
+          />
+        </div>
+        <Select value={estadoFilter} onValueChange={setEstadoFilter}>
+          <SelectTrigger className="w-[140px]"><SelectValue placeholder="Estado" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">Todos</SelectItem>
+            {ESTADO_FILTERS.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
