@@ -154,6 +154,12 @@ export const ComponentesService = {
     const detalle = await ComponentesRepository.getDetalleById(id);
     if (!detalle?.componente) throw businessError('Componente no encontrado', 404);
     detalle.caracteristicas = await ComponentesRepository.getCaracteristicasComponente(id);
+
+    const QRCode = (await import('qrcode')).default;
+    const comp = detalle.componente;
+    const qrData = `COMP:${comp.CodComponente}|${comp.DesComponente}|${comp.Marca||''}|${comp.Modelo||''}`;
+    detalle.qrBase64 = await QRCode.toDataURL(qrData, { width: 150, margin: 1 });
+
     return detalle;
   },
 

@@ -89,6 +89,11 @@ export default function ComponenteDetalleDrawer({
 
         {loading ? loadingState : error || !c ? errorState : (
           <div className="space-y-5">
+            {detalle?.qrBase64 && (
+              <div className="flex justify-center">
+                <img src={detalle.qrBase64} alt="QR" className="w-32 h-32" />
+              </div>
+            )}
             <div>
               <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Datos técnicos</h4>
               <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-sm">
