@@ -363,8 +363,6 @@ export default function Componentes() {
               { key: 'CodComponente', label: 'Código' },
               { key: 'DesComponente', label: 'Descripción' },
               { key: 'DesTipodeComponente', label: 'Tipo' },
-              { key: 'Marca', label: 'Marca' },
-              { key: 'Serie', label: 'Serie' },
               { key: 'Estado', label: 'Estado', render: (r) => <StatusBadge status={r.Estado} /> },
             ]
         }
