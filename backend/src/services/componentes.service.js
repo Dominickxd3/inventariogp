@@ -157,7 +157,8 @@ export const ComponentesService = {
 
     const QRCode = (await import('qrcode')).default;
     const comp = detalle.componente;
-    const url = `/componentes/scan/${comp.CodComponente}`;
+    const publicUrl = process.env.ACTAS_PUBLIC_URL || 'http://localhost:5173';
+    const url = `${publicUrl}/componentes/scan/${comp.CodComponente}`;
     detalle.qrBase64 = await QRCode.toDataURL(url, { width: 150, margin: 1 });
     detalle.qrUrl = url;
 
