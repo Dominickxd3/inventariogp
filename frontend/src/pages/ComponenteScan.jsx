@@ -1,16 +1,21 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { api } from '../lib/api'
 import { StatusBadge } from '../components/StatusBadge'
 import { Button } from '#components/ui/button.jsx'
 import { Skeleton } from '#components/ui/skeleton.jsx'
 import { formatDate } from '../lib/utils'
 import { Eye, Copy, Check, ArrowLeft, Cpu } from 'lucide-react'
 
+const CATEGORIA_LABEL = {
+  REPUESTO_TECNICO: 'Repuesto Técnico',
+  ACCESORIO: 'Accesorio',
+  CONSUMIBLE: 'Consumible',
+}
+
 export default function ComponenteScan() {
   const { codigo } = useParams()
   const navigate = useNavigate()
-  const [data, setData] = useState(null)
+  const [detalle, setDetalle] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
@@ -20,7 +25,7 @@ export default function ComponenteScan() {
     setLoading(true)
     fetch(`/api/componentes/scan/${codigo}`)
       .then(r => r.json())
-      .then(d => { if (d.error) throw new Error(d.error); setData(d); setLoading(false) })
+      .then(d => { if (d.error) throw new Error(d.error); setDetalle(d); setLoading(false) })
       .catch(() => { setError('Componente no encontrado o código inválido'); setLoading(false) })
   }, [codigo])
 
@@ -30,7 +35,10 @@ export default function ComponenteScan() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const c = data
+  const c = detalle?.componente
+  const uso = detalle?.usoActual
+  const caracteristicas = detalle?.caracteristicas || []
+  const timeline = detalle?.timeline || []
 
   return (
     <div className="max-w-lg mx-auto space-y-6">
@@ -40,10 +48,6 @@ export default function ComponenteScan() {
         </Button>
         <h1 className="text-2xl font-bold text-foreground">Componente Escaneado</h1>
       </div>
-
-      <p className="text-sm text-muted-foreground">
-        Código: <code className="bg-muted px-2 py-0.5 rounded text-xs font-mono">{codigo}</code>
-      </p>
 
       {loading && <Skeleton className="h-48 rounded-xl" />}
 
@@ -56,36 +60,77 @@ export default function ComponenteScan() {
       )}
 
       {c && (
-        <div className="bg-card rounded-xl border border-border p-6 space-y-5 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-foreground">{c.CodComponente}</h2>
-              <p className="text-sm text-muted-foreground">{c.DesTipodeComponente || c.TipoComponente}</p>
+        <div className="space-y-5">
+          <div className="bg-card rounded-xl border border-border p-6 space-y-5 shadow-sm">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-foreground">{c.CodComponente}</h2>
+                <p className="text-sm text-muted-foreground">{c.DesComponente}</p>
+              </div>
+              <StatusBadge status={c.Estado} />
             </div>
-            <StatusBadge status={c.Estado} />
+
+            <div className="bg-muted/50 rounded-lg p-4 space-y-1.5 text-sm">
+              <div className="flex justify-between"><span className="text-muted-foreground">Código interno</span><span className="font-medium">{c.CodComponente}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Categoría</span><span className="font-medium">{CATEGORIA_LABEL[c.Categoria] || c.Categoria}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Tipo</span><span className="font-medium">{c.TipoComponente || c.DesTipodeComponente}</span></div>
+              {c.Marca && <div className="flex justify-between"><span className="text-muted-foreground">Marca</span><span className="font-medium">{c.Marca}</span></div>}
+              {c.Modelo && <div className="flex justify-between"><span className="text-muted-foreground">Modelo</span><span className="font-medium">{c.Modelo}</span></div>}
+              <div className="flex justify-between"><span className="text-muted-foreground">Serie</span><span className="font-medium">{c.Serie || 'Sin serie'}</span></div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            {c.Marca && <div className="bg-muted/50 rounded-lg p-3">
-              <p className="text-xs text-muted-foreground mb-0.5">Marca</p>
-              <p className="font-medium">{c.Marca}</p>
-            </div>}
-            {c.Modelo && <div className="bg-muted/50 rounded-lg p-3">
-              <p className="text-xs text-muted-foreground mb-0.5">Modelo</p>
-              <p className="font-medium">{c.Modelo}</p>
-            </div>}
-            {c.Serie && <div className="bg-muted/50 rounded-lg p-3">
-              <p className="text-xs text-muted-foreground mb-0.5">Serie</p>
-              <p className="font-medium">{c.Serie}</p>
-            </div>}
-            {c.Categoria && <div className="bg-muted/50 rounded-lg p-3">
-              <p className="text-xs text-muted-foreground mb-0.5">Categoría</p>
-              <p className="font-medium">{c.Categoria === 'REPUESTO_TECNICO' ? 'Repuesto Técnico' : c.Categoria === 'ACCESORIO' ? 'Accesorio' : c.Categoria}</p>
-            </div>}
+          {caracteristicas.length > 0 && (
+            <div className="bg-card rounded-xl border border-border p-5 space-y-2 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Características</p>
+              <div className="space-y-1 text-sm">
+                {caracteristicas.map(car => (
+                  <div key={car.IdCaracteristica} className="flex justify-between">
+                    <span className="text-muted-foreground">{car.Etiqueta || car.Clave}</span>
+                    <span className="font-medium">{car.Valor}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="bg-card rounded-xl border border-border p-5 space-y-2 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Uso actual</p>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between"><span className="text-muted-foreground">Estado</span><StatusBadge status={c.Estado} /></div>
+              {uso?.tipo === 'EQUIPO' ? (
+                <>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Instalado en</span><span className="font-medium">{uso.equipo?.CodEquipo}</span></div>
+                  {uso.equipo?.TipoEquipo && <div className="flex justify-between"><span className="text-muted-foreground">Tipo equipo</span><span className="font-medium">{uso.equipo.TipoEquipo}</span></div>}
+                </>
+              ) : uso?.tipo === 'TRABAJADOR' ? (
+                <>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Asignado a</span><span className="font-medium">{uso.trabajador?.NombreTrabajador}</span></div>
+                </>
+              ) : (
+                <div className="flex justify-between"><span className="text-muted-foreground">Ubicación</span><span className="font-medium">Almacén TI</span></div>
+              )}
+            </div>
           </div>
 
-          <div className="flex flex-col gap-2 pt-2">
-            <Button onClick={() => navigate(`/componentes`)} className="w-full">
+          <div className="bg-card rounded-xl border border-border p-5 space-y-2 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Historial</p>
+            {timeline.length > 0 ? (
+              <div className="space-y-2 text-sm">
+                {timeline.map((t, i) => (
+                  <div key={i} className="flex justify-between gap-3">
+                    <span className="text-muted-foreground whitespace-nowrap">{formatDate(t.fecha)}</span>
+                    <span className="font-medium text-right">{t.descripcion || t.titulo}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Sin movimientos</p>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Button onClick={() => navigate('/componentes')} className="w-full">
               <Eye className="w-4 h-4 mr-2" /> Ver en inventario
             </Button>
             <div className="flex gap-2">

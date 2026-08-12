@@ -99,6 +99,14 @@ export const ComponentesService = {
     return ComponentesRepository.getByCodigo(cod);
   },
 
+  async getDetalleByCodigo(cod) {
+    const comp = await ComponentesRepository.getByCodigo(cod);
+    if (!comp) return null;
+    const detalle = await ComponentesRepository.getDetalleById(comp.IdComponente);
+    detalle.caracteristicas = await ComponentesRepository.getCaracteristicasComponente(comp.IdComponente);
+    return detalle;
+  },
+
   async listTipos() {
     const tipos = await ComponentesRepository.listTipos();
     return tipos.filter((tipo) => !INVALID_COMPONENT_TYPES.has(normalizeTypeName(tipo.DesTipodeComponente)));
