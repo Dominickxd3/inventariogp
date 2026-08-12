@@ -215,9 +215,8 @@ export const ComponentesService = {
   },
 
   async saveCaracteristicas(idComponente, caracteristicas, idUsuario) {
-    const comp = await ComponentesRepository.getById(idComponente);
-    if (!comp || !comp.length) throw Object.assign(new Error('Componente no encontrado'), { statusCode: 404 });
-    const datos = comp[0];
+    const datos = await ComponentesRepository.getById(idComponente);
+    if (!datos) throw Object.assign(new Error('Componente no encontrado'), { statusCode: 404 });
 
     const plantilla = await ComponentesRepository.getPlantillaByComponenteTipo(datos.IdTipodeComponente);
     const validIds = new Set(plantilla.map(p => p.IdPlantilla));
