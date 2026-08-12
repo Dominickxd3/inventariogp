@@ -96,7 +96,9 @@ export default function Componentes() {
     api.componentes.plantillaByTipo(Number(tipoFilter))
       .then(pl => {
         if (!pl?.length) { setTipoColumns(null); return; }
-        setTipoColumns(pl.map(c => ({ key: `car_${c.Clave}`, label: c.Etiqueta || c.Clave })));
+        setTipoColumns(pl
+          .filter(c => !['MARCA','MODELO','SERIE'].includes(c.Clave?.toUpperCase()))
+          .map(c => ({ key: `car_${c.Clave}`, label: c.Etiqueta || c.Clave })));
       })
       .catch(() => setTipoColumns(null));
   }, [tipoFilter]);

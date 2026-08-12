@@ -67,25 +67,21 @@ export default function ComponenteDetalleDrawer({
             <DialogTitle>Error</DialogTitle>
           ) : (
             <>
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <DialogTitle className="text-base">{c.CodComponente}</DialogTitle>
-                    <EstadoBadge estado={c.Estado} />
-                    <CategoriaBadge categoria={c.Categoria} />
-                  </div>
-                  <DialogDescription>
-                    {c.TipoComponente || c.DesTipodeComponente}{c.DesComponente ? ` — ${c.DesComponente}` : ''}
-                  </DialogDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button size="sm" variant="outline" onClick={() => onEdit?.(c)}>
-                    <Pencil className="w-3.5 h-3.5 mr-1" /> Editar
-                  </Button>
-                  <Button size="sm" variant="outline" className="text-red-600" onClick={() => onBaja?.(c.IdComponente)}>
-                    Dar baja
-                  </Button>
-                </div>
+              <div className="flex items-center gap-2 pr-8">
+                <DialogTitle className="text-base">{c.CodComponente}</DialogTitle>
+                <EstadoBadge estado={c.Estado} />
+                <CategoriaBadge categoria={c.Categoria} />
+              </div>
+              <DialogDescription>
+                {c.TipoComponente || c.DesTipodeComponente}{c.DesComponente ? ` — ${c.DesComponente}` : ''}
+              </DialogDescription>
+              <div className="flex items-center gap-2 mt-3">
+                <Button size="sm" variant="outline" onClick={() => onEdit?.(c)}>
+                  <Pencil className="w-3.5 h-3.5 mr-1" /> Editar
+                </Button>
+                <Button size="sm" variant="outline" className="text-red-600" onClick={() => onBaja?.(c.IdComponente)}>
+                  Dar baja
+                </Button>
               </div>
             </>
           )}
