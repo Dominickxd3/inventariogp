@@ -19,7 +19,6 @@ import {
 } from '#components/ui/alert-dialog.jsx';
 import ComponenteDetalleDrawer from '../components/componentes/ComponenteDetalleDrawer';
 import AutocompleteInput from '../components/AutocompleteInput';
-import { Combobox } from '../components/ui/combobox.jsx';
 import { Plus, Search, Cpu, Headphones } from 'lucide-react';
 
 const componentTypeConfig = {
@@ -320,18 +319,17 @@ export default function Componentes() {
             <SelectItem value="CONSUMIBLE">Consumibles</SelectItem>
           </SelectContent>
         </Select>
-        <div className="w-[180px]">
-          <Combobox
-            options={tiposPorCategoria.map(t => ({ value: String(t.IdTipodeComponente), label: t.DesTipodeComponente }))}
-            value={tipoFilter ? (tipos?.find(t => String(t.IdTipodeComponente) === tipoFilter)?.DesTipodeComponente || '') : ''}
-            onSelect={(v) => setTipoFilter(v)}
-            placeholder={categoria ? 'Seleccionar tipo...' : 'Primero selecciona categoría'}
-            searchPlaceholder="Buscar tipo..."
-            emptyText="Sin tipos"
-            disabled={!categoria}
-            className="h-8"
-          />
-        </div>
+        <Select value={tipoFilter} onValueChange={setTipoFilter} disabled={!categoria}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder={categoria ? 'Seleccionar tipo...' : 'Primero selecciona categoría'} />
+          </SelectTrigger>
+          <SelectContent>
+            {tiposPorCategoria.map((t) => <SelectItem key={t.IdTipodeComponente} value={String(t.IdTipodeComponente)}>{t.DesTipodeComponente}</SelectItem>)}
+            {tiposPorCategoria.length === 0 && categoria && (
+              <div className="px-2 py-2 text-xs text-muted-foreground text-center">Sin tipos</div>
+            )}
+          </SelectContent>
+        </Select>
         <Select value={estadoFilter} onValueChange={setEstadoFilter}>
           <SelectTrigger className="w-[140px]"><SelectValue placeholder="Estado" /></SelectTrigger>
           <SelectContent>
