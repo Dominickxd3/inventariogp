@@ -19,7 +19,7 @@ export default function ComponenteScan() {
     if (!codigo) { setError('Código no proporcionado'); setLoading(false); return }
     setLoading(true)
     api.componentes.detalle(undefined).constructor.name // placeholder
-    fetch(`/api/componentes/scan/${codigo}`, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
+    fetch(`/api/componentes/scan/${codigo}`)
       .then(r => r.json())
       .then(d => { if (d.error) throw new Error(d.error); setData(d); setLoading(false) })
       .catch(() => { setError('Componente no encontrado o código inválido'); setLoading(false) })
