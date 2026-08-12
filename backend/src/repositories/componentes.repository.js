@@ -39,6 +39,16 @@ export const ComponentesRepository = {
     return rows[0] || null;
   },
 
+  async searchCatalogo(nombre, q) {
+    return query(DB, `
+      SELECT v.IdValor, v.NombreValor
+      FROM Mae_CatalogoValores v
+      JOIN Mae_Catalogos c ON v.IdCatalogo = c.IdCatalogo
+      WHERE c.NombreCatalogo = @nombre AND v.NombreValor LIKE '%' + @q + '%' AND v.Activo = 1
+      ORDER BY v.NombreValor
+    `, { nombre, q });
+  },
+
   async create(data) {
     const result = await query(DB, `
       INSERT INTO Tab_EQ_Componentes
@@ -442,9 +452,12 @@ export const ComponentesRepository = {
 
   async getPlantillaByComponenteTipo(idTipo) {
     return query(DB, `
-      SELECT IdPlantilla, Clave, Etiqueta, TipoDato, Requerido, Orden, Ejemplo, MostrarEnDescripcion, OrdenDescripcion
-      FROM Tab_Componente_PlantillaCaracteristicas
-      WHERE IdTipodeComponente = @idTipo AND Activo = 1
+      SELECT cp.IdPlantilla, cp.Clave, cp.Etiqueta, cp.TipoDato, cp.Requerido, cp.Orden, cp.Ejemplo,
+             cp.MostrarEnDescripcion, cp.OrdenDescripcion, cp.Unidad, cp.IdCatalogo,
+             mc.NombreCatalogo AS CatalogoNombre
+      FROM Tab_Componente_PlantillaCaracteristicas cp
+      LEFT JOIN Mae_Catalogos mc ON cp.IdCatalogo = mc.IdCatalogo
+      WHERE cp.IdTipodeComponente = @idTipo AND cp.Activo = 1
       ORDER BY Orden
     `, { idTipo });
   },

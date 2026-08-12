@@ -141,4 +141,13 @@ router.get('/scan/:codigo', authMiddleware, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.get('/catalogos/:nombre/search', authMiddleware, async (req, res, next) => {
+  try {
+    const q = (req.query.q || '').trim();
+    if (!q) return res.json([]);
+    const result = await ComponentesRepository.searchCatalogo(req.params.nombre, q);
+    res.json(result);
+  } catch (e) { next(e); }
+});
+
 export default router;

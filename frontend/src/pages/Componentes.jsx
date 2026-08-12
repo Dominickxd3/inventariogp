@@ -18,6 +18,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '#components/ui/alert-dialog.jsx';
 import ComponenteDetalleDrawer from '../components/componentes/ComponenteDetalleDrawer';
+import AutocompleteInput from '../components/AutocompleteInput';
 import { Plus, Search, Cpu, Headphones } from 'lucide-react';
 
 const componentTypeConfig = {
@@ -446,11 +447,20 @@ export default function Componentes() {
                         {c.Etiqueta || c.Clave}
                         {c.Requerido ? <span className="text-red-500 ml-0.5">*</span> : null}
                       </label>
-                      <Input
-                        placeholder={c.Ejemplo || c.Etiqueta || c.Clave}
-                        value={compCaracVals[c.IdPlantilla] || ''}
-                        onChange={(e) => setCompCaracVals((prev) => ({ ...prev, [c.IdPlantilla]: e.target.value.toUpperCase() }))}
-                      />
+                      {c.TipoDato === 'CATALOGO' ? (
+                        <AutocompleteInput
+                          placeholder={c.Ejemplo || c.Etiqueta || c.Clave}
+                          catalogoNombre={c.CatalogoNombre}
+                          value={compCaracVals[c.IdPlantilla] || ''}
+                          onChange={(v) => setCompCaracVals((prev) => ({ ...prev, [c.IdPlantilla]: v.toUpperCase() }))}
+                        />
+                      ) : (
+                        <Input
+                          placeholder={c.Ejemplo || c.Etiqueta || c.Clave}
+                          value={compCaracVals[c.IdPlantilla] || ''}
+                          onChange={(e) => setCompCaracVals((prev) => ({ ...prev, [c.IdPlantilla]: e.target.value.toUpperCase() }))}
+                        />
+                      )}
                     </div>
                   ))}
                 </div>

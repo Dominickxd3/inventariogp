@@ -189,5 +189,6 @@ export const api = {
     plantillaByTipo: (idTipo) => request(`/componentes/tipos/${idTipo}/plantilla`),
     saveCaracteristicas: (id, caracteristicas) =>
       request(`/componentes/${id}/caracteristicas`, { method: 'PUT', body: JSON.stringify({ caracteristicas }) }),
+    searchCatalogo: (nombre, q) => request(`/componentes/catalogos/${nombre}/search?q=${encodeURIComponent(q)}`),
   },
 };
