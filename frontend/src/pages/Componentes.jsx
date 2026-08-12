@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import Swal from 'sweetalert2';
 import { api } from '../lib/api';
 import { StatusBadge } from '../components/StatusBadge';
 import DataTable from '../components/DataTable';
@@ -171,7 +172,9 @@ export default function Componentes() {
       queryClient.invalidateQueries({ queryKey: ['componentes'] });
       setShowModal(false);
       resetForm();
+      Swal.fire({ icon: 'success', title: 'Componente creado', timer: 1500, showConfirmButton: false });
     },
+    onError: (err) => Swal.fire({ icon: 'error', title: 'Error', text: err.message }),
   });
 
   const updateMutation = useMutation({
@@ -190,7 +193,9 @@ export default function Componentes() {
       queryClient.invalidateQueries({ queryKey: ['componente-detalle'] });
       setShowModal(false);
       resetForm();
+      Swal.fire({ icon: 'success', title: 'Componente actualizado', timer: 1500, showConfirmButton: false });
     },
+    onError: (err) => Swal.fire({ icon: 'error', title: 'Error', text: err.message }),
   });
 
   function resetForm() {
