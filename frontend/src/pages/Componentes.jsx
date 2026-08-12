@@ -148,7 +148,7 @@ export default function Componentes() {
   }, [categoria, tipos])
 
   const handleCategoriaChange = (v) => {
-    setCategoria(v)
+    setCategoria(v === 'todos' ? '' : v)
     setTipoFilter('')
     setTipoColumns(null)
   }
@@ -314,6 +314,7 @@ export default function Componentes() {
         <Select value={categoria} onValueChange={handleCategoriaChange}>
           <SelectTrigger className="w-[160px]"><SelectValue placeholder="Categoría" /></SelectTrigger>
           <SelectContent>
+            <SelectItem value="todos">Todos</SelectItem>
             <SelectItem value="REPUESTO_TECNICO">Repuestos Técnicos</SelectItem>
             <SelectItem value="ACCESORIO">Accesorios</SelectItem>
             <SelectItem value="CONSUMIBLE">Consumibles</SelectItem>
@@ -321,7 +322,9 @@ export default function Componentes() {
         </Select>
         <Select value={tipoFilter} onValueChange={setTipoFilter} disabled={!categoria}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder={categoria ? 'Seleccionar tipo...' : 'Primero selecciona categoría'} />
+            <SelectValue placeholder={categoria ? 'Seleccionar tipo...' : 'Primero selecciona categoría'}>
+              {tipoFilter ? (tipos?.find(t => String(t.IdTipodeComponente) === tipoFilter)?.DesTipodeComponente || '') : null}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {tiposPorCategoria.map((t) => <SelectItem key={t.IdTipodeComponente} value={String(t.IdTipodeComponente)}>{t.DesTipodeComponente}</SelectItem>)}
