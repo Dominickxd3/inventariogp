@@ -210,6 +210,7 @@ export default function Componentes() {
 
   async function openEdit(comp) {
     setEditId(comp.IdComponente);
+    setCategoriaNuevo(comp.Categoria || '');
     setForm({
       IdTipodeComponente: comp.IdTipodeComponente || '',
       DesComponente: comp.DesComponente || '',
@@ -219,20 +220,21 @@ export default function Componentes() {
       Capacidad: comp.Capacidad || '',
       Obs: comp.Obs || '',
     });
-    setCategoriaNuevo(comp.Categoria || '');
+    setCompPlantilla(null);
     setCompCaracVals({});
     if (comp.IdTipodeComponente) {
-      api.componentes.plantillaByTipo(Number(comp.IdTipodeComponente))
-        .then(r => setCompPlantilla(r || []))
-        .catch(() => setCompPlantilla(null));
       try {
-        const caracs = await api.componentes.detalle(comp.IdComponente);
+        const pl = await api.componentes.plantillaByTipo(Number(comp.IdTipodeComponente));
+        setCompPlantilla(pl || []);
+        const det = await api.componentes.detalle(comp.IdComponente);
         const vals = {};
-        for (const c of (caracs?.caracteristicas || [])) {
+        for (const c of (det?.caracteristicas || [])) {
           vals[c.IdPlantilla] = c.Valor || '';
         }
         setCompCaracVals(vals);
-      } catch {}
+      } catch {
+        setCompPlantilla(null);
+      }
     }
     setShowModal(true);
   }
