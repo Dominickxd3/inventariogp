@@ -8,7 +8,7 @@ function toOption(item) {
   return { id: null, label: String(item ?? '') }
 }
 
-export default function AutocompleteInput({ value, onChange, placeholder, searchFn, disabled }) {
+export default function AutocompleteInput({ value, onChange, placeholder, searchFn, disabled, maxLength }) {
   const [open, setOpen] = useState(false)
   const [options, setOptions] = useState([])
   const timerRef = useRef(null)
@@ -40,6 +40,7 @@ export default function AutocompleteInput({ value, onChange, placeholder, search
         onChange={(e) => handleChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
+        maxLength={maxLength}
         onFocus={() => { focusedRef.current = true }}
         onBlur={() => { setTimeout(() => { focusedRef.current = false; setOpen(false) }, 150) }}
       />

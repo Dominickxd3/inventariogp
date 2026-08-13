@@ -115,8 +115,8 @@ export const AsignacionesRepository = {
   async getAccsByAsignacion(id) {
     return query(DB, `
       SELECT m.*, c.CodComponente, c.DesComponente,
-             COALESCE(cc.MarcaCar, c.Marca) AS Marca,
-             COALESCE(cc.ModeloCar, c.Modelo) AS Modelo,
+             cc.MarcaCar AS Marca,
+             cc.ModeloCar AS Modelo,
              tc.DesTipodeComponente
       FROM Tab_EQ_MovAccesoriosTrabajador m
       JOIN Tab_EQ_Componentes c ON m.IdComponente = c.IdComponente

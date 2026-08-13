@@ -236,6 +236,8 @@ function AsignarForm({ onSuccess, equipoInicial }) {
   const [selectedAcc, setSelectedAcc] = useState([]);
   const [searchAcc, setSearchAcc] = useState('');
   const [obs, setObs] = useState('');
+  const [hostname, setHostname] = useState('');
+  const [usuarioWindows, setUsuarioWindows] = useState('');
 
   const { data: trabajadores } = useQuery({
     queryKey: ['trabajadores-search', searchTrab],
@@ -267,6 +269,14 @@ function AsignarForm({ onSuccess, equipoInicial }) {
   }, [equipoInicialData]);
 
   const totalSteps = 4;
+
+  const TIPOS_CONFIGURABLES = ['PC ESCRITORIO', 'LAPTOP'];
+  const equipoUnico = selectedEquipos.length === 1 ? selectedEquipos[0] : null;
+  const esTipoConfigurable = (tipo) => TIPOS_CONFIGURABLES.includes((tipo || '').toUpperCase().trim());
+  const puedeConfigurar = !!equipoUnico && esTipoConfigurable(equipoUnico.DesTipodeEquipo);
+  const configPayload = puedeConfigurar
+    ? { Hostname: hostname.trim() || null, UsuarioWindows: usuarioWindows.trim() || null }
+    : {};
 
   function mostrarActaLink(acta) {
     if (!acta) return '';
@@ -345,12 +355,14 @@ function AsignarForm({ onSuccess, equipoInicial }) {
         IdReferente: selectedTrab.IdTrabajador,
         Obs: obs || null,
         Accesorios: selectedAcc.map((a) => ({ IdComponente: a.IdComponente, Obs: null })),
+        ...configPayload,
       });
     } else {
       asignarMutation.mutate({
         IdMaeEquipos: selectedEquipos.map((e) => e.IdMaeEquipo),
         IdReferente: selectedTrab.IdTrabajador,
         Obs: obs,
+        ...configPayload,
       });
     }
   };
@@ -509,6 +521,25 @@ function AsignarForm({ onSuccess, equipoInicial }) {
               Los accesorios seleccionados quedarán asignados al trabajador y vinculados a esta entrega.
             </div>
           </div>
+
+          {puedeConfigurar && (
+            <div className="mt-3 pt-2 border-t border-border">
+              <p className="font-semibold text-base border-b border-border pb-2 mb-2">Configuración TI (opcional)</p>
+              <p className="text-xs text-muted-foreground mb-2">
+                Registra el hostname y usuario Windows iniciales del equipo <strong>{equipoUnico?.CodEquipo}</strong>.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Hostname</label>
+                  <Input value={hostname} onChange={(e) => setHostname(e.target.value)} placeholder="Ej: PC-JPEREZ01" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Usuario Windows</label>
+                  <Input value={usuarioWindows} onChange={(e) => setUsuarioWindows(e.target.value)} placeholder="Ej: jperez" />
+                </div>
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium mb-1">Observaciones generales</label>

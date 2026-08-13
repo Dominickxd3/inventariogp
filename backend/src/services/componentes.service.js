@@ -113,6 +113,24 @@ async function buildCaracteristicasResueltas(lista, plantilla) {
   return resueltas;
 }
 
+// Conserva los campos legacy (Marca/Modelo/Serie/Lote/Capacidad) como
+// caracteristicas cuando la plantilla del tipo define esa clave. Evita que
+// esos datos se pierdan al ya no existir las columnas fijas en Tab_EQ_Componentes.
+function mergeLegacyCaracteristicas(resueltas, plantilla, data) {
+  const out = [...(resueltas || [])];
+  const existentes = new Set(out.map(c => c.Clave));
+  const claves = ['Marca', 'Modelo', 'Serie', 'Lote', 'Capacidad'];
+  for (const clave of claves) {
+    const valor = data?.[clave]?.trim?.();
+    if (!valor || existentes.has(clave)) continue;
+    const p = (plantilla || []).find(x => x.Clave === clave);
+    if (!p) continue;
+    out.push({ IdPlantilla: p.IdPlantilla, Clave: clave, Valor: valor, IdValorCatalogo: null });
+    existentes.add(clave);
+  }
+  return out;
+}
+
 export const ComponentesService = {
   async list(filtros) {
     const result = await ComponentesRepository.listAll(filtros);
@@ -231,7 +249,10 @@ export const ComponentesService = {
       data.CodComponente = `${prefix}-${String(nextNum).padStart(6, '0')}`;
     }
     const plantilla = await ComponentesRepository.getPlantillaByComponenteTipo(data.IdTipodeComponente);
-    const caracteristicas = await buildCaracteristicasResueltas(data.caracteristicas || [], plantilla);
+    const caracteristicas = mergeLegacyCaracteristicas(
+      await buildCaracteristicasResueltas(data.caracteristicas || [], plantilla),
+      plantilla, data,
+    );
     if (!data.DesComponente?.trim()) {
       data.DesComponente = buildAutoDescFromPlantilla(tipo.DesTipodeComponente, plantilla, caracteristicas) || null;
     }
@@ -297,18 +318,16 @@ export const ComponentesService = {
     const codComponente = `${prefix}-${String(nextNum).padStart(6, '0')}`;
 
     const plantilla = await ComponentesRepository.getPlantillaByComponenteTipo(data.IdTipodeComponente);
-    const caracteristicas = await buildCaracteristicasResueltas(data.caracteristicas || [], plantilla);
+    const caracteristicas = mergeLegacyCaracteristicas(
+      await buildCaracteristicasResueltas(data.caracteristicas || [], plantilla),
+      plantilla, data,
+    );
     const autoDescription = buildAutoDescFromPlantilla(tipo.DesTipodeComponente, plantilla, caracteristicas);
 
     return ComponentesRepository.create({
       IdTipodeComponente: data.IdTipodeComponente,
       CodComponente: codComponente,
       DesComponente: data.DesComponente?.trim() || autoDescription || null,
-      Marca: data.Marca || null,
-      Modelo: data.Modelo || null,
-      Serie: data.Serie || null,
-      Lote: data.Lote || null,
-      Capacidad: data.Capacidad || null,
       Obs: data.Obs || null,
     }, { idUsuario, caracteristicas });
   },

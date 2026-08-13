@@ -23,6 +23,9 @@ const incidenciaSchema = z.object({
   TipoIncidencia: z.string().min(1, 'Selecciona un tipo'),
   Descripcion: z.string().min(1, 'La descripción es obligatoria'),
   FecIncidencia: z.string().optional(),
+  Accion: z.string().optional(),
+  NuevoHostname: z.string().optional(),
+  NuevoUsuarioWindows: z.string().optional(),
 });
 
 const tipoStyles = {
@@ -30,7 +33,15 @@ const tipoStyles = {
   PERDIDA: 'bg-amber-50 text-amber-700 ring-amber-600/20',
   DAÑO: 'bg-orange-50 text-orange-700 ring-orange-600/20',
   DEVOLUCION: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+  MANTENIMIENTO: 'bg-blue-50 text-blue-700 ring-blue-600/20',
 };
+
+const ACCIONES_MANTENIMIENTO = [
+  { value: 'FORMATEO', label: 'Formateo' },
+  { value: 'REINSTALACION_SO', label: 'Reinstalación de sistema operativo' },
+  { value: 'CAMBIO_HOSTNAME', label: 'Cambio de hostname' },
+  { value: 'CAMBIO_USUARIO_WINDOWS', label: 'Cambio de usuario Windows' },
+];
 
 function TipoBadge({ tipo }) {
   const style = tipoStyles[tipo] || 'bg-gray-50 text-gray-600 ring-gray-500/20';
@@ -93,7 +104,12 @@ export default function Incidencias() {
           { key: 'CodEquipo', label: 'Equipo' },
           { key: 'DesTipodeEquipo', label: 'Tipo' },
           { key: 'Trabajador', label: 'Trabajador', render: (r) => r.Trabajador || '-' },
-          { key: 'TipoIncidencia', label: 'Tipo', render: (r) => <TipoBadge tipo={r.TipoIncidencia} /> },
+          { key: 'TipoIncidencia', label: 'Tipo', render: (r) => (
+            <div className="flex items-center gap-1.5">
+              <TipoBadge tipo={r.TipoIncidencia} />
+              {r.Accion && <span className="text-[11px] text-muted-foreground tracking-wide">{r.Accion}</span>}
+            </div>
+          ) },
           { key: 'FecIncidencia', label: 'Fecha', render: (r) => formatDate(r.FecIncidencia) },
           { key: 'Estado', label: 'Estado', render: (r) => <StatusBadge status={r.Estado} /> },
           {
@@ -119,7 +135,7 @@ export default function Incidencias() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Registrar Incidencia</DialogTitle>
-            <DialogDescription>Registra un daño, robo, pérdida o devolución de equipo</DialogDescription>
+            <DialogDescription>Registra un daño, robo, pérdida, devolución o mantenimiento de equipo</DialogDescription>
           </DialogHeader>
           <IncidenciaForm onSuccess={() => { setShowModal(false); queryClient.invalidateQueries({ queryKey: ['incidencias'] }); }} />
         </DialogContent>
@@ -134,7 +150,7 @@ function IncidenciaForm({ onSuccess }) {
 
   const form = useForm({
     resolver: zodResolver(incidenciaSchema),
-    defaultValues: { TipoIncidencia: 'DAÑO', Descripcion: '', FecIncidencia: new Date().toISOString().split('T')[0] },
+    defaultValues: { TipoIncidencia: 'DAÑO', Descripcion: '', FecIncidencia: new Date().toISOString().split('T')[0], Accion: '', NuevoHostname: '', NuevoUsuarioWindows: '' },
   });
 
   const { data: equipos } = useQuery({
@@ -157,9 +173,16 @@ function IncidenciaForm({ onSuccess }) {
         Swal.fire({ icon: 'warning', title: 'Selecciona un equipo' });
         return;
       }
+      if (data.TipoIncidencia === 'MANTENIMIENTO' && !data.Accion) {
+        Swal.fire({ icon: 'warning', title: 'Selecciona la acción de mantenimiento' });
+        return;
+      }
       createMutation.mutate({
         IdMaeEquipo: selectedEquipo.IdMaeEquipo,
         ...data,
+        ...(data.TipoIncidencia === 'MANTENIMIENTO'
+          ? { Accion: data.Accion, NuevoHostname: data.NuevoHostname?.trim() || null, NuevoUsuarioWindows: data.NuevoUsuarioWindows?.trim() || null }
+          : { Accion: null, NuevoHostname: null, NuevoUsuarioWindows: null }),
       });
     })} className="space-y-4">
       <div className="space-y-1.5">
@@ -198,6 +221,7 @@ function IncidenciaForm({ onSuccess }) {
               <SelectItem value="ROBO">Robo</SelectItem>
               <SelectItem value="PERDIDA">Pérdida</SelectItem>
               <SelectItem value="DEVOLUCION">Devolución</SelectItem>
+              <SelectItem value="MANTENIMIENTO">Mantenimiento</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -206,6 +230,35 @@ function IncidenciaForm({ onSuccess }) {
           <Input type="date" {...form.register('FecIncidencia')} />
         </div>
       </div>
+
+      {form.watch('TipoIncidencia') === 'MANTENIMIENTO' && (
+        <>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-foreground">Acción <span className="text-destructive">*</span></label>
+            <Select value={form.watch('Accion') || ''} onValueChange={(v) => form.setValue('Accion', v)}>
+              <SelectTrigger><SelectValue placeholder="Seleccionar acción de mantenimiento" /></SelectTrigger>
+              <SelectContent>
+                {ACCIONES_MANTENIMIENTO.map((a) => (
+                  <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {form.formState.errors.Accion && (
+              <p className="text-xs text-destructive">{form.formState.errors.Accion.message}</p>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">Nuevo hostname</label>
+              <Input {...form.register('NuevoHostname')} placeholder="Ej: LAP-CONTAB01" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">Nuevo usuario Windows</label>
+              <Input {...form.register('NuevoUsuarioWindows')} placeholder="Ej: conta01" />
+            </div>
+          </div>
+        </>
+      )}
 
       <div className="space-y-1.5">
         <label className="text-sm font-medium text-foreground">Descripción <span className="text-destructive">*</span></label>

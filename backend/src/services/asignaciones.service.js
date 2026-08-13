@@ -3,6 +3,8 @@ import { EquiposRepository } from '../repositories/equipos.repository.js';
 import { ComponentesRepository } from '../repositories/componentes.repository.js';
 import { TrabajadoresRepository } from '../repositories/trabajadores.repository.js';
 import { IncidenciasRepository } from '../repositories/incidencias.repository.js';
+import { ConfiguracionesService } from './configuraciones.service.js';
+import { ConfiguracionesRepository } from '../repositories/configuraciones.repository.js';
 import { withTransaction, createRequest, query } from '../config/db.js';
 
 const DB = 'InventarioGP';
@@ -65,6 +67,13 @@ export const AsignacionesService = {
     const equipo = await validarEquipoDisponible(idEquipo);
     await validarTrabajador(idTrabajador);
 
+    const config = await ConfiguracionesService.resolver({
+      idEquipo, hostname: data.Hostname, usuarioWindows: data.UsuarioWindows,
+    });
+    const tipoCfgAsignacion = config.hostname || config.usuarioWindows
+      ? await ConfiguracionesRepository.getTipoByCod('ASIGNACION')
+      : null;
+
     return withTransaction(DB, async (trx) => {
       const rows = await trxRows(trx, `
         INSERT INTO Tab_EQ_MovEquiposAsignaciones (IdMaeEquipo, IdReferente, FecAsignacion, Obs, Estado)
@@ -90,13 +99,30 @@ export const AsignacionesService = {
         }
       }
 
+      if (tipoCfgAsignacion) {
+        await ConfiguracionesRepository.actualizarConfig(trx, idEquipo, config.hostname, config.usuarioWindows);
+        await ConfiguracionesRepository.registrar(trx, {
+          idEquipo,
+          idMovEquipoAsignacion: idAsig,
+          idTipoConfiguracion: tipoCfgAsignacion.IdTipodeConfiguracion,
+          hostnameAnterior: equipo.HostnameActual,
+          hostnameNuevo: config.hostname,
+          usuarioAnterior: equipo.UsuarioWindowsActual,
+          usuarioNuevo: config.usuarioWindows,
+          idUsuario: data.IdUsuario || null,
+          obs: 'Configuracion inicial del equipo al asignar',
+        });
+      }
+
       return idAsig;
     });
   },
 
   async getAccsByAsignacion(id) {
     return query(DB, `
-      SELECT m.*, c.CodComponente, c.DesComponente, c.Marca, c.Modelo,
+      SELECT m.*, c.CodComponente, c.DesComponente,
+             (SELECT TOP 1 Valor FROM Tab_Componente_Caracteristicas cc WHERE cc.IdComponente = c.IdComponente AND cc.Clave = 'Marca') AS Marca,
+             (SELECT TOP 1 Valor FROM Tab_Componente_Caracteristicas cc WHERE cc.IdComponente = c.IdComponente AND cc.Clave = 'Modelo') AS Modelo,
              tc.DesTipodeComponente
       FROM Tab_EQ_MovAccesoriosTrabajador m
       JOIN Tab_EQ_Componentes c ON m.IdComponente = c.IdComponente
@@ -290,6 +316,18 @@ export const AsignacionesService = {
       await validarEquipoDisponible(idEquipo);
     }
 
+    // La configuración TI (hostname/usuario) solo aplica en asignación de un equipo
+    const esUnEquipo = IdMaeEquipos.length === 1;
+    const config = esUnEquipo
+      ? await ConfiguracionesService.resolver({
+          idEquipo: IdMaeEquipos[0], hostname: data.Hostname, usuarioWindows: data.UsuarioWindows,
+        })
+      : null;
+    const tipoCfgAsignacion = config?.hostname || config?.usuarioWindows
+      ? await ConfiguracionesRepository.getTipoByCod('ASIGNACION')
+      : null;
+    const equipoUnico = config ? await EquiposRepository.getById(IdMaeEquipos[0]) : null;
+
     return withTransaction(DB, async (trx) => {
       const results = [];
 
@@ -307,6 +345,21 @@ export const AsignacionesService = {
           VALUES (@idEquipo, 'DISPONIBLE', 'ASIGNADO', @idUsuario, 'Asignación múltiple')
         `, { idEquipo, idUsuario: idUsuario || null });
 
+        if (tipoCfgAsignacion && config) {
+          await ConfiguracionesRepository.actualizarConfig(trx, idEquipo, config.hostname, config.usuarioWindows);
+          await ConfiguracionesRepository.registrar(trx, {
+            idEquipo,
+            idMovEquipoAsignacion: idAsig,
+            idTipoConfiguracion: tipoCfgAsignacion.IdTipodeConfiguracion,
+            hostnameAnterior: equipoUnico?.HostnameActual,
+            hostnameNuevo: config.hostname,
+            usuarioAnterior: equipoUnico?.UsuarioWindowsActual,
+            usuarioNuevo: config.usuarioWindows,
+            idUsuario: idUsuario || null,
+            obs: 'Configuracion inicial del equipo al asignar',
+          });
+        }
+
         results.push({ idEquipo, idAsig, success: true });
       }
 
@@ -319,6 +372,13 @@ export const AsignacionesService = {
 
     const equipo = await validarEquipoDisponible(IdMaeEquipo);
     const trabajador = await validarTrabajador(IdReferente);
+
+    const config = await ConfiguracionesService.resolver({
+      idEquipo: IdMaeEquipo, hostname: data.Hostname, usuarioWindows: data.UsuarioWindows,
+    });
+    const tipoCfgAsignacion = config.hostname || config.usuarioWindows
+      ? await ConfiguracionesRepository.getTipoByCod('ASIGNACION')
+      : null;
 
     const accsValidos = [];
     if (Accesorios?.length) {
@@ -371,6 +431,21 @@ export const AsignacionesService = {
         });
 
         await trxExec(trx, `UPDATE Tab_EQ_Componentes SET Estado = 'ASIGNADO' WHERE IdComponente = @id`, { id: acc.IdComponente });
+      }
+
+      if (tipoCfgAsignacion) {
+        await ConfiguracionesRepository.actualizarConfig(trx, IdMaeEquipo, config.hostname, config.usuarioWindows);
+        await ConfiguracionesRepository.registrar(trx, {
+          idEquipo: IdMaeEquipo,
+          idMovEquipoAsignacion: idAsig,
+          idTipoConfiguracion: tipoCfgAsignacion.IdTipodeConfiguracion,
+          hostnameAnterior: equipo.HostnameActual,
+          hostnameNuevo: config.hostname,
+          usuarioAnterior: equipo.UsuarioWindowsActual,
+          usuarioNuevo: config.usuarioWindows,
+          idUsuario: IdUsuario || null,
+          obs: 'Configuracion inicial del equipo al asignar',
+        });
       }
 
       return { idAsig, equipo: IdMaeEquipo, accesorios: accsValidos.length };

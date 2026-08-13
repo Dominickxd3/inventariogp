@@ -391,9 +391,9 @@ export default function Componentes() {
                 key: `col_${c.clave}`,
                 label: c.label,
                 render: (r) => {
-                  if (c.clave === 'Marca') return r.Marca || ''
-                  if (c.clave === 'Modelo') return r.Modelo || ''
-                  if (c.clave === 'Serie') return r.Serie || ''
+                  if (c.clave === 'Marca') return r.caracteristicas?.Marca || r.Marca || ''
+                  if (c.clave === 'Modelo') return r.caracteristicas?.Modelo || r.Modelo || ''
+                  if (c.clave === 'Serie') return r.caracteristicas?.Serie || r.Serie || ''
                   return (r.caracteristicas || {})[c.clave] || ''
                 },
               })),

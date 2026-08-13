@@ -97,6 +97,7 @@ export const api = {
     },
     tiposAsignables: () => request('/equipos/tipos-asignables'),
     plantillaByTipo: (idTipo) => request(`/equipos/tipos/${idTipo}/plantilla`),
+    plantillaValores: (idPlantilla, q) => request(`/equipos/plantillas/${idPlantilla}/valores?q=${encodeURIComponent(q || '')}`),
     saveCaracteristicas: (id, caracteristicas) =>
       request(`/equipos/${id}/caracteristicas`, { method: 'PUT', body: JSON.stringify({ caracteristicas }) }),
     intervenciones: {
@@ -114,6 +115,10 @@ export const api = {
       list: (id) => request(`/equipos/${id}/componentes`),
       add: (id, data) => request(`/equipos/${id}/componentes`, { method: 'POST', body: JSON.stringify(data) }),
       remove: (id, idMov, motivo) => request(`/equipos/${id}/componentes/${idMov}`, { method: 'DELETE', body: JSON.stringify({ motivo }) }),
+    },
+    configuracion: {
+      get: (id) => request(`/equipos/${id}/configuracion`),
+      update: (id, data) => request(`/equipos/${id}/configuracion`, { method: 'PUT', body: JSON.stringify(data) }),
     },
   },
   actas: {

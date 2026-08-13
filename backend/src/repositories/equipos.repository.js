@@ -198,11 +198,27 @@ export const EquiposRepository = {
   // Plantillas de características por tipo de equipo
   async getPlantillaByTipo(idTipo) {
     return query(DB, `
-      SELECT IdPlantilla, Clave, Etiqueta, TipoDato, Requerido, Orden
+      SELECT IdPlantilla, Clave, Etiqueta, TipoDato, Requerido, Orden, LongitudMin, LongitudMax
       FROM Tab_EQ_PlantillaCaracteristicas
       WHERE IdTipodeEquipo = @idTipo AND Activo = 1
       ORDER BY Orden
     `, { idTipo });
+  },
+
+  // Valores existentes (distintos) de una característica de la plantilla, para autocompletar
+  async listValoresPlantilla(idPlantilla, q = '') {
+    const params = { idPlantilla };
+    let filtro = "LTRIM(RTRIM(Valor)) <> ''";
+    if (q.trim()) {
+      filtro += ' AND Valor LIKE @q';
+      params.q = `%${q.trim()}%`;
+    }
+    return query(DB, `
+      SELECT DISTINCT LTRIM(RTRIM(Valor)) AS Valor
+      FROM Tab_EQ_CaracteristicasEquipo
+      WHERE IdPlantilla = @idPlantilla AND ${filtro}
+      ORDER BY Valor
+    `, params);
   },
 
   // Características técnicas (con IdPlantilla)
@@ -315,6 +331,21 @@ export const EquiposRepository = {
         FROM Tab_EQ_MovEquiposComponentes mc
         LEFT JOIN Tab_EQ_Componentes c ON mc.IdComponente = c.IdComponente
         WHERE mc.IdMaeEquipo = @id AND mc.FecBajaComponente IS NOT NULL
+        UNION ALL
+        SELECT
+          mc.FecRegistro,
+          'CONFIGURACION',
+          CONCAT('Config: ', tc.DesTipodeConfiguracion,
+            CASE WHEN mc.HostnameAnterior IS NOT NULL OR mc.HostnameNuevo IS NOT NULL
+              THEN CONCAT(' | Host ', ISNULL(mc.HostnameAnterior, '-'), ' -> ', ISNULL(mc.HostnameNuevo, '-')) ELSE '' END,
+            CASE WHEN mc.UsuarioWindowsAnterior IS NOT NULL OR mc.UsuarioWindowsNuevo IS NOT NULL
+              THEN CONCAT(' | Usr ', ISNULL(mc.UsuarioWindowsAnterior, '-'), ' -> ', ISNULL(mc.UsuarioWindowsNuevo, '-')) ELSE '' END),
+          u.User_Fullname,
+          mc.FecRegistro
+        FROM Tab_EQ_MovConfiguraciones mc
+        LEFT JOIN Tab_EQ_TipodeConfiguraciones tc ON mc.IdTipodeConfiguracion = tc.IdTipodeConfiguracion
+        LEFT JOIN Tab_SYS_Usuarios u ON mc.IdUsuarioCrea = u.IdUsuario
+        WHERE mc.IdMaeEquipo = @id
       ) t
       ORDER BY Orden DESC
     `, { id: idEquipo });

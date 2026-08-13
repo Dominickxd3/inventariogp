@@ -20,7 +20,7 @@ import IncidenciaSelect from '../components/IncidenciaSelect';
 import CesarAsignacionDialog from '../components/asignaciones/CesarAsignacionDialog';
 import {
   ArrowLeft, QrCode, Eye, Pencil, Save, X, Plus, Trash2, Monitor, Search, Cpu, Wrench, Hammer, AlertTriangle, Clock,
-  Download, Copy, Check,
+  Download, Copy, Check, Settings,
 } from 'lucide-react';
 
 export default function EquipoDetalle() {
@@ -51,11 +51,22 @@ export default function EquipoDetalle() {
   const [cesarOpen, setCesarOpen] = useState(false);
   const [cesarTarget, setCesarTarget] = useState(null);
   const [incidenciaOpen, setIncidenciaOpen] = useState(false);
-  const [incidenciaForm, setIncidenciaForm] = useState({ TipoIncidencia: 'DAÑO', Descripcion: '', Prioridad: '', Obs: '' });
+  const [incidenciaForm, setIncidenciaForm] = useState({ TipoIncidencia: 'DAÑO', Descripcion: '', Prioridad: '', Obs: '', Accion: '', NuevoHostname: '', NuevoUsuarioWindows: '' });
+  const [cfgOpen, setCfgOpen] = useState(false);
+  const [cfgForm, setCfgForm] = useState({ Hostname: '', UsuarioWindows: '', Obs: '' });
 
   const { data: equipo, isLoading } = useQuery({
     queryKey: ['equipo', id],
     queryFn: () => api.equipos.get(id),
+  });
+
+  const TIPOS_CONFIGURABLES = ['PC ESCRITORIO', 'LAPTOP'];
+  const esConfigurableTI = TIPOS_CONFIGURABLES.includes(((equipo?.DesTipodeEquipo) || '').toUpperCase().trim());
+
+  const { data: configData, refetch: refetchCfg } = useQuery({
+    queryKey: ['configuracion-equipo', id],
+    queryFn: () => api.equipos.configuracion.get(id),
+    enabled: esConfigurableTI,
   });
 
   const { data: tipos } = useQuery({
@@ -107,6 +118,18 @@ export default function EquipoDetalle() {
       queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
       setEditMode(false);
       Swal.fire({ icon: 'success', title: 'Equipo actualizado', timer: 1500, showConfirmButton: false });
+    },
+    onError: (err) => Swal.fire({ icon: 'error', title: 'Error', text: err.message }),
+  });
+
+  const updateCfgMutation = useMutation({
+    mutationFn: (data) => api.equipos.configuracion.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['configuracion-equipo', id] });
+      queryClient.invalidateQueries({ queryKey: ['equipo', id] });
+      queryClient.invalidateQueries({ queryKey: ['timeline-equipo', id] });
+      setCfgOpen(false);
+      Swal.fire({ icon: 'success', title: 'Configuración actualizada', timer: 1500, showConfirmButton: false });
     },
     onError: (err) => Swal.fire({ icon: 'error', title: 'Error', text: err.message }),
   });
@@ -167,7 +190,7 @@ export default function EquipoDetalle() {
       queryClient.invalidateQueries({ queryKey: ['equipos'] });
       queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
       setIncidenciaOpen(false);
-      setIncidenciaForm({ TipoIncidencia: 'DAÑO', Descripcion: '', Prioridad: '', Obs: '' });
+      setIncidenciaForm({ TipoIncidencia: 'DAÑO', Descripcion: '', Prioridad: '', Obs: '', Accion: '', NuevoHostname: '', NuevoUsuarioWindows: '' });
       Swal.fire({ icon: 'success', title: 'Incidencia registrada', timer: 1500, showConfirmButton: false });
     },
     onError: (err) => Swal.fire({ icon: 'error', title: 'Error', text: err.message }),
@@ -194,6 +217,15 @@ export default function EquipoDetalle() {
     });
     setTecForm(initial);
     setTecEditOpen(true);
+  };
+
+  const openCfgEdit = () => {
+    setCfgForm({
+      Hostname: configData?.equipo?.HostnameActual || '',
+      UsuarioWindows: configData?.equipo?.UsuarioWindowsActual || '',
+      Obs: '',
+    });
+    setCfgOpen(true);
   };
 
   const handleSaveTec = () => {
@@ -529,6 +561,65 @@ export default function EquipoDetalle() {
         </Card>
       )}
 
+      {esConfigurableTI && (
+        <Card className={esBaja ? 'opacity-60' : ''}>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Settings className="w-4 h-4" />
+                <CardTitle>Configuración TI</CardTitle>
+              </div>
+              {!esBaja && (
+                <Button variant="outline" size="sm" onClick={openCfgEdit}>
+                  <Pencil className="w-4 h-4" /> Editar configuración
+                </Button>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">Hostname y usuario Windows actuales del equipo</p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Hostname actual</p>
+                <p className="text-sm font-medium font-mono">{configData?.equipo?.HostnameActual || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Usuario Windows actual</p>
+                <p className="text-sm font-medium font-mono">{configData?.equipo?.UsuarioWindowsActual || '—'}</p>
+              </div>
+            </div>
+
+            {configData?.historial?.length > 0 && (
+              <div className="mt-4">
+                <p className="text-xs font-medium text-muted-foreground mb-2">Historial de cambios</p>
+                <div className="space-y-2">
+                  {configData.historial.map((h) => (
+                    <div key={h.IdMovConfiguracion} className="text-xs border rounded-lg px-3 py-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{h.DesTipodeConfiguracion}</span>
+                        <span className="text-muted-foreground">{h.FecRegistro ? formatDate(h.FecRegistro) : ''}</span>
+                      </div>
+                      {(h.HostnameAnterior !== null || h.HostnameNuevo !== null) && (
+                        <p className="text-muted-foreground mt-0.5">
+                          Host: {h.HostnameAnterior || '—'} <span className="text-muted-foreground">→</span> {h.HostnameNuevo || '—'}
+                        </p>
+                      )}
+                      {(h.UsuarioWindowsAnterior !== null || h.UsuarioWindowsNuevo !== null) && (
+                        <p className="text-muted-foreground mt-0.5">
+                          Usr: {h.UsuarioWindowsAnterior || '—'} <span className="text-muted-foreground">→</span> {h.UsuarioWindowsNuevo || '—'}
+                        </p>
+                      )}
+                      {h.NombreUsuario && <p className="text-muted-foreground mt-0.5">Por: {h.NombreUsuario}</p>}
+                      {h.Obs && <p className="text-muted-foreground mt-0.5">{h.Obs}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Card className={esBaja ? 'opacity-60' : ''}>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -602,6 +693,7 @@ export default function EquipoDetalle() {
                         {inc.Estado}
                       </span>
                       <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted">{inc.TipoIncidencia}</span>
+                      {inc.Accion && <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted">{inc.Accion}</span>}
                       {inc.FecIncidencia && <span className="text-xs text-muted-foreground">{formatDate(inc.FecIncidencia)}</span>}
                     </div>
                     <p className="text-sm mt-1">{inc.Descripcion}</p>
@@ -629,12 +721,12 @@ export default function EquipoDetalle() {
               {timeline.map((ev, i) => {
                 const iconMap = {
                   CREACION: Plus, ESTADO: Clock, ASIGNACION: Monitor,
-                  CESE: X, INCIDENCIA: AlertTriangle, INTERVENCION: Wrench, COMPONENTE: Cpu,
+                  CESE: X, INCIDENCIA: AlertTriangle, INTERVENCION: Wrench, COMPONENTE: Cpu, CONFIGURACION: Settings,
                 };
                 const Icon = iconMap[ev.Tipo] || Clock;
                 const colorMap = {
                   CREACION: 'text-blue-500', ESTADO: 'text-gray-500', ASIGNACION: 'text-green-500',
-                  CESE: 'text-orange-500', INCIDENCIA: 'text-red-500', INTERVENCION: 'text-purple-500', COMPONENTE: 'text-cyan-500',
+                  CESE: 'text-orange-500', INCIDENCIA: 'text-red-500', INTERVENCION: 'text-purple-500', COMPONENTE: 'text-cyan-500', CONFIGURACION: 'text-indigo-500',
                 };
                 return (
                   <div key={i} className="flex gap-3">
@@ -1157,8 +1249,47 @@ export default function EquipoDetalle() {
         }}
       />
 
+      {/* Editar Configuración TI */}
+      <Dialog open={cfgOpen} onOpenChange={(v) => { setCfgOpen(v); if (!v) setCfgForm({ Hostname: '', UsuarioWindows: '', Obs: '' }); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Configuración TI</DialogTitle>
+            <DialogDescription>
+              Actualiza el hostname y usuario Windows de <strong>{equipo?.CodEquipo}</strong>. El cambio quedará registrado en el historial.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Hostname</label>
+              <Input value={cfgForm.Hostname} onChange={(e) => setCfgForm({ ...cfgForm, Hostname: e.target.value })} placeholder="Ej: PC-CONTA1" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Usuario Windows</label>
+              <Input value={cfgForm.UsuarioWindows} onChange={(e) => setCfgForm({ ...cfgForm, UsuarioWindows: e.target.value })} placeholder="Ej: mvillaverde" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Observaciones (opcional)</label>
+              <Input value={cfgForm.Obs} onChange={(e) => setCfgForm({ ...cfgForm, Obs: e.target.value })} placeholder="Motivo del cambio..." />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCfgOpen(false)} disabled={updateCfgMutation.isPending}>Cancelar</Button>
+            <Button
+              onClick={() => updateCfgMutation.mutate({
+                Hostname: cfgForm.Hostname,
+                UsuarioWindows: cfgForm.UsuarioWindows,
+                Obs: cfgForm.Obs.trim() || undefined,
+              })}
+              disabled={updateCfgMutation.isPending}
+            >
+              <Save className="w-4 h-4" /> Guardar configuración
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Nueva incidencia */}
-      <Dialog open={incidenciaOpen} onOpenChange={(v) => { setIncidenciaOpen(v); if (!v) setIncidenciaForm({ TipoIncidencia: 'DAÑO', Descripcion: '', Prioridad: '', Obs: '' }); }}>
+      <Dialog open={incidenciaOpen} onOpenChange={(v) => { setIncidenciaOpen(v); if (!v) setIncidenciaForm({ TipoIncidencia: 'DAÑO', Descripcion: '', Prioridad: '', Obs: '', Accion: '', NuevoHostname: '', NuevoUsuarioWindows: '' }); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Nueva Incidencia</DialogTitle>
@@ -1179,9 +1310,47 @@ export default function EquipoDetalle() {
                   <SelectItem value="ROBO">Robo</SelectItem>
                   <SelectItem value="PERDIDA">Pérdida</SelectItem>
                   <SelectItem value="DEVOLUCION">Devolución</SelectItem>
+                  <SelectItem value="MANTENIMIENTO">Mantenimiento</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            {incidenciaForm.TipoIncidencia === 'MANTENIMIENTO' && (
+              <>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Acción <span className="text-destructive">*</span></label>
+                  <Select
+                    value={incidenciaForm.Accion}
+                    onValueChange={(v) => setIncidenciaForm({ ...incidenciaForm, Accion: v })}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Seleccionar acción" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="FORMATEO">Formateo</SelectItem>
+                      <SelectItem value="REINSTALACION_SO">Reinstalación de sistema operativo</SelectItem>
+                      <SelectItem value="CAMBIO_HOSTNAME">Cambio de hostname</SelectItem>
+                      <SelectItem value="CAMBIO_USUARIO_WINDOWS">Cambio de usuario Windows</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Nuevo hostname</label>
+                    <Input
+                      value={incidenciaForm.NuevoHostname}
+                      onChange={(e) => setIncidenciaForm({ ...incidenciaForm, NuevoHostname: e.target.value })}
+                      placeholder="Ej: LAP-CONTAB01"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Nuevo usuario Windows</label>
+                    <Input
+                      value={incidenciaForm.NuevoUsuarioWindows}
+                      onChange={(e) => setIncidenciaForm({ ...incidenciaForm, NuevoUsuarioWindows: e.target.value })}
+                      placeholder="Ej: conta01"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Descripción <span className="text-destructive">*</span></label>
               <textarea
@@ -1219,7 +1388,7 @@ export default function EquipoDetalle() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setIncidenciaOpen(false); setIncidenciaForm({ TipoIncidencia: 'DAÑO', Descripcion: '', Prioridad: '', Obs: '' }); }}>
+            <Button variant="outline" onClick={() => { setIncidenciaOpen(false); setIncidenciaForm({ TipoIncidencia: 'DAÑO', Descripcion: '', Prioridad: '', Obs: '', Accion: '', NuevoHostname: '', NuevoUsuarioWindows: '' }); }}>
               Cancelar
             </Button>
             <Button
@@ -1228,12 +1397,19 @@ export default function EquipoDetalle() {
                   Swal.fire({ icon: 'warning', title: 'Descripción requerida', text: 'Describe la incidencia' });
                   return;
                 }
+                if (incidenciaForm.TipoIncidencia === 'MANTENIMIENTO' && !incidenciaForm.Accion) {
+                  Swal.fire({ icon: 'warning', title: 'Acción requerida', text: 'Selecciona la acción de mantenimiento' });
+                  return;
+                }
                 createIncidenciaMutation.mutate({
                   IdMaeEquipo: Number(id),
                   TipoIncidencia: incidenciaForm.TipoIncidencia,
                   Descripcion: incidenciaForm.Descripcion.trim(),
                   Prioridad: incidenciaForm.Prioridad || undefined,
                   Obs: incidenciaForm.Obs.trim() || undefined,
+                  Accion: incidenciaForm.TipoIncidencia === 'MANTENIMIENTO' ? incidenciaForm.Accion : null,
+                  NuevoHostname: incidenciaForm.TipoIncidencia === 'MANTENIMIENTO' ? (incidenciaForm.NuevoHostname.trim() || null) : null,
+                  NuevoUsuarioWindows: incidenciaForm.TipoIncidencia === 'MANTENIMIENTO' ? (incidenciaForm.NuevoUsuarioWindows.trim() || null) : null,
                 });
               }}
               disabled={createIncidenciaMutation.isPending}

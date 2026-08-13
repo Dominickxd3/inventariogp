@@ -75,6 +75,8 @@ export const asignacionCreateSchema = z.object({
   IdEquipo: z.number().int().positive(),
   FechaAsignacion: z.string().optional(),
   Obs: z.string().optional(),
+  Hostname: z.string().max(100).optional(),
+  UsuarioWindows: z.string().max(100).optional(),
 });
 
 export const asignacionCesarSchema = z.object({
@@ -95,6 +97,9 @@ export const incidenciaCreateSchema = z.object({
   TipoIncidencia: z.string().min(1, 'Tipo de incidencia requerido'),
   Descripcion: z.string().min(1, 'Descripción requerida'),
   Prioridad: z.string().optional(),
+  Accion: z.string().max(50).optional(),
+  NuevoHostname: z.string().max(100).optional(),
+  NuevoUsuarioWindows: z.string().max(100).optional(),
 });
 
 export const idParamSchema = z.object({

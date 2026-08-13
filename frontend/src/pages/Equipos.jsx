@@ -15,6 +15,7 @@ import {
   DialogFooter,
 } from '#components/ui/dialog.jsx';
 import { Skeleton } from '#components/ui/skeleton.jsx';
+import AutocompleteInput from '../components/AutocompleteInput';
 import { Plus, QrCode, Eye, Archive, Monitor, CheckCircle, Clock, AlertTriangle, Search, Download, Copy, Check } from 'lucide-react';
 import { formatDate } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -115,9 +116,19 @@ export default function Equipos() {
 
   const createRapidoMutation = useMutation({
     mutationFn: async (data) => {
+      const cam = plantilla || [];
+      for (const c of cam) {
+        const v = (caracteristicasVals[c.IdPlantilla] || '').trim();
+        if (!v) continue;
+        if (c.LongitudMax && v.length > c.LongitudMax) {
+          throw new Error(`"${c.Etiqueta || c.Clave}" supera el máximo de ${c.LongitudMax} caracteres`);
+        }
+        if (c.LongitudMin && v.length < c.LongitudMin) {
+          throw new Error(`"${c.Etiqueta || c.Clave}" requiere al menos ${c.LongitudMin} caracteres`);
+        }
+      }
       const resp = await api.equipos.rapido(data);
       const id = resp.equipo.IdMaeEquipo;
-      const cam = plantilla || [];
       if (id && cam.length > 0) {
         const vals = Object.entries(caracteristicasVals)
           .filter(([_, v]) => v)
@@ -307,7 +318,9 @@ export default function Equipos() {
 
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-foreground">Código de barra / Serie</label>
-              <Input data-equipo-codbarra {...form.register('CodBarra')} placeholder="Escanea o escribe el código del equipo" />
+              <Input data-equipo-codbarra {...form.register('CodBarra')}
+                onChange={(e) => form.setValue('CodBarra', e.target.value.toUpperCase())}
+                placeholder="Escanea o escribe el código del equipo" />
               <p className="text-xs text-muted-foreground">Puedes dejarlo vacío si el equipo no tiene código visible.</p>
             </div>
 
@@ -315,19 +328,30 @@ export default function Equipos() {
               <div className="space-y-2 pt-1">
                 <p className="text-sm font-semibold text-foreground border-b pb-1">Características</p>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                  {plantilla.map((c) => (
-                    <div key={c.IdPlantilla} className="space-y-1">
-                      <label className="text-sm font-medium text-foreground">
-                        {c.Etiqueta || c.Clave}
-                        {c.Requerido ? <span className="text-red-500 ml-0.5">*</span> : null}
-                      </label>
-                      <Input
-                        placeholder={c.Etiqueta || c.Clave}
-                        value={caracteristicasVals[c.IdPlantilla] || ''}
-                        onChange={(e) => setCaracteristicasVals((prev) => ({ ...prev, [c.IdPlantilla]: e.target.value }))}
-                      />
-                    </div>
-                  ))}
+                  {plantilla.map((c) => {
+                    const etiqueta = c.Etiqueta || c.Clave;
+                    const tieneLimite = c.LongitudMax || c.LongitudMin;
+                    return (
+                      <div key={c.IdPlantilla} className="space-y-1">
+                        <label className="text-sm font-medium text-foreground">
+                          {etiqueta}
+                          {c.Requerido ? <span className="text-red-500 ml-0.5">*</span> : null}
+                        </label>
+                        <AutocompleteInput
+                          placeholder={etiqueta}
+                          maxLength={c.LongitudMax || undefined}
+                          searchFn={(q) => api.equipos.plantillaValores(c.IdPlantilla, q).then((res) => (res || []).map((v) => v.Valor))}
+                          value={caracteristicasVals[c.IdPlantilla] || ''}
+                          onChange={(v) => setCaracteristicasVals((prev) => ({ ...prev, [c.IdPlantilla]: v }))}
+                        />
+                        {tieneLimite && (
+                          <p className="text-xs text-muted-foreground">
+                            {c.LongitudMin ? `${c.LongitudMin} a ` : 'Hasta '}{c.LongitudMax} caracteres
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

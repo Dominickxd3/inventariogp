@@ -50,6 +50,13 @@ router.get('/tipos/:id/plantilla', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.get('/plantillas/:idPlantilla/valores', async (req, res, next) => {
+  try {
+    const valores = await EquiposService.listValoresPlantilla(Number(req.params.idPlantilla), req.query.q);
+    res.json(valores);
+  } catch (e) { next(e); }
+});
+
 router.get('/scan/:codigo', async (req, res, next) => {
   try {
     const equipo = await EquiposService.getByCodigo(req.params.codigo);
@@ -135,6 +142,24 @@ router.put('/:id/caracteristicas', authMiddleware, roleMiddleware('ADMIN', 'TECN
       req.usuario?.id
     );
     res.json({ success: true, caracteristicas });
+  } catch (e) { next(e); }
+});
+
+router.get('/:id/configuracion', async (req, res, next) => {
+  try {
+    const data = await EquiposService.getConfiguracion(parseInt(req.params.id));
+    res.json(data);
+  } catch (e) { next(e); }
+});
+
+router.put('/:id/configuracion', authMiddleware, roleMiddleware('ADMIN', 'TECNICO'), async (req, res, next) => {
+  try {
+    const data = await EquiposService.actualizarConfiguracion(
+      parseInt(req.params.id),
+      req.body,
+      req.usuario?.id || 1
+    );
+    res.json(data);
   } catch (e) { next(e); }
 });
 

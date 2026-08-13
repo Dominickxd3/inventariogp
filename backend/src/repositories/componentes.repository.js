@@ -14,7 +14,7 @@ export const ComponentesRepository = {
     if (filtros.estado) { sql += ' AND c.Estado = @estado'; params.estado = filtros.estado; }
     if (filtros.categoria) { sql += ' AND tc.Categoria = @categoria'; params.categoria = filtros.categoria; }
     if (filtros.idTipo) { sql += ' AND c.IdTipodeComponente = @idTipo'; params.idTipo = filtros.idTipo; }
-    if (filtros.search) { sql += " AND (c.CodComponente LIKE @search OR c.DesComponente LIKE @search OR c.Marca LIKE @search OR c.Modelo LIKE @search OR c.Serie LIKE @search OR c.Capacidad LIKE @search OR EXISTS (SELECT 1 FROM Tab_Componente_Caracteristicas cc WHERE cc.IdComponente = c.IdComponente AND cc.Valor LIKE @search))"; params.search = `%${filtros.search}%`; }
+    if (filtros.search) { sql += " AND (c.CodComponente LIKE @search OR c.DesComponente LIKE @search OR EXISTS (SELECT 1 FROM Tab_Componente_Caracteristicas cc WHERE cc.IdComponente = c.IdComponente AND cc.Valor LIKE @search))"; params.search = `%${filtros.search}%`; }
     sql += ' ORDER BY c.DesComponente';
     return query(DB, sql, params);
   },
@@ -79,21 +79,15 @@ export const ComponentesRepository = {
         idTipo: data.IdTipodeComponente,
         cod: data.CodComponente,
         desc: data.DesComponente || null,
-        marca: data.Marca || null,
-        modelo: data.Modelo || null,
-        serie: data.Serie || null,
-        lote: data.Lote || null,
-        capacidad: data.Capacidad || null,
         obs: data.Obs || null,
         idUsuario,
       });
 
       const result = await req.query(`
         INSERT INTO Tab_EQ_Componentes
-          (IdTipodeComponente, CodComponente, DesComponente, Marca, Modelo, Serie,
-           Lote, Capacidad, Obs, Estado, FechaRegistro, IdUsuarioCrea)
+          (IdTipodeComponente, CodComponente, DesComponente, Obs, Estado, FechaRegistro, IdUsuarioCrea)
         OUTPUT INSERTED.IdComponente
-        VALUES (@idTipo, @cod, @desc, @marca, @modelo, @serie, @lote, @capacidad, @obs, 'DISPONIBLE', GETDATE(), @idUsuario)
+        VALUES (@idTipo, @cod, @desc, @obs, 'DISPONIBLE', GETDATE(), @idUsuario)
       `);
       const newId = result.recordset[0]?.IdComponente;
       if (newId == null) throw new Error('No se pudo crear el componente');
@@ -130,19 +124,12 @@ export const ComponentesRepository = {
   async update(id, data) {
     await query(DB, `
       UPDATE Tab_EQ_Componentes
-      SET IdTipodeComponente = @idTipo, DesComponente = @desc,
-          Marca = @marca, Modelo = @modelo, Serie = @serie, Lote = @lote,
-          Capacidad = @capacidad, Obs = @obs
+      SET IdTipodeComponente = @idTipo, DesComponente = @desc, Obs = @obs
       WHERE IdComponente = @id
     `, {
       id,
       idTipo: data.IdTipodeComponente,
       desc: data.DesComponente,
-      marca: data.Marca,
-      modelo: data.Modelo,
-      serie: data.Serie,
-      lote: data.Lote,
-      capacidad: data.Capacidad,
       obs: data.Obs,
     });
   },
@@ -156,11 +143,16 @@ export const ComponentesRepository = {
     return rows[0] || null;
   },
 
-  async getBySerie(serie) {
+async getBySerie(serie) {
     const rows = await query(DB, `
-      SELECT TOP 1 *
-      FROM Tab_EQ_Componentes
-      WHERE LTRIM(RTRIM(Serie)) = LTRIM(RTRIM(@serie))
+      SELECT TOP 1 c.*
+      FROM Tab_EQ_Componentes c
+      WHERE EXISTS (
+        SELECT 1 FROM Tab_Componente_Caracteristicas cc
+        WHERE cc.IdComponente = c.IdComponente
+          AND cc.Clave = 'Serie'
+          AND LTRIM(RTRIM(cc.Valor)) = LTRIM(RTRIM(@serie))
+      )
     `, { serie });
     return rows[0] || null;
   },
@@ -177,17 +169,16 @@ export const ComponentesRepository = {
 
   async listMarcas(q = '') {
     const params = {};
-    let filtro = "Marca IS NOT NULL AND LTRIM(RTRIM(Marca)) <> ''";
+    let sql = `
+      SELECT DISTINCT LTRIM(RTRIM(Valor)) AS Marca
+      FROM Tab_Componente_Caracteristicas
+      WHERE Clave = 'Marca' AND Valor IS NOT NULL AND LTRIM(RTRIM(Valor)) <> ''
+    `;
     if (q.trim()) {
-      filtro += ' AND Marca LIKE @q';
+      sql += ' AND Valor LIKE @q';
       params.q = `%${q.trim()}%`;
     }
-    return query(DB, `
-      SELECT DISTINCT LTRIM(RTRIM(Marca)) AS Marca
-      FROM Tab_EQ_Componentes
-      WHERE ${filtro}
-      ORDER BY Marca
-    `, params);
+    return query(DB, sql + ' ORDER BY Marca', params);
   },
 
   async getLastCodComponenteByPrefix(prefix) {
@@ -216,9 +207,9 @@ export const ComponentesRepository = {
 async getByEquipo(idEquipo) {
     return query(DB, `
       SELECT mc.*, c.CodComponente, c.DesComponente,
-             COALESCE(cc.MarcaCar, c.Marca) AS Marca,
-             COALESCE(cc.ModeloCar, c.Modelo) AS Modelo,
-             c.Serie, tc.DesTipodeComponente
+             cc.MarcaCar AS Marca,
+             cc.ModeloCar AS Modelo,
+             tc.DesTipodeComponente
       FROM Tab_EQ_MovEquiposComponentes mc
       JOIN Tab_EQ_Componentes c ON mc.IdComponente = c.IdComponente
       LEFT JOIN (
@@ -310,7 +301,7 @@ async getByEquipo(idEquipo) {
     const rows = await query(DB, `
       SELECT
         c.IdComponente, c.CodComponente, c.DesComponente,
-        c.Marca, c.Modelo, c.Serie, c.Lote, c.Capacidad, c.Obs, c.Estado, c.FechaRegistro,
+        c.Obs, c.Estado, c.FechaRegistro,
         tc.IdTipodeComponente,
         tc.DesTipodeComponente AS TipoComponente,
         tc.Categoria
@@ -497,9 +488,9 @@ async getByEquipo(idEquipo) {
   async listAccesoriosPorTrabajador(idTrabajador) {
     return query(DB, `
       SELECT m.*, c.CodComponente, c.DesComponente,
-             COALESCE(cc.MarcaCar, c.Marca) AS Marca,
-             COALESCE(cc.ModeloCar, c.Modelo) AS Modelo,
-             c.Serie, tc.DesTipodeComponente
+             cc.MarcaCar AS Marca,
+             cc.ModeloCar AS Modelo,
+             tc.DesTipodeComponente
       FROM Tab_EQ_MovAccesoriosTrabajador m
       JOIN Tab_EQ_Componentes c ON m.IdComponente = c.IdComponente
       LEFT JOIN (

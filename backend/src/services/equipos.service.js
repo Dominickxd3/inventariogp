@@ -3,6 +3,8 @@ import { AsignacionesRepository } from '../repositories/asignaciones.repository.
 import { ComponentesRepository } from '../repositories/componentes.repository.js';
 import { IncidenciasRepository } from '../repositories/incidencias.repository.js';
 import { IntervencionesRepository } from '../repositories/intervenciones.repository.js';
+import { ConfiguracionesService } from './configuraciones.service.js';
+import { ConfiguracionesRepository } from '../repositories/configuraciones.repository.js';
 import { withTransaction, createRequest } from '../config/db.js';
 import QRCode from 'qrcode';
 
@@ -152,6 +154,10 @@ export const EquiposService = {
     return EquiposRepository.getPlantillaByTipo(idTipo);
   },
 
+  async listValoresPlantilla(idPlantilla, q) {
+    return EquiposRepository.listValoresPlantilla(idPlantilla, q || '');
+  },
+
   async getTimeline(id) {
     const equipo = await EquiposRepository.getById(id);
     if (!equipo) return [];
@@ -228,6 +234,85 @@ export const EquiposService = {
       }
     });
     return this.getCaracteristicas(idEquipo);
+  },
+
+  // ─── Configuración TI (hostname / usuario Windows) ──────────────
+  async getConfiguracion(id) {
+    const equipo = await EquiposRepository.getById(id);
+    if (!equipo) throw businessError('Equipo no encontrado', 404);
+    const historial = await ConfiguracionesService.getHistorial(id);
+    return {
+      equipo: {
+        IdMaeEquipo: equipo.IdMaeEquipo,
+        CodEquipo: equipo.CodEquipo,
+        DesTipodeEquipo: equipo.DesTipodeEquipo,
+        HostnameActual: equipo.HostnameActual,
+        UsuarioWindowsActual: equipo.UsuarioWindowsActual,
+      },
+      historial,
+    };
+  },
+
+  async actualizarConfiguracion(id, data, idUsuario) {
+    const equipo = await EquiposRepository.getById(id);
+    if (!equipo) throw businessError('Equipo no encontrado', 404);
+    validarNoBaja(equipo);
+
+    const tipo = await EquiposRepository.getTipoById(equipo.IdTipodeEquipo);
+    if (!ConfiguracionesService.esTipoConfigurable(tipo)) {
+      throw businessError(`El tipo de equipo ${equipo.DesTipodeEquipo} no admite configuración TI (hostname / usuario Windows).`);
+    }
+
+    const finales = await ConfiguracionesService.resolver({
+      idEquipo: id,
+      hostname: data.Hostname,
+      usuarioWindows: data.UsuarioWindows,
+    });
+
+    const registros = [];
+    if (finales.hostname !== (equipo.HostnameActual || null)) {
+      registros.push({
+        idTipoCod: 'CAMBIO_HOSTNAME',
+        hostnameAnterior: equipo.HostnameActual || null,
+        hostnameNuevo: finales.hostname,
+      });
+    }
+    if (finales.usuarioWindows !== (equipo.UsuarioWindowsActual || null)) {
+      registros.push({
+        idTipoCod: 'CAMBIO_USUARIO_WINDOWS',
+        usuarioAnterior: equipo.UsuarioWindowsActual || null,
+        usuarioNuevo: finales.usuarioWindows,
+      });
+    }
+
+    if (!registros.length) {
+      return this.getConfiguracion(id);
+    }
+
+    const tiposResueltos = await Promise.all(
+      registros.map(async (r) => ({
+        ...r,
+        idTipoConfiguracion: (await ConfiguracionesRepository.getTipoByCod(r.idTipoCod))?.IdTipodeConfiguracion ?? null,
+      }))
+    );
+
+    await withTransaction('InventarioGP', async (trx) => {
+      await ConfiguracionesRepository.actualizarConfig(trx, id, finales.hostname, finales.usuarioWindows);
+      for (const r of tiposResueltos) {
+        await ConfiguracionesRepository.registrar(trx, {
+          idEquipo: id,
+          idTipoConfiguracion: r.idTipoConfiguracion,
+          hostnameAnterior: r.hostnameAnterior,
+          hostnameNuevo: r.hostnameNuevo,
+          usuarioAnterior: r.usuarioAnterior ?? null,
+          usuarioNuevo: r.usuarioNuevo ?? null,
+          idUsuario,
+          obs: data.Obs || null,
+        });
+      }
+    });
+
+    return this.getConfiguracion(id);
   },
 
   async agregarComponenteAEquipo(idEquipo, idComponente, obs, idUsuario, origenVinculo, motivo, idIntervencion) {
