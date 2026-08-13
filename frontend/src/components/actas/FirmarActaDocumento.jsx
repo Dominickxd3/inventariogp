@@ -12,9 +12,9 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 ).toString()
 
 const POSICIONES_FIRMA = {
-  ENTREGA: { left: 8.5, top: 79, width: 27.6, height: 10 },
+  ENTREGA: { left: 8.5, top: 81, width: 27.6, height: 10 },
   DEVOLUCION_RESPONSABLE: { left: 8.5, top: 62, width: 27.6, height: 11 },
-  DEVOLUCION_COLABORADOR: { left: 64, top: 54, width: 27.6, height: 11 },
+  DEVOLUCION_COLABORADOR: { left: 64, top: 56, width: 27.6, height: 11 },
 }
 
 const ZOOM_MIN = 0.7

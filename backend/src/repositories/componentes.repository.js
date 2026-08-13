@@ -49,6 +49,30 @@ export const ComponentesRepository = {
     `, { nombre, q });
   },
 
+  async findCatalogoValor(idCatalogo, nombreValor) {
+    const rows = await query(DB, `
+      SELECT TOP 1 IdValor, NombreValor
+      FROM Mae_CatalogoValores
+      WHERE IdCatalogo = @idCatalogo AND LTRIM(RTRIM(NombreValor)) = LTRIM(RTRIM(@nombreValor))
+    `, { idCatalogo, nombreValor });
+    return rows[0] || null;
+  },
+
+  async listValoresPlantilla(idPlantilla, q = '') {
+    const params = { idPlantilla };
+    let filtro = "LTRIM(RTRIM(Valor)) <> ''";
+    if (q.trim()) {
+      filtro += ' AND Valor LIKE @q';
+      params.q = `%${q.trim()}%`;
+    }
+    return query(DB, `
+      SELECT DISTINCT LTRIM(RTRIM(Valor)) AS Valor
+      FROM Tab_Componente_Caracteristicas
+      WHERE IdPlantilla = @idPlantilla AND ${filtro}
+      ORDER BY Valor
+    `, params);
+  },
+
   async create(data) {
     const result = await query(DB, `
       INSERT INTO Tab_EQ_Componentes
@@ -116,6 +140,21 @@ export const ComponentesRepository = {
       WHERE c.Estado = 'DISPONIBLE' AND tc.Categoria = 'ACCESORIO'
       ORDER BY tc.DesTipodeComponente, c.CodComponente
     `);
+  },
+
+  async listMarcas(q = '') {
+    const params = {};
+    let filtro = "Marca IS NOT NULL AND LTRIM(RTRIM(Marca)) <> ''";
+    if (q.trim()) {
+      filtro += ' AND Marca LIKE @q';
+      params.q = `%${q.trim()}%`;
+    }
+    return query(DB, `
+      SELECT DISTINCT LTRIM(RTRIM(Marca)) AS Marca
+      FROM Tab_EQ_Componentes
+      WHERE ${filtro}
+      ORDER BY Marca
+    `, params);
   },
 
   async getLastCodComponenteByPrefix(prefix) {
@@ -464,7 +503,7 @@ export const ComponentesRepository = {
 
   async getCaracteristicasComponente(idComponente) {
     return query(DB, `
-      SELECT c.IdCaracteristica, c.IdPlantilla, c.Clave, c.Valor, p.Etiqueta
+      SELECT c.IdCaracteristica, c.IdPlantilla, c.Clave, c.Valor, c.IdValorCatalogo, p.Etiqueta
       FROM Tab_Componente_Caracteristicas c
       LEFT JOIN Tab_Componente_PlantillaCaracteristicas p ON c.IdPlantilla = p.IdPlantilla
       WHERE c.IdComponente = @id
@@ -484,11 +523,11 @@ export const ComponentesRepository = {
     await req.query('DELETE FROM Tab_Componente_Caracteristicas WHERE IdComponente = @id');
   },
 
-  async insertCaracteristicaComponente(idComponente, idPlantilla, clave, valor, idUsuario, transaction) {
-    const req = createRequest(transaction, { idComponente, idPlantilla, clave, valor, idUsuario });
+  async insertCaracteristicaComponente(idComponente, idPlantilla, clave, valor, idValorCatalogo, idUsuario, transaction) {
+    const req = createRequest(transaction, { idComponente, idPlantilla, clave, valor, idValorCatalogo, idUsuario });
     await req.query(`
-      INSERT INTO Tab_Componente_Caracteristicas (IdComponente, IdPlantilla, Clave, Valor, IdUsuarioCrea)
-      VALUES (@idComponente, @idPlantilla, @clave, @valor, @idUsuario)
+      INSERT INTO Tab_Componente_Caracteristicas (IdComponente, IdPlantilla, Clave, Valor, IdValorCatalogo, IdUsuarioCrea)
+      VALUES (@idComponente, @idPlantilla, @clave, @valor, @idValorCatalogo, @idUsuario)
     `);
   },
 };

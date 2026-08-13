@@ -31,6 +31,13 @@ router.get('/tipos/:id/plantilla', authMiddleware, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.get('/plantillas/:idPlantilla/valores', authMiddleware, async (req, res, next) => {
+  try {
+    const valores = await ComponentesService.listValoresPlantilla(Number(req.params.idPlantilla), req.query.q);
+    res.json(valores);
+  } catch (e) { next(e); }
+});
+
 router.get('/:id/caracteristicas', authMiddleware, async (req, res, next) => {
   try {
     const result = await ComponentesService.getCaracteristicas(Number(req.params.id));
@@ -53,6 +60,13 @@ router.get('/accesorios-disponibles', authMiddleware, async (req, res, next) => 
   try {
     const list = await ComponentesService.listAccDisponibles();
     res.json(list);
+  } catch (e) { next(e); }
+});
+
+router.get('/marcas', authMiddleware, async (req, res, next) => {
+  try {
+    const marcas = await ComponentesService.listMarcas(req.query.q);
+    res.json(marcas);
   } catch (e) { next(e); }
 });
 
@@ -145,7 +159,7 @@ router.get('/catalogos/:nombre/search', authMiddleware, async (req, res, next) =
   try {
     const q = (req.query.q || '').trim();
     if (!q) return res.json([]);
-    const result = await ComponentesRepository.searchCatalogo(req.params.nombre, q);
+    const result = await ComponentesService.searchCatalogo(req.params.nombre, q);
     res.json(result);
   } catch (e) { next(e); }
 });

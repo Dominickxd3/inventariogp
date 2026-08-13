@@ -19,6 +19,7 @@ const PREFIX_MAP = new Map([
   ['MEMORIA RAM', 'RAM'],
   ['DISCO SSD', 'SSD'],
   ['DISCO DURO', 'HDD'],
+  ['M.2 NVME', 'NVME'],
   ['FUENTE DE PODER', 'FUE'],
   ['PLACA MADRE', 'PLA'],
   ['PROCESADOR', 'CPU'],
@@ -114,6 +115,18 @@ export const ComponentesService = {
 
   async listAccDisponibles() {
     return ComponentesRepository.listAccDisponibles();
+  },
+
+  async listMarcas(q) {
+    return ComponentesRepository.listMarcas(q || '');
+  },
+
+  async searchCatalogo(nombre, q) {
+    return ComponentesRepository.searchCatalogo(nombre, q);
+  },
+
+  async listValoresPlantilla(idPlantilla, q) {
+    return ComponentesRepository.listValoresPlantilla(idPlantilla, q || '');
   },
 
   async listAccsPorTrabajador(idTrabajador) {
@@ -252,11 +265,23 @@ export const ComponentesService = {
 
       for (const carac of caracteristicas) {
         const plant = plantilla.find(p => p.IdPlantilla === carac.IdPlantilla);
-        const req2 = createRequest(tx, { idComponente, idPlantilla: carac.IdPlantilla, clave: plant?.Clave || '', valor: carac.Valor || '', idUsuario });
-        await req2.query(`
-          INSERT INTO Tab_Componente_Caracteristicas (IdComponente, IdPlantilla, Clave, Valor, IdUsuarioCrea)
-          VALUES (@idComponente, @idPlantilla, @clave, @valor, @idUsuario)
-        `);
+        const esCatalogo = String(plant?.TipoDato || '').toUpperCase() === 'CATALOGO';
+        let idValorCatalogo = carac.IdValorCatalogo || null;
+
+        if (esCatalogo && !idValorCatalogo && carac.Valor?.trim()) {
+          const match = await ComponentesRepository.findCatalogoValor(plant.IdCatalogo, carac.Valor);
+          idValorCatalogo = match?.IdValor || null;
+        }
+
+        await ComponentesRepository.insertCaracteristicaComponente(
+          idComponente,
+          carac.IdPlantilla,
+          plant?.Clave || '',
+          carac.Valor || '',
+          idValorCatalogo,
+          idUsuario,
+          tx,
+        );
       }
     });
 

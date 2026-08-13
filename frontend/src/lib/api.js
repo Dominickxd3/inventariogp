@@ -181,12 +181,14 @@ export const api = {
     update: (id, data) => request(`/componentes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     baja: (id) => request(`/componentes/${id}/baja`, { method: 'POST' }),
     accesoriosDisponibles: () => request('/componentes/accesorios-disponibles'),
+    marcas: (q) => request(`/componentes/marcas?q=${encodeURIComponent(q || '')}`),
     accesoriosPorTrabajador: (id) => request(`/componentes/accesorios-por-trabajador/${id}`),
     tipos: {
       list: () => request('/componentes/tipos'),
       create: (data) => request('/componentes/tipos', { method: 'POST', body: JSON.stringify(data) }),
     },
     plantillaByTipo: (idTipo) => request(`/componentes/tipos/${idTipo}/plantilla`),
+    plantillaValores: (idPlantilla, q) => request(`/componentes/plantillas/${idPlantilla}/valores?q=${encodeURIComponent(q || '')}`),
     saveCaracteristicas: (id, caracteristicas) =>
       request(`/componentes/${id}/caracteristicas`, { method: 'PUT', body: JSON.stringify({ caracteristicas }) }),
     searchCatalogo: (nombre, q) => request(`/componentes/catalogos/${nombre}/search?q=${encodeURIComponent(q)}`),

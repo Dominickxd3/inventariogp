@@ -21,23 +21,6 @@ import ComponenteDetalleDrawer from '../components/componentes/ComponenteDetalle
 import AutocompleteInput from '../components/AutocompleteInput';
 import { Plus, Search, Cpu, Headphones } from 'lucide-react';
 
-const componentTypeConfig = {
-  'MEMORIA RAM': { descripcion: 'Ej: Memoria RAM DDR4', marca: 'Ej: Kingston', modelo: 'Ej: Fury Beast', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: 16 GB DDR4 3200 MHz' },
-  'DISCO SSD': { descripcion: 'Ej: Disco SSD', marca: 'Ej: Kingston', modelo: 'Ej: A400', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: 512 GB SSD SATA / NVMe' },
-  'DISCO DURO': { descripcion: 'Ej: Disco duro', marca: 'Ej: Seagate', modelo: 'Ej: Barracuda', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: 1 TB HDD SATA' },
-  CARGADOR: { descripcion: 'Ej: Cargador de laptop', marca: 'Ej: Lenovo', modelo: 'Ej: USB-C 65W', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: 65W USB-C' },
-  BATERIA: { descripcion: 'Ej: Batería de laptop', marca: 'Ej: Lenovo', modelo: 'Ej: L19M3PF1', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: 45Wh / 3 celdas' },
-  PANTALLA: { descripcion: 'Ej: Pantalla de laptop', marca: 'Ej: BOE', modelo: 'Ej: NV156FHM', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: 15.6 pulgadas FHD' },
-  'TARJETA DE VIDEO': { descripcion: 'Ej: Tarjeta de video', marca: 'Ej: NVIDIA', modelo: 'Ej: GTX 1650', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: 4 GB GDDR6 / PCIe' },
-  MOUSE: { descripcion: 'Ej: Mouse', marca: 'Ej: Logitech', modelo: 'Ej: M90', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: USB / inalámbrico' },
-  TECLADO: { descripcion: 'Ej: Teclado', marca: 'Ej: Logitech', modelo: 'Ej: K120', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: USB / español' },
-  TONER: { descripcion: 'Ej: Tóner de impresora', marca: 'Ej: HP', modelo: 'Ej: 85A', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: Negro / CE285A' },
-  TINTA: { descripcion: 'Ej: Tinta de impresora', marca: 'Ej: Epson', modelo: 'Ej: T664', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: Negro / CMYK' },
-  CARTUCHO: { descripcion: 'Ej: Cartucho de impresora', marca: 'Ej: HP', modelo: 'Ej: 65XL', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: Negro / Alto rendimiento' },
-  AUDIFONOS: { descripcion: 'Ej: Audífonos', marca: 'Ej: Logitech', modelo: 'Ej: H390', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: USB / diadema' },
-  MOCHILA: { descripcion: 'Ej: Mochila', marca: 'Ej: Targus', modelo: 'Ej: TSB026', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: 15.6 pulgadas' },
-};
-
 const defaultTypeConfig = { descripcion: 'Ej: descripción del componente', marca: 'Ej: Kingston', modelo: 'Ej: modelo', serie: 'Opcional', detalleLabel: 'Detalle técnico', detalle: 'Ej: especificación principal', ayuda: '' };
 const initialForm = { IdTipodeComponente: '', DesComponente: '', Marca: '', Modelo: '', Serie: '', Capacidad: '', Obs: '' };
 
@@ -68,10 +51,6 @@ const ESTADO_FILTERS = [
   { value: 'BAJA', label: 'Baja' },
   { value: 'INACTIVO', label: 'Inactivo' },
 ];
-
-function normalizeTypeName(value) {
-  return (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
-}
 
 function buildAutoDescription(tipoNombre, marca, modelo, detalle) {
   return [tipoNombre, marca, modelo, detalle].map((v) => v?.trim()).filter(Boolean).join(' ');
@@ -113,12 +92,18 @@ export default function Componentes() {
   const [form, setForm] = useState({ ...initialForm });
   const [compPlantilla, setCompPlantilla] = useState(null);
   const [compCaracVals, setCompCaracVals] = useState({});
+  const [compCaracIdVal, setCompCaracIdVal] = useState({});
+  const [compCaracOriginal, setCompCaracOriginal] = useState({});
+  const [formOriginal, setFormOriginal] = useState({});
 
   const setField = (field) => (e) => setForm((prev) => ({ ...prev, [field]: e.target.value.toUpperCase() }));
 
   const handleTipoCompChange = (v) => {
     setForm((prev) => ({ ...prev, IdTipodeComponente: Number(v) }));
     setCompCaracVals({});
+    setCompCaracIdVal({});
+    setCompCaracOriginal({});
+    setFormOriginal({});
     if (!v) { setCompPlantilla(null); return; }
     api.componentes.plantillaByTipo(Number(v))
       .then(r => setCompPlantilla(r || []))
@@ -166,8 +151,7 @@ export default function Componentes() {
   }, [categoriaNuevo, tipos]);
 
   const selectedTipo = tipos?.find((t) => String(t.IdTipodeComponente) === String(form.IdTipodeComponente)) || null;
-  const selectedTypeName = normalizeTypeName(selectedTipo?.DesTipodeComponente || '');
-  const typeConfig = componentTypeConfig[selectedTypeName] || defaultTypeConfig;
+  const typeConfig = defaultTypeConfig;
   const autoDescription = buildAutoDescription(selectedTipo?.DesTipodeComponente, form.Marca, form.Modelo, form.Capacidad);
   const categoriaLabel = categoriaNuevo ? formatCategoria(categoriaNuevo) : '';
 
@@ -179,7 +163,7 @@ export default function Componentes() {
       if (id && cam.length > 0) {
         const vals = Object.entries(compCaracVals)
           .filter(([_, v]) => v)
-          .map(([idPlantilla, valor]) => ({ IdPlantilla: Number(idPlantilla), Valor: valor }));
+          .map(([idPlantilla, valor]) => ({ IdPlantilla: Number(idPlantilla), Valor: valor, IdValorCatalogo: compCaracIdVal[idPlantilla] || null }));
         if (vals.length > 0) await api.componentes.saveCaracteristicas(id, vals);
       }
       return resp;
@@ -200,7 +184,7 @@ export default function Componentes() {
       if (cam.length > 0) {
         const vals = Object.entries(compCaracVals)
           .filter(([_, v]) => v)
-          .map(([idPlantilla, valor]) => ({ IdPlantilla: Number(idPlantilla), Valor: valor }));
+          .map(([idPlantilla, valor]) => ({ IdPlantilla: Number(idPlantilla), Valor: valor, IdValorCatalogo: compCaracIdVal[idPlantilla] || null }));
         if (vals.length > 0) await api.componentes.saveCaracteristicas(editId, vals);
       }
     },
@@ -219,6 +203,9 @@ export default function Componentes() {
     setCategoriaNuevo('');
     setCompPlantilla(null);
     setCompCaracVals({});
+    setCompCaracIdVal({});
+    setCompCaracOriginal({});
+    setFormOriginal({});
     setEditId(null);
   }
 
@@ -236,16 +223,29 @@ export default function Componentes() {
     });
     setCompPlantilla(null);
     setCompCaracVals({});
+    setCompCaracIdVal({});
+    setCompCaracOriginal({});
+    setFormOriginal({
+      DesComponente: comp.DesComponente || '',
+      Marca: comp.Marca || '',
+      Modelo: comp.Modelo || '',
+      Serie: comp.Serie || '',
+      Capacidad: comp.Capacidad || '',
+    });
     if (comp.IdTipodeComponente) {
       try {
         const pl = await api.componentes.plantillaByTipo(Number(comp.IdTipodeComponente));
         setCompPlantilla(pl || []);
         const det = await api.componentes.detalle(comp.IdComponente);
         const vals = {};
+        const idVals = {};
         for (const c of (det?.caracteristicas || [])) {
           vals[c.IdPlantilla] = c.Valor || '';
+          if (c.IdValorCatalogo) idVals[c.IdPlantilla] = c.IdValorCatalogo;
         }
         setCompCaracVals(vals);
+        setCompCaracIdVal(idVals);
+        setCompCaracOriginal(vals);
       } catch {
         setCompPlantilla(null);
       }
@@ -263,8 +263,43 @@ export default function Componentes() {
     },
   });
 
+  const getCamposFaltantes = () => {
+    const faltantes = [];
+    if (editId) {
+      const legacyCampos = [
+        ['DesComponente', 'Nombre / descripción'],
+        ['Capacidad', typeConfig.detalleLabel],
+        ['Marca', 'Marca'],
+        ['Modelo', 'Modelo'],
+        ['Serie', 'Serie'],
+      ];
+      for (const [k, label] of legacyCampos) {
+        if (formOriginal[k] && !String(form[k] ?? '').trim()) faltantes.push(label);
+      }
+    }
+    if (compPlantilla && compPlantilla.length > 0) {
+      for (const c of compPlantilla) {
+        const val = String(compCaracVals[c.IdPlantilla] ?? '').trim();
+        const etiqueta = c.Etiqueta || c.Clave;
+        const yaTeniaValor = editId && compCaracOriginal[c.IdPlantilla];
+        if ((c.Requerido || yaTeniaValor) && !val) faltantes.push(etiqueta);
+      }
+    }
+    return [...new Set(faltantes)];
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
+    const faltantes = getCamposFaltantes();
+    if (faltantes.length > 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Campos obligatorios',
+        html: `<p class="mb-2">Debes completar los siguientes campos:</p><ul style="text-align:left;display:inline-block">${faltantes.map((f) => `<li>• <b>${f}</b></li>`).join('')}</ul>`,
+        confirmButtonText: 'Entendido',
+      });
+      return;
+    }
     const autoDesc = [
       selectedTipo?.DesTipodeComponente,
       ...(compPlantilla || [])
@@ -317,7 +352,6 @@ export default function Componentes() {
             <SelectItem value="todos">Todos</SelectItem>
             <SelectItem value="REPUESTO_TECNICO">Repuestos Técnicos</SelectItem>
             <SelectItem value="ACCESORIO">Accesorios</SelectItem>
-            <SelectItem value="CONSUMIBLE">Consumibles</SelectItem>
           </SelectContent>
         </Select>
         <Select value={tipoFilter} onValueChange={setTipoFilter} disabled={!categoria}>
@@ -327,6 +361,7 @@ export default function Componentes() {
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="">Todos</SelectItem>
             {tiposPorCategoria.map((t) => <SelectItem key={t.IdTipodeComponente} value={String(t.IdTipodeComponente)}>{t.DesTipodeComponente}</SelectItem>)}
             {tiposPorCategoria.length === 0 && categoria && (
               <div className="px-2 py-2 text-xs text-muted-foreground text-center">Sin tipos</div>
@@ -375,7 +410,14 @@ export default function Componentes() {
       />
       </div>
 
-      <Dialog open={showModal} onOpenChange={setShowModal}>
+      <Dialog
+        open={showModal}
+        disablePointerDismissal
+        onOpenChange={(open, eventDetails) => {
+          if (!open && ['escape-key', 'close-watcher', 'outside-press', 'focus-out'].includes(eventDetails?.reason)) return;
+          setShowModal(open);
+        }}
+      >
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editId ? 'Editar Componente' : 'Nuevo Componente'}</DialogTitle>
@@ -462,28 +504,44 @@ export default function Componentes() {
                 </div>
                 <p className="text-sm font-semibold text-foreground mb-3">Características</p>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                  {compPlantilla.map((c) => (
-                    <div key={c.IdPlantilla} className="space-y-1">
-                      <label className="text-sm font-medium text-foreground">
-                        {c.Etiqueta || c.Clave}
-                        {c.Requerido ? <span className="text-red-500 ml-0.5">*</span> : null}
-                      </label>
-                      {c.TipoDato === 'CATALOGO' ? (
-                        <AutocompleteInput
-                          placeholder={c.Ejemplo || c.Etiqueta || c.Clave}
-                          catalogoNombre={c.CatalogoNombre}
-                          value={compCaracVals[c.IdPlantilla] || ''}
-                          onChange={(v) => setCompCaracVals((prev) => ({ ...prev, [c.IdPlantilla]: v.toUpperCase() }))}
-                        />
-                      ) : (
-                        <Input
-                          placeholder={c.Ejemplo || c.Etiqueta || c.Clave}
-                          value={compCaracVals[c.IdPlantilla] || ''}
-                          onChange={(e) => setCompCaracVals((prev) => ({ ...prev, [c.IdPlantilla]: e.target.value.toUpperCase() }))}
-                        />
-                      )}
-                    </div>
-                  ))}
+                  {compPlantilla.map((c) => {
+                    const tipoDato = String(c.TipoDato || 'TEXTO').toUpperCase();
+                    const etiqueta = c.Etiqueta || c.Clave;
+                    const placeholder = c.Ejemplo || c.Clave || '';
+                    return (
+                      <div key={c.IdPlantilla} className="space-y-1">
+                        <label className="text-sm font-medium text-foreground">
+                          {etiqueta}
+                          {c.Requerido ? <span className="text-red-500 ml-0.5">*</span> : null}
+                        </label>
+                        {tipoDato === 'CATALOGO' ? (
+                          <AutocompleteInput
+                            placeholder={placeholder}
+                            searchFn={(q) => api.componentes.searchCatalogo(c.CatalogoNombre, q).then((res) => (res || []).map((v) => ({ id: v.IdValor, label: v.NombreValor })))}
+                            value={compCaracVals[c.IdPlantilla] || ''}
+                            onChange={(v, item) => {
+                              setCompCaracVals((prev) => ({ ...prev, [c.IdPlantilla]: v }));
+                              setCompCaracIdVal((prev) => ({ ...prev, [c.IdPlantilla]: item?.id ?? null }));
+                            }}
+                          />
+                        ) : tipoDato === 'NUMERO' ? (
+                          <Input
+                            type="number"
+                            placeholder={placeholder}
+                            value={compCaracVals[c.IdPlantilla] || ''}
+                            onChange={(e) => setCompCaracVals((prev) => ({ ...prev, [c.IdPlantilla]: e.target.value }))}
+                          />
+                        ) : (
+                          <AutocompleteInput
+                            placeholder={placeholder}
+                            searchFn={(q) => api.componentes.plantillaValores(c.IdPlantilla, q).then((res) => (res || []).map((v) => v.Valor))}
+                            value={compCaracVals[c.IdPlantilla] || ''}
+                            onChange={(v) => setCompCaracVals((prev) => ({ ...prev, [c.IdPlantilla]: v }))}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ) : (
@@ -501,7 +559,12 @@ export default function Componentes() {
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium text-foreground">Marca</label>
-                    <Input value={form.Marca} onChange={setField('Marca')} placeholder={typeConfig.marca} />
+                    <AutocompleteInput
+                      placeholder={typeConfig.marca}
+                      searchFn={(q) => api.componentes.marcas(q).then((res) => (res || []).map((m) => m.Marca))}
+                      value={form.Marca}
+                      onChange={(v) => setForm((prev) => ({ ...prev, Marca: v }))}
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium text-foreground">Modelo</label>
