@@ -55,6 +55,11 @@ export const componenteCreateSchema = z.object({
   Capacidad: z.string().optional(),
   Lote: z.string().optional(),
   Obs: z.string().optional(),
+  caracteristicas: z.array(z.object({
+    IdPlantilla: z.number().int().positive(),
+    Valor: z.string().optional().default(''),
+    IdValorCatalogo: z.number().int().nullable().optional(),
+  })).optional(),
 });
 
 export const componenteUpdateSchema = componenteCreateSchema.partial();

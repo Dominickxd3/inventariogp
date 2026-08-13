@@ -107,14 +107,14 @@ router.get('/:id', authMiddleware, async (req, res, next) => {
 
 router.post('/', authMiddleware, roleMiddleware('ADMIN', 'TECNICO'), validate(componenteCreateSchema), async (req, res, next) => {
   try {
-    const id = await ComponentesService.create(req.body);
+    const id = await ComponentesService.create(req.body, req.usuario?.id);
     res.status(201).json({ id });
   } catch (e) { next(e); }
 });
 
 router.post('/rapido', authMiddleware, roleMiddleware('ADMIN', 'TECNICO'), validate(componenteCreateSchema), async (req, res, next) => {
   try {
-    const id = await ComponentesService.createQuick(req.body);
+    const id = await ComponentesService.createQuick(req.body, req.usuario?.id);
     res.status(201).json({ id });
   } catch (e) { next(e); }
 });

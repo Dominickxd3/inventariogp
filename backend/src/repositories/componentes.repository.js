@@ -14,7 +14,7 @@ export const ComponentesRepository = {
     if (filtros.estado) { sql += ' AND c.Estado = @estado'; params.estado = filtros.estado; }
     if (filtros.categoria) { sql += ' AND tc.Categoria = @categoria'; params.categoria = filtros.categoria; }
     if (filtros.idTipo) { sql += ' AND c.IdTipodeComponente = @idTipo'; params.idTipo = filtros.idTipo; }
-    if (filtros.search) { sql += " AND (c.CodComponente LIKE @search OR c.DesComponente LIKE @search OR c.Marca LIKE @search OR c.Modelo LIKE @search OR c.Serie LIKE @search OR c.Capacidad LIKE @search)"; params.search = `%${filtros.search}%`; }
+    if (filtros.search) { sql += " AND (c.CodComponente LIKE @search OR c.DesComponente LIKE @search OR c.Marca LIKE @search OR c.Modelo LIKE @search OR c.Serie LIKE @search OR c.Capacidad LIKE @search OR EXISTS (SELECT 1 FROM Tab_Componente_Caracteristicas cc WHERE cc.IdComponente = c.IdComponente AND cc.Valor LIKE @search))"; params.search = `%${filtros.search}%`; }
     sql += ' ORDER BY c.DesComponente';
     return query(DB, sql, params);
   },
@@ -73,25 +73,58 @@ export const ComponentesRepository = {
     `, params);
   },
 
-  async create(data) {
-    const result = await query(DB, `
-      INSERT INTO Tab_EQ_Componentes
-        (IdTipodeComponente, CodComponente, DesComponente, Marca, Modelo, Serie,
-         Lote, Capacidad, Obs, Estado)
-      OUTPUT INSERTED.IdComponente
-      VALUES (@idTipo, @cod, @desc, @marca, @modelo, @serie, @lote, @capacidad, @obs, 'DISPONIBLE')
-    `, {
-      idTipo: data.IdTipodeComponente,
-      cod: data.CodComponente,
-      desc: data.DesComponente || null,
-      marca: data.Marca || null,
-      modelo: data.Modelo || null,
-      serie: data.Serie || null,
-      lote: data.Lote || null,
-      capacidad: data.Capacidad || null,
-      obs: data.Obs || null,
+  async create(data, { idUsuario = null, caracteristicas = [] } = {}) {
+    return withTransaction('InventarioGP', async (tx) => {
+      const req = createRequest(tx, {
+        idTipo: data.IdTipodeComponente,
+        cod: data.CodComponente,
+        desc: data.DesComponente || null,
+        marca: data.Marca || null,
+        modelo: data.Modelo || null,
+        serie: data.Serie || null,
+        lote: data.Lote || null,
+        capacidad: data.Capacidad || null,
+        obs: data.Obs || null,
+        idUsuario,
+      });
+
+      const result = await req.query(`
+        INSERT INTO Tab_EQ_Componentes
+          (IdTipodeComponente, CodComponente, DesComponente, Marca, Modelo, Serie,
+           Lote, Capacidad, Obs, Estado, FechaRegistro, IdUsuarioCrea)
+        OUTPUT INSERTED.IdComponente
+        VALUES (@idTipo, @cod, @desc, @marca, @modelo, @serie, @lote, @capacidad, @obs, 'DISPONIBLE', GETDATE(), @idUsuario)
+      `);
+      const newId = result.recordset[0]?.IdComponente;
+      if (newId == null) throw new Error('No se pudo crear el componente');
+
+      for (const c of caracteristicas) {
+        await createRequest(tx, {
+          idComponente: newId,
+          idPlantilla: c.IdPlantilla,
+          clave: c.Clave || '',
+          valor: c.Valor ?? '',
+          idValorCatalogo: c.IdValorCatalogo || null,
+          idUsuario,
+        }).query(`
+          INSERT INTO Tab_Componente_Caracteristicas (IdComponente, IdPlantilla, Clave, Valor, IdValorCatalogo, IdUsuarioCrea)
+          VALUES (@idComponente, @idPlantilla, @clave, @valor, @idValorCatalogo, @idUsuario)
+        `);
+      }
+
+      if (idUsuario) {
+        await createRequest(tx, {
+          idComponente: newId,
+          idUsuario,
+          detalle: JSON.stringify({ tipo: data.IdTipodeComponente, codigo: data.CodComponente || null }),
+        }).query(`
+          INSERT INTO Tab_EQ_ComponentesEventos (IdComponente, EstadoAnterior, EstadoNuevo, IdUsuario, FechaEvento, Motivo, IdReferencia, TablaReferencia, Detalle)
+          VALUES (@idComponente, NULL, 'DISPONIBLE', @idUsuario, GETDATE(), NULL, @idComponente, 'Tab_EQ_Componentes', @detalle)
+        `);
+      }
+
+      return newId;
     });
-    return result[0]?.IdComponente;
   },
 
   async update(id, data) {
@@ -180,12 +213,21 @@ export const ComponentesRepository = {
   },
 
   // Componentes asignados a un equipo
-  async getByEquipo(idEquipo) {
+async getByEquipo(idEquipo) {
     return query(DB, `
-      SELECT mc.*, c.CodComponente, c.DesComponente, c.Marca, c.Modelo, c.Serie,
-             tc.DesTipodeComponente
+      SELECT mc.*, c.CodComponente, c.DesComponente,
+             COALESCE(cc.MarcaCar, c.Marca) AS Marca,
+             COALESCE(cc.ModeloCar, c.Modelo) AS Modelo,
+             c.Serie, tc.DesTipodeComponente
       FROM Tab_EQ_MovEquiposComponentes mc
       JOIN Tab_EQ_Componentes c ON mc.IdComponente = c.IdComponente
+      LEFT JOIN (
+        SELECT cc.IdComponente,
+               MAX(CASE WHEN cc.Clave = 'Marca' THEN cc.Valor END) AS MarcaCar,
+               MAX(CASE WHEN cc.Clave = 'Modelo' THEN cc.Valor END) AS ModeloCar
+        FROM Tab_Componente_Caracteristicas cc
+        GROUP BY cc.IdComponente
+      ) cc ON cc.IdComponente = c.IdComponente
       LEFT JOIN Tab_EQ_TipodeComponentes tc ON c.IdTipodeComponente = tc.IdTipodeComponente
       WHERE mc.IdMaeEquipo = @id AND mc.Estado = 'VIGENTE'
       ORDER BY mc.IdMovEquipoComponente DESC
@@ -268,7 +310,7 @@ export const ComponentesRepository = {
     const rows = await query(DB, `
       SELECT
         c.IdComponente, c.CodComponente, c.DesComponente,
-        c.Marca, c.Modelo, c.Serie, c.Lote, c.Capacidad, c.Obs, c.Estado,
+        c.Marca, c.Modelo, c.Serie, c.Lote, c.Capacidad, c.Obs, c.Estado, c.FechaRegistro,
         tc.IdTipodeComponente,
         tc.DesTipodeComponente AS TipoComponente,
         tc.Categoria
@@ -454,10 +496,19 @@ export const ComponentesRepository = {
 
   async listAccesoriosPorTrabajador(idTrabajador) {
     return query(DB, `
-      SELECT m.*, c.CodComponente, c.DesComponente, c.Marca, c.Modelo, c.Serie,
-             tc.DesTipodeComponente
+      SELECT m.*, c.CodComponente, c.DesComponente,
+             COALESCE(cc.MarcaCar, c.Marca) AS Marca,
+             COALESCE(cc.ModeloCar, c.Modelo) AS Modelo,
+             c.Serie, tc.DesTipodeComponente
       FROM Tab_EQ_MovAccesoriosTrabajador m
       JOIN Tab_EQ_Componentes c ON m.IdComponente = c.IdComponente
+      LEFT JOIN (
+        SELECT cc.IdComponente,
+               MAX(CASE WHEN cc.Clave = 'Marca' THEN cc.Valor END) AS MarcaCar,
+               MAX(CASE WHEN cc.Clave = 'Modelo' THEN cc.Valor END) AS ModeloCar
+        FROM Tab_Componente_Caracteristicas cc
+        GROUP BY cc.IdComponente
+      ) cc ON cc.IdComponente = c.IdComponente
       LEFT JOIN Tab_EQ_TipodeComponentes tc ON c.IdTipodeComponente = tc.IdTipodeComponente
       WHERE m.IdReferente = @id AND m.Estado = 'VIGENTE'
       ORDER BY m.FecAsignacion DESC

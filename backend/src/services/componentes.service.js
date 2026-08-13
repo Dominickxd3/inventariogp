@@ -68,14 +68,55 @@ function buildAutoDescription(tipoNombre, marca, modelo, detalle) {
     .join(' ');
 }
 
+function buildAutoDescFromPlantilla(tipoNombre, plantilla, caracteristicas) {
+  const map = {};
+  for (const c of caracteristicas || []) map[c.Clave] = c.Valor;
+  const partes = [String(tipoNombre || '').trim()];
+  const filas = (plantilla || [])
+    .filter(p => p.MostrarEnDescripcion && map[p.Clave])
+    .sort((a, b) => (a.OrdenDescripcion || 99) - (b.OrdenDescripcion || 99));
+  for (const p of filas) partes.push(map[p.Clave]);
+  return partes.filter(Boolean).join(' ');
+}
+
 function normalizeTypeName(value) {
   return normalizarTexto(value);
+}
+
+async function buildCaracteristicasResueltas(lista, plantilla) {
+  const plantillaArr = plantilla || [];
+  const idsValidos = new Set(plantillaArr.map(p => p.IdPlantilla));
+  const invalidos = (lista || []).filter(c => c && !idsValidos.has(c.IdPlantilla));
+  if (invalidos.length > 0) {
+    throw businessError(`IDs de plantilla inválidos: ${invalidos.map(x => x.IdPlantilla).join(', ')}`, 422);
+  }
+  const resueltas = [];
+  for (const c of lista || []) {
+    if (!c || !c.IdPlantilla) continue;
+    const plant = plantillaArr.find(p => p.IdPlantilla === c.IdPlantilla);
+    let idValorCatalogo = c.IdValorCatalogo || null;
+    let valor = c.Valor ?? '';
+    if (String(plant?.TipoDato || '').toUpperCase() === 'CATALOGO' && !idValorCatalogo && valor.trim()) {
+      const match = await ComponentesRepository.findCatalogoValor(plant.IdCatalogo, valor);
+      if (match) {
+        idValorCatalogo = match.IdValor;
+        valor = match.NombreValor;
+      }
+    }
+    resueltas.push({
+      IdPlantilla: c.IdPlantilla,
+      Clave: plant?.Clave || '',
+      Valor: valor,
+      IdValorCatalogo: idValorCatalogo,
+    });
+  }
+  return resueltas;
 }
 
 export const ComponentesService = {
   async list(filtros) {
     const result = await ComponentesRepository.listAll(filtros);
-    if (filtros.idTipo && result.length) {
+    if (result.length) {
       const ids = result.map(r => r.IdComponente).join(',');
       if (ids) {
         const caracs = await ComponentesRepository.getCaracteristicasByLote(ids);
@@ -84,7 +125,16 @@ export const ComponentesService = {
           if (!map[c.IdComponente]) map[c.IdComponente] = {};
           map[c.IdComponente][c.Clave] = c.Valor;
         }
-        return result.map(r => ({ ...r, caracteristicas: map[r.IdComponente] || {} }));
+        return result.map(r => {
+          const caracMap = map[r.IdComponente] || {};
+          return {
+            ...r,
+            caracteristicas: caracMap,
+            Marca: caracMap.Marca || r.Marca || null,
+            Modelo: caracMap.Modelo || r.Modelo || null,
+            Capacidad: caracMap.Capacidad || r.Capacidad || null,
+          };
+        });
       }
     }
     return result;
@@ -93,7 +143,16 @@ export const ComponentesService = {
   async getById(id) {
     const c = await ComponentesRepository.getById(id);
     if (!c) throw businessError('Componente no encontrado', 404);
-    return c;
+    const caracs = await ComponentesRepository.getCaracteristicasComponente(id);
+    const map = {};
+    for (const cc of caracs) map[cc.Clave] = cc.Valor;
+    return {
+      ...c,
+      caracteristicas: caracs,
+      Marca: map.Marca || c.Marca || null,
+      Modelo: map.Modelo || c.Modelo || null,
+      Capacidad: map.Capacidad || c.Capacidad || null,
+    };
   },
 
   async getByCodigo(cod) {
@@ -114,7 +173,23 @@ export const ComponentesService = {
   },
 
   async listAccDisponibles() {
-    return ComponentesRepository.listAccDisponibles();
+    const list = await ComponentesRepository.listAccDisponibles();
+    if (list.length) {
+      const ids = list.map(r => r.IdComponente).join(',');
+      if (ids) {
+        const caracs = await ComponentesRepository.getCaracteristicasByLote(ids);
+        const map = {};
+        for (const c of caracs) {
+          if (!map[c.IdComponente]) map[c.IdComponente] = {};
+          map[c.IdComponente][c.Clave] = c.Valor;
+        }
+        return list.map(r => {
+          const m = map[r.IdComponente] || {};
+          return { ...r, Marca: m.Marca || r.Marca || null, Modelo: m.Modelo || r.Modelo || null };
+        });
+      }
+    }
+    return list;
   },
 
   async listMarcas(q) {
@@ -133,7 +208,7 @@ export const ComponentesService = {
     return ComponentesRepository.listAccesoriosPorTrabajador(idTrabajador);
   },
 
-  async create(data) {
+  async create(data, idUsuario) {
     const tipo = await ComponentesRepository.getTipoById(data.IdTipodeComponente);
     if (!tipo) throw businessError('Tipo de componente no encontrado');
     if (INVALID_COMPONENT_TYPES.has(normalizeTypeName(tipo.DesTipodeComponente))) {
@@ -155,12 +230,12 @@ export const ComponentesService = {
       }
       data.CodComponente = `${prefix}-${String(nextNum).padStart(6, '0')}`;
     }
+    const plantilla = await ComponentesRepository.getPlantillaByComponenteTipo(data.IdTipodeComponente);
+    const caracteristicas = await buildCaracteristicasResueltas(data.caracteristicas || [], plantilla);
     if (!data.DesComponente?.trim()) {
-      data.DesComponente = buildAutoDescription(
-        tipo.DesTipodeComponente, data.Marca, data.Modelo, data.Capacidad
-      ) || null;
+      data.DesComponente = buildAutoDescFromPlantilla(tipo.DesTipodeComponente, plantilla, caracteristicas) || null;
     }
-    return ComponentesRepository.create(data);
+    return ComponentesRepository.create(data, { idUsuario, caracteristicas });
   },
 
   async update(id, data) {
@@ -198,7 +273,7 @@ export const ComponentesService = {
     return ComponentesRepository.baja(id);
   },
 
-  async createQuick(data) {
+  async createQuick(data, idUsuario) {
     const tipo = await ComponentesRepository.getTipoById(data.IdTipodeComponente);
     if (!tipo) throw businessError('Tipo de componente no encontrado');
     if (INVALID_COMPONENT_TYPES.has(normalizeTypeName(tipo.DesTipodeComponente))) {
@@ -220,12 +295,10 @@ export const ComponentesService = {
       nextNum = parseInt(numPart, 10) + 1;
     }
     const codComponente = `${prefix}-${String(nextNum).padStart(6, '0')}`;
-    const autoDescription = buildAutoDescription(
-      tipo.DesTipodeComponente,
-      data.Marca,
-      data.Modelo,
-      data.Capacidad
-    );
+
+    const plantilla = await ComponentesRepository.getPlantillaByComponenteTipo(data.IdTipodeComponente);
+    const caracteristicas = await buildCaracteristicasResueltas(data.caracteristicas || [], plantilla);
+    const autoDescription = buildAutoDescFromPlantilla(tipo.DesTipodeComponente, plantilla, caracteristicas);
 
     return ComponentesRepository.create({
       IdTipodeComponente: data.IdTipodeComponente,
@@ -237,7 +310,7 @@ export const ComponentesService = {
       Lote: data.Lote || null,
       Capacidad: data.Capacidad || null,
       Obs: data.Obs || null,
-    });
+    }, { idUsuario, caracteristicas });
   },
   async getPlantillaByTipo(idTipo) {
     return ComponentesRepository.getPlantillaByComponenteTipo(idTipo);

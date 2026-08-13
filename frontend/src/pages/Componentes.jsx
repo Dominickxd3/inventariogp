@@ -64,6 +64,13 @@ function normalizarCategoria(cat) {
   return value;
 }
 
+function formatFecha(valor) {
+  if (!valor) return '—';
+  const d = new Date(valor);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
 export default function Componentes() {
   const [search, setSearch] = useState('');
   const [categoria, setCategoria] = useState('');
@@ -157,16 +164,13 @@ export default function Componentes() {
 
   const createMutation = useMutation({
     mutationFn: async (data) => {
-      const resp = await api.componentes.createQuick(data);
-      const id = resp.componente?.IdComponente || resp.IdComponente || resp.id;
       const cam = compPlantilla || [];
-      if (id && cam.length > 0) {
-        const vals = Object.entries(compCaracVals)
-          .filter(([_, v]) => v)
-          .map(([idPlantilla, valor]) => ({ IdPlantilla: Number(idPlantilla), Valor: valor, IdValorCatalogo: compCaracIdVal[idPlantilla] || null }));
-        if (vals.length > 0) await api.componentes.saveCaracteristicas(id, vals);
-      }
-      return resp;
+      const carac = cam.length > 0
+        ? Object.entries(compCaracVals)
+            .filter(([_, v]) => v)
+            .map(([idPlantilla, valor]) => ({ IdPlantilla: Number(idPlantilla), Valor: valor, IdValorCatalogo: compCaracIdVal[idPlantilla] || null }))
+        : [];
+      return api.componentes.createQuick({ ...data, caracteristicas: carac });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['componentes'] });
@@ -394,12 +398,14 @@ export default function Componentes() {
                 },
               })),
               { key: 'Estado', label: 'Estado', render: (r) => <StatusBadge status={r.Estado} /> },
+              { key: 'FechaRegistro', label: 'Registro', render: (r) => formatFecha(r.FechaRegistro) },
             ]
           : [
               { key: 'CodComponente', label: 'Código' },
               { key: 'DesComponente', label: 'Descripción' },
               { key: 'DesTipodeComponente', label: 'Tipo' },
               { key: 'Estado', label: 'Estado', render: (r) => <StatusBadge status={r.Estado} /> },
+              { key: 'FechaRegistro', label: 'Registro', render: (r) => formatFecha(r.FechaRegistro) },
             ]
         }
         data={data}

@@ -114,10 +114,19 @@ export const AsignacionesRepository = {
 
   async getAccsByAsignacion(id) {
     return query(DB, `
-      SELECT m.*, c.CodComponente, c.DesComponente, c.Marca, c.Modelo,
+      SELECT m.*, c.CodComponente, c.DesComponente,
+             COALESCE(cc.MarcaCar, c.Marca) AS Marca,
+             COALESCE(cc.ModeloCar, c.Modelo) AS Modelo,
              tc.DesTipodeComponente
       FROM Tab_EQ_MovAccesoriosTrabajador m
       JOIN Tab_EQ_Componentes c ON m.IdComponente = c.IdComponente
+      LEFT JOIN (
+        SELECT cc.IdComponente,
+               MAX(CASE WHEN cc.Clave = 'Marca' THEN cc.Valor END) AS MarcaCar,
+               MAX(CASE WHEN cc.Clave = 'Modelo' THEN cc.Valor END) AS ModeloCar
+        FROM Tab_Componente_Caracteristicas cc
+        GROUP BY cc.IdComponente
+      ) cc ON cc.IdComponente = c.IdComponente
       LEFT JOIN Tab_EQ_TipodeComponentes tc ON c.IdTipodeComponente = tc.IdTipodeComponente
       WHERE m.IdMovEquipoAsignacion = @id
       ORDER BY m.FecAsignacion DESC
