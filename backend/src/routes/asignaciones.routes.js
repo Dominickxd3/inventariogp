@@ -42,13 +42,15 @@ router.post('/', roleMiddleware('ADMIN', 'TECNICO'), validate(asignacionCreateSc
       idUsuarioGenera: req.usuario.id,
     });
 
-    if (actaResult.success) {
+    if (actaResult.success && actaResult.acta) {
       console.log(`[Actas] Acta generada para asignación ${id}`);
       res.status(201).json({
         id,
         message: 'Equipo asignado correctamente',
         acta: actaResult.acta,
       });
+    } else if (actaResult.success && actaResult.skipped) {
+      res.status(201).json({ id, message: 'Equipo asignado correctamente', actaSkipped: true });
     } else {
       console.error(`[Actas] Error al generar acta para asignación ${id}: ${actaResult.error}`);
       res.status(201).json({
@@ -72,11 +74,15 @@ router.post('/bulk', roleMiddleware('ADMIN', 'TECNICO'), async (req, res, next) 
           tipoActa: 'ENTREGA',
           idUsuarioGenera: req.usuario.id,
         });
-        r.actaGenerada = actaResult.success;
-        if (actaResult.success) {
+        if (actaResult.success && actaResult.acta) {
+          r.actaGenerada = true;
           r.acta = actaResult.acta;
           r.urlFirma = actaResult.acta.urlFirma;
           console.log(`[Actas] Acta generada para asignación ${r.idAsig}`);
+        } else if (actaResult.success && actaResult.skipped) {
+          r.actaGenerada = false;
+          r.actaSkipped = true;
+          console.log(`[Actas] Sin acta para asignación ${r.idAsig}: ${actaResult.reason}`);
         } else {
           r.warning = `Acta no generada: ${actaResult.error}`;
           console.error(`[Actas] Error al generar acta para asignación ${r.idAsig}: ${actaResult.error}`);
@@ -100,9 +106,11 @@ router.post('/con-accesorios', roleMiddleware('ADMIN', 'TECNICO'), async (req, r
       idUsuarioGenera: req.usuario.id,
     });
 
-    if (actaResult.success) {
+    if (actaResult.success && actaResult.acta) {
       console.log(`[Actas] Acta generada para asignación ${result.idAsig}`);
       res.status(201).json({ success: true, ...result, acta: actaResult.acta });
+    } else if (actaResult.success && actaResult.skipped) {
+      res.status(201).json({ success: true, ...result, actaSkipped: true });
     } else {
       console.error(`[Actas] Error al generar acta para asignación ${result.idAsig}: ${actaResult.error}`);
       res.status(201).json({
@@ -128,9 +136,11 @@ router.post('/:id/cesar', roleMiddleware('ADMIN', 'TECNICO'), validate(asignacio
       observacionesDevolucion: req.body?.ObservacionesDevolucion,
     });
 
-    if (actaResult.success) {
+    if (actaResult.success && actaResult.acta) {
       console.log(`[Actas] Acta generada para cesar asignación ${req.params.id}`);
       res.json({ message: 'Asignación finalizada', acta: actaResult.acta });
+    } else if (actaResult.success && actaResult.skipped) {
+      res.json({ message: 'Asignación finalizada', actaSkipped: true });
     } else {
       console.error(`[Actas] Error al generar acta para cesar asignación ${req.params.id}: ${actaResult.error}`);
       res.json({

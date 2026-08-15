@@ -12,3 +12,7 @@ datos/
 data/
 uploads/
 temp/
+
+# Artefactos generados en runtime
+backend/assets/actas/
+sse-test.mjs

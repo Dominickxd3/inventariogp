@@ -2,12 +2,15 @@ import { EquiposRepository } from '../repositories/equipos.repository.js';
 import { AsignacionesRepository } from '../repositories/asignaciones.repository.js';
 import { ActasRepository } from '../repositories/actas.repository.js';
 import { ComponentesRepository } from '../repositories/componentes.repository.js';
+import { ComponentesService } from './componentes.service.js';
+import { PlantillasComponentesRepository } from '../repositories/plantillas-componentes.repository.js';
 import { IncidenciasRepository } from '../repositories/incidencias.repository.js';
 import { IntervencionesRepository } from '../repositories/intervenciones.repository.js';
 import { ConfiguracionesService } from './configuraciones.service.js';
 import { ConfiguracionesRepository } from '../repositories/configuraciones.repository.js';
 import { withTransaction, createRequest } from '../config/db.js';
 import QRCode from 'qrcode';
+import { EventsService } from './events.service.js';
 
 function normalizarTexto(valor) {
   return String(valor || '')
@@ -15,6 +18,27 @@ function normalizarTexto(valor) {
     .toUpperCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '');
+}
+
+export function normalizarClaveEquipo(clave) {
+  const limpia = normalizarTexto(clave).replace(/\s+/g, ' ');
+  const alias = {
+    MARCA: 'Marca',
+    MODELO: 'Modelo',
+    COLOR: 'Color',
+    CAPACIDAD: 'Capacidad',
+    ALMACENAMIENTO: 'Capacidad',
+    DISCO: 'Capacidad',
+    'DISCO DURO': 'Capacidad',
+    SSD: 'Capacidad',
+    NVME: 'Capacidad',
+    'CAPACIDAD DE DISCO': 'Capacidad',
+    RAM: 'Ram',
+    MEMORIA: 'Ram',
+    'MEMORIA RAM': 'Ram',
+    'MEMORIA PRINCIPAL': 'Ram',
+  };
+  return alias[limpia] || '';
 }
 
 const TIPOS_NO_EQUIPO = [
@@ -54,9 +78,62 @@ function validarNoBaja(equipo) {
   }
 }
 
+// Tipos de componente esenciales de una PC armada (la tarjeta de video es opcional)
+const ESSENCIALES = {
+  RAM: { etiqueta: 'Memoria RAM', nombres: ['MEMORIA RAM'] },
+  DISCO: { etiqueta: 'Almacenamiento (Disco)', nombres: ['DISCO SSD', 'DISCO DURO', 'M.2 NVME'] },
+  PLACA: { etiqueta: 'Placa Madre', nombres: ['PLACA MADRE'] },
+  PROCESADOR: { etiqueta: 'Procesador', nombres: ['PROCESADOR'] },
+  FUENTE: { etiqueta: 'Fuente de Poder', nombres: ['FUENTE DE PODER'] },
+};
+
+function normalizarTipoNombre(v) {
+  return String(v || '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+async function validarComponentesEsenciales(componentes) {
+  if (!componentes?.length) return;
+  const presentes = new Set();
+  for (const c of componentes) {
+    const tipo = await ComponentesRepository.getTipoById(c.IdTipodeComponente);
+    if (tipo) presentes.add(normalizarTipoNombre(tipo.DesTipodeComponente));
+  }
+  const faltantes = Object.values(ESSENCIALES)
+    .filter((e) => !e.nombres.some((n) => presentes.has(normalizarTipoNombre(n))))
+    .map((e) => e.etiqueta);
+  if (faltantes.length) {
+    throw businessError(`Faltan componentes esenciales: ${faltantes.join(', ')}. La tarjeta de video es opcional.`);
+  }
+}
+
 export const EquiposService = {
   async list(filtros) {
-    return EquiposRepository.listAll(filtros);
+    const result = await EquiposRepository.listAll(filtros);
+    if (result.rows && result.rows.length) {
+      const ids = result.rows.map(r => r.IdMaeEquipo).join(',');
+      const caracs = await EquiposRepository.getCaracteristicasByLote(ids);
+      const map = {};
+      for (const c of caracs) {
+        if (!map[c.IdMaeEquipo]) map[c.IdMaeEquipo] = {};
+        map[c.IdMaeEquipo][normalizarClaveEquipo(c.Clave)] = c.Valor;
+      }
+      result.rows = result.rows.map(r => {
+        const m = map[r.IdMaeEquipo] || {};
+        return {
+          ...r,
+          Marca: m.Marca || null,
+          Modelo: m.Modelo || null,
+          Capacidad: m.Capacidad || null,
+          Ram: m.Ram || null,
+          Color: m.Color || null,
+        };
+      });
+    }
+    return result;
   },
 
   async listAllForExport(filtros) {
@@ -108,6 +185,7 @@ export const EquiposService = {
     const id = await EquiposRepository.create(data);
     const equipo = await this.getById(id);
     await EquiposRepository.registrarCambioEstado(id, null, 'DISPONIBLE', data.IdUsuario, 'Equipo creado');
+    EventsService.emit('equipo.created', { id, CodEquipo: equipo.CodEquipo });
     return equipo;
   },
 
@@ -126,7 +204,9 @@ export const EquiposService = {
     delete safeData.CodEquipo;
     delete safeData.Estado;
     await EquiposRepository.update(id, safeData);
-    return this.getById(id);
+    const actualizado = await this.getById(id);
+    EventsService.emit('equipo.updated', { id, CodEquipo: actualizado.CodEquipo });
+    return actualizado;
   },
 
   async bajaEquipo(id, idUsuario, motivo) {
@@ -138,7 +218,9 @@ export const EquiposService = {
     if (activa) throw businessError('No se puede dar de baja un equipo con asignación activa');
     await EquiposRepository.updateEstado(id, 'BAJA');
     await EquiposRepository.registrarCambioEstado(id, equipo.Estado, 'BAJA', idUsuario, `Baja: ${motivo}`);
-    return this.getById(id);
+    const resultado = await this.getById(id);
+    EventsService.emit('equipo.deleted', { id, CodEquipo: equipo.CodEquipo });
+    return resultado;
   },
 
   async cambiarEstado(id, nuevoEstado, idUsuario, obs) {
@@ -148,7 +230,9 @@ export const EquiposService = {
     const estadoAnterior = equipo.Estado;
     await EquiposRepository.updateEstado(id, nuevoEstado);
     await EquiposRepository.registrarCambioEstado(id, estadoAnterior, nuevoEstado, idUsuario, obs);
-    return this.getById(id);
+    const actualizado = await this.getById(id);
+    EventsService.emit('equipo.updated', { id, CodEquipo: actualizado.CodEquipo });
+    return actualizado;
   },
 
   async generarQR(id) {
@@ -250,6 +334,7 @@ export const EquiposService = {
         }
       }
     });
+    EventsService.emit('equipo.updated', { id: idEquipo });
     return this.getCaracteristicas(idEquipo);
   },
 
@@ -330,7 +415,9 @@ export const EquiposService = {
       }
     });
 
-    return this.getConfiguracion(id);
+    const configActualizada = await this.getConfiguracion(id);
+    EventsService.emit('configuracion.updated', { id, Hostname: finales.hostname, UsuarioWindows: finales.usuarioWindows });
+    return configActualizada;
   },
 
   async agregarComponenteAEquipo(idEquipo, idComponente, obs, idUsuario, origenVinculo, motivo, idIntervencion) {
@@ -347,14 +434,18 @@ export const EquiposService = {
       throw businessError('El componente ya está instalado en este equipo');
     }
 
-    return ComponentesRepository.asignarAEquipo(idEquipo, idComponente, obs, origenVinculo, motivo, idIntervencion);
+    const resultadoVinculo = await ComponentesRepository.asignarAEquipo(idEquipo, idComponente, obs, origenVinculo, motivo, idIntervencion);
+    EventsService.emit('accesorio.vinculado', { idEquipo, idComponente });
+    return resultadoVinculo;
   },
 
   async quitarComponenteDeEquipo(idEquipo, idMovComponente, idUsuario, motivo, nuevoEstado) {
     const equipo = await EquiposRepository.getById(idEquipo);
     if (!equipo) throw new Error('Equipo no encontrado');
     validarNoBaja(equipo);
-    return ComponentesRepository.desasignarDeEquipo(idMovComponente, motivo, nuevoEstado);
+    const resultadoDesvinculo = await ComponentesRepository.desasignarDeEquipo(idMovComponente, motivo, nuevoEstado);
+    EventsService.emit('accesorio.desvinculado', { idEquipo, idMovComponente });
+    return resultadoDesvinculo;
   },
 
   async getComponentesDelEquipo(idEquipo) {
@@ -402,7 +493,78 @@ export const EquiposService = {
       idUsuario: data.IdUsuario || null,
     });
 
-    return this.getById(id);
+    // Componentes de fábrica: se crean en el módulo Componentes y se vinculan
+    // automáticamente a la PC con OrigenVinculo = FABRICA
+    let componentes = data.componentes || [];
+    if (data.idPlantillaComp) {
+      const plantilla = await PlantillasComponentesRepository.getById(data.idPlantillaComp);
+      if (!plantilla) throw businessError('Plantilla de componentes no encontrada');
+      componentes = plantilla.componentes.map((c) => ({
+        IdTipodeComponente: c.IdTipodeComponente,
+        Marca: c.Marca,
+        Modelo: c.Modelo,
+        Capacidad: c.Capacidad,
+      }));
+    }
+
+    if (componentes?.length) {
+      await validarComponentesEsenciales(componentes);
+      for (const compData of componentes) {
+        if (!compData.IdTipodeComponente) {
+          throw businessError('Cada componente requiere un tipo de componente');
+        }
+        const idComp = await ComponentesService.createQuick(
+          {
+            IdTipodeComponente: compData.IdTipodeComponente,
+            DesComponente: compData.DesComponente,
+            Marca: compData.Marca,
+            Modelo: compData.Modelo,
+            Serie: compData.Serie,
+            Capacidad: compData.Capacidad,
+            Obs: compData.Obs,
+          },
+          data.IdUsuario || null,
+        );
+        await ComponentesRepository.asignarAEquipo(
+          id,
+          idComp,
+          compData.Obs || null,
+          'FABRICA',
+          'Componente de fábrica (PC armada)',
+          null,
+        );
+      }
+    }
+
+    const equipoCreado = await this.getById(id);
+    EventsService.emit('equipo.created', { id, CodEquipo: codEquipo });
+    return equipoCreado;
+  },
+
+  async createQuickLote(data) {
+    if (!data.IdTipodeEquipo) throw businessError('El tipo de equipo es obligatorio');
+    const cantidad = Math.min(Math.max(parseInt(data.cantidad, 10) || 1, 1), 100);
+    if (!data.idPlantillaComp) throw businessError('Selecciona una plantilla de componentes');
+    const plantilla = await PlantillasComponentesRepository.getById(data.idPlantillaComp);
+    if (!plantilla) throw businessError('Plantilla de componentes no encontrada');
+    const componentes = plantilla.componentes.map((c) => ({
+      IdTipodeComponente: c.IdTipodeComponente,
+      Marca: c.Marca,
+      Modelo: c.Modelo,
+      Capacidad: c.Capacidad,
+    }));
+    await validarComponentesEsenciales(componentes);
+
+    const creados = [];
+    for (let i = 0; i < cantidad; i++) {
+      const creado = await this.createQuick({
+        IdTipodeEquipo: data.IdTipodeEquipo,
+        idPlantillaComp: data.idPlantillaComp,
+        IdUsuario: data.IdUsuario,
+      });
+      creados.push(creado);
+    }
+    return creados;
   },
 
   async generateNextCodEquipo(tipo) {
@@ -565,5 +727,34 @@ export const EquiposService = {
       default:
         return IntervencionesRepository.create(payload);
     }
+  },
+
+  // Plantillas de componentes de fábrica
+  async listPlantillas() {
+    return PlantillasComponentesRepository.list();
+  },
+
+  async getPlantilla(id) {
+    const p = await PlantillasComponentesRepository.getById(id);
+    if (!p) throw businessError('Plantilla no encontrada', 404);
+    return p;
+  },
+
+  async createPlantilla(nombre, descripcion, componentes, idUsuario) {
+    if (!nombre?.trim()) throw businessError('El nombre de la plantilla es obligatorio');
+    if (!componentes?.length) throw businessError('La plantilla debe tener al menos un componente');
+    await validarComponentesEsenciales(componentes);
+    return PlantillasComponentesRepository.create(nombre.trim(), descripcion, componentes, idUsuario);
+  },
+
+  async updatePlantilla(id, nombre, descripcion, componentes) {
+    if (!nombre?.trim()) throw businessError('El nombre de la plantilla es obligatorio');
+    if (!componentes?.length) throw businessError('La plantilla debe tener al menos un componente');
+    await validarComponentesEsenciales(componentes);
+    return PlantillasComponentesRepository.update(id, nombre.trim(), descripcion, componentes);
+  },
+
+  async deletePlantilla(id) {
+    return PlantillasComponentesRepository.remove(id);
   },
 };

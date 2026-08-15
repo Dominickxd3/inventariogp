@@ -86,6 +86,7 @@ export const api = {
     scan: (codigo) => request(`/equipos/scan/${codigo}`),
     create: (data) => request('/equipos', { method: 'POST', body: JSON.stringify(data) }),
     rapido: (data) => request('/equipos/rapido', { method: 'POST', body: JSON.stringify(data) }),
+    rapidoLote: (data) => request('/equipos/rapido-lote', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) => request(`/equipos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     baja: (id, motivo) => request(`/equipos/${id}/baja`, { method: 'POST', body: JSON.stringify({ motivo }) }),
     timeline: (id) => request(`/equipos/${id}/timeline`),
@@ -98,6 +99,13 @@ export const api = {
     tiposAsignables: () => request('/equipos/tipos-asignables'),
     plantillaByTipo: (idTipo) => request(`/equipos/tipos/${idTipo}/plantilla`),
     plantillaValores: (idPlantilla, q) => request(`/equipos/plantillas/${idPlantilla}/valores?q=${encodeURIComponent(q || '')}`),
+    plantillasComponentes: {
+      list: () => request('/equipos/plantillas-componentes'),
+      get: (id) => request(`/equipos/plantillas-componentes/${id}`),
+      create: (data) => request('/equipos/plantillas-componentes', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id, data) => request(`/equipos/plantillas-componentes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+      remove: (id) => request(`/equipos/plantillas-componentes/${id}`, { method: 'DELETE' }),
+    },
     saveCaracteristicas: (id, caracteristicas) =>
       request(`/equipos/${id}/caracteristicas`, { method: 'PUT', body: JSON.stringify({ caracteristicas }) }),
     intervenciones: {
@@ -136,10 +144,16 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ token, ultimosCuatroDni }),
       }),
-    firmarActa: (token, ultimosCuatroDni, aceptaCondiciones, firmaBase64) =>
+    firmarActa: (token, ultimosCuatroDni, aceptaCondiciones, firmaBase64, posicionFirma) =>
       request('/public/actas/firmar', {
         method: 'POST',
-        body: JSON.stringify({ token, ultimosCuatroDni, aceptaCondiciones, firmaBase64 }),
+        body: JSON.stringify({
+          token,
+          ultimosCuatroDni,
+          aceptaCondiciones,
+          firmaBase64,
+          ...(posicionFirma ? { posicionFirma } : {}),
+        }),
       }),
     previewActa: (token, ultimosCuatroDni) =>
       publicRequestBlob('/public/actas/preview', {

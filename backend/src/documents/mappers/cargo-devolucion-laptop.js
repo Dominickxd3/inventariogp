@@ -44,6 +44,8 @@ export function mapAsignacionToCargoDevolucion(snapshot, empresa, responsable) {
       accesorios: accsText,
       accesoriosDetalle: accs,
       caracteristicas,
+      estadoFisico: String(snapshot.estadoFisicoDevolucion || 'BUENO'),
+      observaciones: String(snapshot.observacionesDevolucion || ''),
     },
     fecha: formatearFecha(snapshot.fechaDocumento || new Date()),
   }

@@ -9,6 +9,8 @@ import {
   equipoEstadoSchema,
   equipoCreateTipoSchema,
   equipoAgregarComponenteSchema,
+  plantillaComponentesSchema,
+  equipoLoteSchema,
 } from '../middleware/validators.js';
 
 const router = Router();
@@ -94,6 +96,50 @@ router.post('/rapido', roleMiddleware('ADMIN', 'TECNICO'), validate(equipoCreate
       IdUsuario: req.usuario?.id || 1,
     });
     res.status(201).json({ success: true, equipo });
+  } catch (e) { next(e); }
+});
+
+router.post('/rapido-lote', roleMiddleware('ADMIN', 'TECNICO'), validate(equipoLoteSchema), async (req, res, next) => {
+  try {
+    const equipos = await EquiposService.createQuickLote({
+      ...req.body,
+      IdUsuario: req.usuario?.id || 1,
+    });
+    res.status(201).json({ success: true, creados: equipos.map((e) => ({ IdMaeEquipo: e.IdMaeEquipo, CodEquipo: e.CodEquipo })) });
+  } catch (e) { next(e); }
+});
+
+// Plantillas de componentes de fábrica
+router.get('/plantillas-componentes', async (req, res, next) => {
+  try {
+    res.json(await EquiposService.listPlantillas());
+  } catch (e) { next(e); }
+});
+
+router.get('/plantillas-componentes/:id', async (req, res, next) => {
+  try {
+    res.json(await EquiposService.getPlantilla(parseInt(req.params.id)));
+  } catch (e) { next(e); }
+});
+
+router.post('/plantillas-componentes', roleMiddleware('ADMIN', 'TECNICO'), validate(plantillaComponentesSchema), async (req, res, next) => {
+  try {
+    const id = await EquiposService.createPlantilla(req.body.Nombre, req.body.Descripcion, req.body.componentes, req.usuario?.id || 1);
+    res.status(201).json({ success: true, id });
+  } catch (e) { next(e); }
+});
+
+router.put('/plantillas-componentes/:id', roleMiddleware('ADMIN', 'TECNICO'), validate(plantillaComponentesSchema), async (req, res, next) => {
+  try {
+    await EquiposService.updatePlantilla(parseInt(req.params.id), req.body.Nombre, req.body.Descripcion, req.body.componentes);
+    res.json({ success: true });
+  } catch (e) { next(e); }
+});
+
+router.delete('/plantillas-componentes/:id', roleMiddleware('ADMIN'), async (req, res, next) => {
+  try {
+    await EquiposService.deletePlantilla(parseInt(req.params.id));
+    res.json({ success: true });
   } catch (e) { next(e); }
 });
 

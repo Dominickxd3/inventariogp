@@ -41,7 +41,19 @@ const columns = [
       </div>
     ),
   },
-  { key: 'CodEquipo', label: 'Equipo' },
+  {
+    key: 'CodEquipo',
+    label: 'Equipo',
+    render: (r) => {
+      const nombre = [r.Marca, r.Modelo].filter(Boolean).join(' - ');
+      return (
+        <div>
+          <p className="font-medium">{r.CodEquipo}</p>
+          {nombre && <p className="text-xs text-muted-foreground">{nombre}</p>}
+        </div>
+      );
+    },
+  },
   { key: 'DesTipodeEquipo', label: 'Tipo' },
   { key: 'FecAsignacion', label: 'Desde', render: (r) => formatDate(r.FecAsignacion) },
   {
@@ -423,6 +435,7 @@ function AsignarForm({ onSuccess, equipoInicial }) {
                       </div>
                       <div className="flex-1">
                         <p className="font-medium">{e.CodEquipo} - {e.DesTipodeEquipo}</p>
+                        <p className="text-xs">{[e.Marca, e.Modelo].filter(Boolean).join(' - ')}{e.Capacidad ? ` / ${e.Capacidad}` : ''}</p>
                         <p className="text-muted-foreground text-xs">{e.CodBarra || 'Sin código de barra'}</p>
                       </div>
                     </div>
@@ -433,6 +446,7 @@ function AsignarForm({ onSuccess, equipoInicial }) {
           ) : (
             <div className="bg-muted p-4 rounded-lg">
               <p className="font-medium">{selectedEquipos[0]?.CodEquipo} - {selectedEquipos[0]?.DesTipodeEquipo}</p>
+              <p className="text-xs">{[selectedEquipos[0]?.Marca, selectedEquipos[0]?.Modelo].filter(Boolean).join(' - ')}{selectedEquipos[0]?.Capacidad ? ` / ${selectedEquipos[0]?.Capacidad}` : ''}</p>
               <p className="text-xs text-muted-foreground">{selectedEquipos[0]?.CodBarra || 'Sin código de barra'}</p>
             </div>
           )}
@@ -496,7 +510,7 @@ function AsignarForm({ onSuccess, equipoInicial }) {
             <div className="space-y-1">
               {selectedEquipos.map((eq) => (
                 <p key={eq.IdMaeEquipo} className="text-xs">
-                  {eq.CodEquipo} — {eq.DesTipodeEquipo}{eq.Marca ? ` / ${eq.Marca}` : ''}
+                  {eq.CodEquipo} — {eq.DesTipodeEquipo}{[eq.Marca, eq.Modelo].filter(Boolean).join(' - ') ? ` / ${[eq.Marca, eq.Modelo].filter(Boolean).join(' - ')}` : ''}
                 </p>
               ))}
             </div>

@@ -11,12 +11,6 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   import.meta.url,
 ).toString()
 
-const POSICIONES_FIRMA = {
-  ENTREGA: { left: 8.5, top: 81, width: 27.6, height: 10 },
-  DEVOLUCION_RESPONSABLE: { left: 8.5, top: 62, width: 27.6, height: 11 },
-  DEVOLUCION_COLABORADOR: { left: 64, top: 56, width: 27.6, height: 11 },
-}
-
 const ZOOM_MIN = 0.7
 const ZOOM_MAX = 1.4
 const ZOOM_STEP = 0.1
@@ -26,17 +20,13 @@ export default function FirmarActaDocumento({ pdfUrl, tipoActa, onFirmar, envian
   const contenedorRef = useRef(null)
   const zonaFirmaRef = useRef(null)
   const [firmaSrc, setFirmaSrc] = useState(null)
+  const [posicionFirma, setPosicionFirma] = useState(null)
   const [zoom, setZoom] = useState(1)
   const [anchoPagina, setAnchoPagina] = useState(760)
-  const [dimFirma, setDimFirma] = useState({ w: 220, h: 64 })
+  const [dimFirma, setDimFirma] = useState({ w: 760, h: 1075 })
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
   const [toast, setToast] = useState(null)
-
-  const posicion =
-    tipoActa === 'DEVOLUCION'
-      ? POSICIONES_FIRMA.DEVOLUCION_COLABORADOR
-      : POSICIONES_FIRMA.ENTREGA
 
   useEffect(() => {
     const ajustar = () => {
@@ -78,17 +68,31 @@ export default function FirmarActaDocumento({ pdfUrl, tipoActa, onFirmar, envian
 
   const onHistoryChange = useCallback((s) => { setCanUndo(s.canUndo); setCanRedo(s.canRedo) }, [])
 
+  const onFirmaChange = useCallback((img, rect) => {
+    setFirmaSrc(img)
+    if (img && rect) {
+      setPosicionFirma({
+        left: (rect.left / dimFirma.w) * 100,
+        top: (rect.top / dimFirma.h) * 100,
+        width: (rect.width / dimFirma.w) * 100,
+        height: (rect.height / dimFirma.h) * 100,
+      })
+    } else {
+      setPosicionFirma(null)
+    }
+  }, [dimFirma])
+
   const undo = useCallback(() => sigRef.current?.undo(), [])
   const redo = useCallback(() => sigRef.current?.redo(), [])
-  const clearSign = useCallback(() => { sigRef.current?.clear(); setFirmaSrc(null); showToast('Firma borrada') }, [showToast])
+  const clearSign = useCallback(() => { sigRef.current?.clear(); setFirmaSrc(null); setPosicionFirma(null); showToast('Firma borrada') }, [showToast])
   const zoomIn = useCallback(() => setZoom((z) => Math.min(ZOOM_MAX, Math.round((z + ZOOM_STEP) * 10) / 10)), [])
   const zoomOut = useCallback(() => setZoom((z) => Math.max(ZOOM_MIN, Math.round((z - ZOOM_STEP) * 10) / 10)), [])
   const zoomReset = useCallback(() => setZoom(1), [])
 
   const confirmarFirma = useCallback(async () => {
     if (!firmaSrc) { showToast('Debe firmar el documento'); return }
-    await onFirmar(firmaSrc)
-  }, [firmaSrc, onFirmar, showToast])
+    await onFirmar(firmaSrc, posicionFirma)
+  }, [firmaSrc, posicionFirma, onFirmar, showToast])
 
   const actions = useMemo(() => [
     { id: 'undo', label: 'Deshacer (Ctrl+Z)', icon: Icons.undo, onClick: undo, disabled: !canUndo },
@@ -99,6 +103,8 @@ export default function FirmarActaDocumento({ pdfUrl, tipoActa, onFirmar, envian
     { id: 'zoom-in', label: 'Acercar', icon: Icons.zoomIn, onClick: zoomIn, disabled: zoom >= ZOOM_MAX },
     { id: 'send', label: enviando ? 'Guardando...' : 'Confirmar firma', icon: Icons.send, onClick: confirmarFirma, disabled: !firmaSrc || enviando, loading: enviando, primary: true, dividerBefore: true },
   ], [undo, redo, canUndo, canRedo, clearSign, firmaSrc, zoom, zoomIn, zoomOut, zoomReset, confirmarFirma, enviando])
+
+  const hint = canUndo ? undefined : 'Firme en cualquier parte del documento con el mouse o el dedo · Deshacer / Rehacer por trazo'
 
   return (
     <div className="relative min-h-screen bg-neutral-200 pb-28">
@@ -124,21 +130,17 @@ export default function FirmarActaDocumento({ pdfUrl, tipoActa, onFirmar, envian
 
             <div
               ref={zonaFirmaRef}
-              className="absolute z-10"
-              style={{
-                left: `${posicion.left}%`,
-                top: `${posicion.top}%`,
-                width: `${posicion.width}%`,
-                height: `${posicion.height}%`,
-              }}
+              className="absolute inset-0 z-10"
+              style={{ touchAction: 'none' }}
             >
               <InlineSignature
                 ref={sigRef}
                 value={firmaSrc}
-                onChange={setFirmaSrc}
+                onChange={onFirmaChange}
                 onHistoryChange={onHistoryChange}
                 width={dimFirma.w}
                 height={dimFirma.h}
+                hideHint
               />
             </div>
           </div>
@@ -147,7 +149,7 @@ export default function FirmarActaDocumento({ pdfUrl, tipoActa, onFirmar, envian
 
       <FloatingToolbar
         actions={actions}
-        hint={canUndo ? undefined : 'Firme sobre la línea · Deshacer / Rehacer por trazo'}
+        hint={hint}
       />
     </div>
   )

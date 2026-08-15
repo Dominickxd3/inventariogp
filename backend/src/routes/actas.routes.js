@@ -6,6 +6,18 @@ import { actaAnularSchema, actaRegenerarEnlaceSchema } from '../validators/actas
 
 const router = Router();
 
+const PUBLIC_FIELDS = [
+  'IdActa', 'IdMovEquipoAsignacion', 'TipoActa', 'CodigoActa', 'EstadoActa',
+  'FechaGeneracion', 'FechaFirma', 'FechaExpiracion', 'MotivoAnulacion', 'FechaAnulacion',
+];
+
+function sanitizeActa(a) {
+  if (!a) return a;
+  const out = {};
+  for (const k of PUBLIC_FIELDS) if (k in a) out[k] = a[k];
+  return out;
+}
+
 router.use(authMiddleware);
 
 router.get('/', async (req, res, next) => {
@@ -19,7 +31,7 @@ router.get('/:id', async (req, res, next) => {
   try {
     const a = await ActasService.getById(Number(req.params.id));
     if (!a) return res.status(404).json({ error: 'Acta no encontrada' });
-    res.json(a);
+    res.json(sanitizeActa(a));
   } catch (e) { next(e); }
 });
 

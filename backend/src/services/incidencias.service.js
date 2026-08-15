@@ -4,6 +4,7 @@ import { AsignacionesRepository } from '../repositories/asignaciones.repository.
 import { ConfiguracionesService } from './configuraciones.service.js';
 import { ConfiguracionesRepository } from '../repositories/configuraciones.repository.js';
 import { withTransaction, createRequest } from '../config/db.js';
+import { EventsService } from './events.service.js';
 
 const DB = 'InventarioGP';
 
@@ -53,7 +54,7 @@ export const IncidenciasService = {
       ? await ConfiguracionesRepository.getTipoByCod(TIPO_CFG_POR_ACCION[data.Accion])
       : null;
 
-    return withTransaction(DB, async (trx) => {
+    const idIncidenciaCreada = await withTransaction(DB, async (trx) => {
       const req = (params) => createRequest(trx, params);
 
       const { recordset } = await req({
@@ -105,6 +106,8 @@ export const IncidenciasService = {
 
       return idIncidencia;
     });
+    EventsService.emit('incidencia.created', { id: idIncidenciaCreada });
+    return idIncidenciaCreada;
   },
 
   async cerrar(id, idUsuario) {
@@ -121,5 +124,7 @@ export const IncidenciasService = {
       incidencia.IdMaeEquipo, 'INCIDENCIA', nuevoEstado, idUsuario,
       `Incidencia cerrada - equipo ${nuevoEstado === 'ASIGNADO' ? 'permanece asignado' : 'disponible'}`
     );
+
+    EventsService.emit('incidencia.updated', { id, IdMaeEquipo: incidencia.IdMaeEquipo });
   },
 };

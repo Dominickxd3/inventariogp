@@ -50,12 +50,12 @@ export default function FirmarActa() {
     }
   }
 
-  async function handleFirmar(firmaBase64) {
+  async function handleFirmar(firmaBase64, posicionFirma) {
     if (firmaEnviadaRef.current) return
     firmaEnviadaRef.current = true
     setEnviandoFirma(true)
     try {
-      const data = await api.public.firmarActa(token, ultimosCuatroDni, true, firmaBase64)
+      const data = await api.public.firmarActa(token, ultimosCuatroDni, true, firmaBase64, posicionFirma)
       setResultado(data)
       setPaso(PASO.EXITO)
     } catch (err) {

@@ -25,7 +25,7 @@ const MOTIVOS = [
 
 const ACC_OPTIONS = [
   { value: 'DISPONIBLE', label: 'Devolver a disponible' },
-  { value: 'MANTENER', label: 'Mantener asignado al trabajador', disabled: true },
+  { value: 'MANTENER', label: 'Mantener asignado al trabajador' },
   { value: 'BAJA', label: 'Dar de baja' },
   { value: 'PERDIDO', label: 'Marcar como perdido/dañado' },
 ]

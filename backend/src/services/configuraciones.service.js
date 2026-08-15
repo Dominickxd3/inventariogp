@@ -1,6 +1,7 @@
 import { EquiposRepository } from '../repositories/equipos.repository.js';
 import { ConfiguracionesRepository } from '../repositories/configuraciones.repository.js';
 import { withTransaction } from '../config/db.js';
+import { EventsService } from './events.service.js';
 
 const DB = 'InventarioGP';
 
@@ -82,6 +83,8 @@ export const ConfiguracionesService = {
         obs: obs ?? null,
       });
     });
+
+    EventsService.emit('configuracion.updated', { idEquipo, Hostname: resuelto.hostname, UsuarioWindows: resuelto.usuarioWindows });
 
     return this.getHistorial(idEquipo);
   },

@@ -11,6 +11,7 @@ export default function CargoDevolucionLaptop({
   fecha,
   logoSrc = "/logo.png",
   firmaSrc,
+  firmaPosicion,
   firmaResponsableSrc = "/firmasistemas.png",
   signatureField = CARGO_DEVOLUCION_SIGNATURE_FIELD,
 }: any) {
@@ -25,10 +26,19 @@ export default function CargoDevolucionLaptop({
   const tipoEquipo = (equipo.tipo || 'laptop').toLowerCase()
   const titulo = `Cargo de devolución de equipo ${tipoEquipo}`
 
+  const ESTADO_FISICO_LABEL: Record<string, string> = {
+    BUENO: 'en buen estado',
+    DANADO: 'con daño físico',
+    FALTANTE: 'con faltante de accesorios',
+    OTRO: 'con observaciones',
+  }
+  const estadoFisico = (equipo.estadoFisico || 'BUENO').toUpperCase()
+  const estadoLabel = ESTADO_FISICO_LABEL[estadoFisico] || 'en buen estado'
+
   return (
     <div id="cargo-devolucion-laptop-document"
-      className="relative isolate w-[210mm] h-[297mm] bg-white text-black mx-auto overflow-hidden shadow-sm print:shadow-none"
-      style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: "11pt", boxSizing: "border-box", padding: "16mm 18mm 14mm 18mm" }}>
+      className="relative isolate w-[210mm] bg-white text-black mx-auto shadow-sm print:shadow-none"
+      style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: "11pt", boxSizing: "border-box", padding: "16mm 18mm 14mm 18mm", height: "297mm" }}>
       <div aria-hidden className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden" style={{ zIndex: 0 }}>
         <img src={logoSrc} alt="" draggable={false} className="select-none object-contain"
           style={{ width: "130mm", maxWidth: "70%", height: "auto", opacity: 0.09, mixBlendMode: "multiply" }} />
@@ -53,20 +63,24 @@ export default function CargoDevolucionLaptop({
                 <td className="px-2 py-1.5 font-bold uppercase align-top" style={{ backgroundColor: "transparent", border: "1px solid #000", position: "relative", zIndex: 2 }}>{row.value}</td>
               </tr>
             ))}
+            <tr style={{ backgroundColor: "transparent" }}>
+              <td className="px-2 py-1.5 font-normal w-[32%] uppercase align-top" style={{ backgroundColor: "transparent", border: "1px solid #000", position: "relative", zIndex: 2 }}>ACCESORIOS ENTREGADOS</td>
+              <td className="px-2 py-1.5 font-bold uppercase align-top" style={{ backgroundColor: "transparent", border: "1px solid #000", position: "relative", zIndex: 2 }}>
+                {accs.length > 0
+                  ? accs.map((a: any, i: number) => (
+                      <div key={i} style={{ marginBottom: i === accs.length - 1 ? 0 : "3px" }}>• {a.nombre}{a.marca ? ` ${a.marca}` : ''}{a.modelo ? ` ${a.modelo}` : ''}</div>
+                    ))
+                  : 'No se entregó accesorios'}
+              </td>
+            </tr>
           </tbody>
         </table>
-        <div className="mt-4 text-[11pt]">
-          <p className="font-bold uppercase mb-2">ACCESORIOS ENTREGADOS:</p>
-          {accs.length > 0
-            ? accs.map((a: any, i: number) => (
-                <p key={i} className="ml-2 mb-1">• {a.nombre}{a.marca ? ` ${a.marca}` : ''}{a.modelo ? ` ${a.modelo}` : ''}</p>
-              ))
-            : <p className="ml-2">No se entregó accesorios</p>
-          }
-        </div>
-        <p className="mt-6 uppercase text-[11pt] text-justify">El equipo se recibió en condiciones aceptables.</p>
-        <p className="mt-6 uppercase text-[11pt]">San Juan de Lurigancho, {fecha}</p>
-        <div className="mt-8 flex justify-between gap-8">
+        <p className="mt-7 uppercase text-[11pt] text-justify">El equipo se recibió {estadoLabel}.</p>
+        {equipo.observaciones ? (
+          <p className="uppercase text-[11pt] text-justify" style={{ marginTop: "12px" }}>Observaciones: {equipo.observaciones}</p>
+        ) : null}
+        <p className="mt-6 uppercase text-[11pt]" style={{ breakInside: "avoid", pageBreakInside: "avoid" }}>San Juan de Lurigancho, {fecha}</p>
+        <div className="flex justify-between gap-8" style={{ marginTop: "40px", breakInside: "avoid", pageBreakInside: "avoid" }}>
           <div className="w-[58mm] text-center relative">
             <div className="mx-auto flex h-[18mm] w-full items-end justify-center">
               {firmaResponsableSrc && (
@@ -80,7 +94,7 @@ export default function CargoDevolucionLaptop({
           </div>
           <div id="signature-block" className="w-[58mm] text-center relative">
             <div id="signature-field" data-field="signature" className="relative mx-auto flex h-[18mm] w-full items-end justify-center">
-              {firmaSrc ? (
+              {firmaSrc && !firmaPosicion ? (
                 <img id="signature-image" src={firmaSrc} alt="Firma" className="max-h-[16mm] max-w-full object-contain" />
               ) : (
                 <img id="signature-image" alt="" className="hidden max-h-[16mm] max-w-full object-contain" />
@@ -92,11 +106,23 @@ export default function CargoDevolucionLaptop({
             <p className="mt-2 uppercase text-[11pt]">DNI: {empleado.dni}</p>
           </div>
         </div>
-        <footer className="mt-auto pt-8 mb-6">
+        <footer className="mt-auto" style={{ paddingTop: "20px", marginBottom: "16px", breakInside: "avoid", pageBreakInside: "avoid" }}>
           <div className="border-t border-black w-full mb-2" />
           <p className="text-center text-[9.5pt] leading-tight">{empresa.direccion} - {empresa.telefonos}</p>
         </footer>
       </div>
+      {firmaSrc && firmaPosicion ? (
+        <img id="signature-overlay" src={firmaSrc} alt="Firma"
+          style={{
+            position: "absolute",
+            left: `${firmaPosicion.left}%`,
+            top: `${firmaPosicion.top}%`,
+            width: `${firmaPosicion.width}%`,
+            height: `${firmaPosicion.height}%`,
+            objectFit: "contain",
+            zIndex: 20,
+          }} />
+      ) : null}
     </div>
   )
 }

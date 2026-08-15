@@ -1,5 +1,6 @@
 import { ComponentesRepository } from '../repositories/componentes.repository.js';
 import { withTransaction, createRequest } from '../config/db.js';
+import { EventsService } from './events.service.js';
 
 function normalizarTexto(valor) {
   return String(valor || '')
@@ -256,14 +257,18 @@ export const ComponentesService = {
     if (!data.DesComponente?.trim()) {
       data.DesComponente = buildAutoDescFromPlantilla(tipo.DesTipodeComponente, plantilla, caracteristicas) || null;
     }
-    return ComponentesRepository.create(data, { idUsuario, caracteristicas });
+    const resultado = await ComponentesRepository.create(data, { idUsuario, caracteristicas });
+    EventsService.emit('componente.created', { id: resultado, CodComponente: data.CodComponente });
+    return resultado;
   },
 
   async update(id, data) {
     const comp = await ComponentesRepository.getById(id);
     if (!comp) throw businessError('Componente no encontrado', 404);
     if (comp.Estado === 'BAJA') throw businessError('No se puede editar un componente dado de baja');
-    return ComponentesRepository.update(id, data);
+    const resultado = await ComponentesRepository.update(id, data);
+    EventsService.emit('componente.updated', { id });
+    return resultado;
   },
 
   async createTipo(data) {
@@ -291,7 +296,9 @@ export const ComponentesService = {
     if (!comp) throw businessError('Componente no encontrado', 404);
     if (comp.Estado === 'BAJA') throw businessError('El componente ya está dado de baja');
     if (comp.Estado === 'ASIGNADO') throw businessError('No se puede dar de baja un componente asignado. Cese la asignación primero.');
-    return ComponentesRepository.baja(id);
+    const resultado = await ComponentesRepository.baja(id);
+    EventsService.emit('componente.deleted', { id, CodComponente: comp.CodComponente });
+    return resultado;
   },
 
   async createQuick(data, idUsuario) {
@@ -324,12 +331,14 @@ export const ComponentesService = {
     );
     const autoDescription = buildAutoDescFromPlantilla(tipo.DesTipodeComponente, plantilla, caracteristicas);
 
-    return ComponentesRepository.create({
+    const resultado = await ComponentesRepository.create({
       IdTipodeComponente: data.IdTipodeComponente,
       CodComponente: codComponente,
       DesComponente: data.DesComponente?.trim() || autoDescription || null,
       Obs: data.Obs || null,
     }, { idUsuario, caracteristicas });
+    EventsService.emit('componente.created', { id: resultado, CodComponente: codComponente });
+    return resultado;
   },
   async getPlantillaByTipo(idTipo) {
     return ComponentesRepository.getPlantillaByComponenteTipo(idTipo);

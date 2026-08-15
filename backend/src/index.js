@@ -7,6 +7,7 @@ import { config } from './config/index.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { closeAll } from './config/db.js';
 import { loginLimiter } from './middleware/rateLimiter.js';
+import { rateLimit } from 'express-rate-limit';
 
 import equiposRoutes from './routes/equipos.routes.js';
 import trabajadoresRoutes from './routes/trabajadores.routes.js';
@@ -17,6 +18,7 @@ import authRoutes from './routes/auth.routes.js';
 import actasRoutes from './routes/actas.routes.js';
 import actasPublicRoutes from './routes/actas-public.routes.js';
 import catalogosRoutes from './routes/catalogos.routes.js';
+import eventsRoutes from './routes/events.routes.js';
 
 const app = express();
 
@@ -37,9 +39,14 @@ app.use(express.json({ limit: '1mb' }));
 // Logging sanitizado (no loguear bodies en producción)
 app.use(morgan(config.env === 'production' ? 'combined' : 'dev'));
 
-// Rate limiting global opcional (100 req/15min por IP)
-// import { rateLimit } from 'express-rate-limit';
-// app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
+// Rate limiting global (por IP) para mitigar abuso/enumeración; se excluye el healthcheck
+app.use(rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 1000,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.path === '/api/health' || req.path === '/api/events',
+}));
 
 // Rate limit específico para login
 app.use('/api/auth/login', loginLimiter);
@@ -53,6 +60,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/actas', actasRoutes);
 app.use('/api/public/actas', actasPublicRoutes);
 app.use('/api/catalogos', catalogosRoutes);
+app.use('/api/events', eventsRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

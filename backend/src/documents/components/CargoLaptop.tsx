@@ -10,6 +10,7 @@ export default function CargoLaptop({
   fecha,
   logoSrc = "/logo.png",
   firmaSrc,
+  firmaPosicion,
   signatureField = CARGO_LAPTOP_SIGNATURE_FIELD,
 }: any) {
   const rows: { label: string; value: string }[] = [
@@ -25,8 +26,8 @@ export default function CargoLaptop({
 
   return (
     <div id="cargo-laptop-document"
-      className="relative isolate w-[210mm] h-[297mm] bg-white text-black mx-auto overflow-hidden shadow-sm print:shadow-none"
-      style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: "11pt", boxSizing: "border-box", padding: "16mm 18mm 14mm 18mm" }}>
+      className="relative isolate w-[210mm] bg-white text-black mx-auto shadow-sm print:shadow-none"
+      style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: "11pt", boxSizing: "border-box", padding: "16mm 18mm 14mm 18mm", height: "297mm" }}>
       <div aria-hidden className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden" style={{ zIndex: 0 }}>
         <img src={logoSrc} alt="" draggable={false} className="select-none object-contain"
           style={{ width: "130mm", maxWidth: "70%", height: "auto", opacity: 0.09, mixBlendMode: "multiply" }} />
@@ -51,26 +52,27 @@ export default function CargoLaptop({
                 <td className="px-2 py-1.5 font-bold uppercase align-top" style={{ backgroundColor: "transparent", border: "1px solid #000", position: "relative", zIndex: 2 }}>{row.value}</td>
               </tr>
             ))}
+            <tr style={{ backgroundColor: "transparent" }}>
+              <td className="px-2 py-1.5 font-normal w-[32%] uppercase align-top" style={{ backgroundColor: "transparent", border: "1px solid #000", position: "relative", zIndex: 2 }}>ACCESORIOS ENTREGADOS</td>
+              <td className="px-2 py-1.5 font-bold uppercase align-top" style={{ backgroundColor: "transparent", border: "1px solid #000", position: "relative", zIndex: 2 }}>
+                {accs.length > 0
+                  ? accs.map((a: any, i: number) => (
+                      <div key={i} style={{ marginBottom: i === accs.length - 1 ? 0 : "3px" }}>• {a.nombre}{a.marca ? ` ${a.marca}` : ''}{a.modelo ? ` ${a.modelo}` : ''}</div>
+                    ))
+                  : 'No se entregó accesorios'}
+              </td>
+            </tr>
           </tbody>
         </table>
-        <div className="mt-4 text-[11pt]">
-          <p className="font-bold uppercase mb-2">ACCESORIOS ENTREGADOS:</p>
-          {accs.length > 0
-            ? accs.map((a: any, i: number) => (
-                <p key={i} className="ml-2 mb-1">• {a.nombre}{a.marca ? ` ${a.marca}` : ''}{a.modelo ? ` ${a.modelo}` : ''}</p>
-              ))
-            : <p className="ml-2">No se entregó accesorios</p>
-          }
-        </div>
-        <div className="mt-4 text-justify leading-relaxed text-[11pt] space-y-3.5 uppercase">
-          <p>Considero que este equipo debe ser usado exclusivamente para trabajo, es mi obligación responder cada vez que me llamen por asuntos laborales.</p>
-          <p>Asimismo, está prohibido compartir el equipo e instalar aplicaciones que no se usan dentro del trabajo, caso contrario se le aplicará un memorandum por incumplimiento.</p>
+        <div className="text-justify leading-relaxed text-[11pt] uppercase" style={{ marginTop: "20px" }}>
+          <p style={{ marginBottom: "14px" }}>Considero que este equipo debe ser usado exclusivamente para trabajo, es mi obligación responder cada vez que me llamen por asuntos laborales.</p>
+          <p style={{ marginBottom: "14px" }}>Asimismo, está prohibido compartir el equipo e instalar aplicaciones que no se usan dentro del trabajo, caso contrario se le aplicará un memorandum por incumplimiento.</p>
           <p>Es mi responsabilidad ante cualquier siniestro (robo o hurto), la reposicion del equipo en el menor tiempo posible y razonable. Ademas de comunicar de forma inmediata al area de sistemas (922386045).</p>
         </div>
-        <p className="mt-7 uppercase text-[11pt]">San Juan de Lurigancho, {fecha}</p>
-        <div id="signature-block" className="mt-14 w-[58mm] text-center relative">
-          <div id="signature-field" data-field="signature" className="relative mx-auto flex h-[18mm] w-full items-end justify-center">
-            {firmaSrc ? (
+        <p className="mt-6 uppercase text-[11pt]" style={{ breakInside: "avoid", pageBreakInside: "avoid" }}>San Juan de Lurigancho, {fecha}</p>
+        <div id="signature-block" className="w-[58mm] text-center relative" style={{ marginTop: "28px", breakInside: "avoid", pageBreakInside: "avoid" }}>
+          <div id="signature-field" data-field="signature" className="relative mx-auto flex w-full items-end justify-center" style={{ height: "16mm" }}>
+            {firmaSrc && !firmaPosicion ? (
               <img id="signature-image" src={firmaSrc} alt="Firma" className="max-h-[16mm] max-w-full object-contain" />
             ) : (
               <img id="signature-image" alt="" className="hidden max-h-[16mm] max-w-full object-contain" />
@@ -81,11 +83,23 @@ export default function CargoLaptop({
           </div>
           <p className="mt-2 uppercase text-[11pt]">DNI: {empleado.dni}</p>
         </div>
-        <footer className="mt-auto pt-8 mb-6">
+        <footer className="mt-auto" style={{ paddingTop: "20px", marginBottom: "16px", breakInside: "avoid", pageBreakInside: "avoid" }}>
           <div className="border-t border-black w-full mb-2" />
           <p className="text-center text-[9.5pt] leading-tight">{empresa.direccion}{empresa.telefonos ? ` - ${empresa.telefonos}` : ""}</p>
         </footer>
       </div>
+      {firmaSrc && firmaPosicion ? (
+        <img id="signature-overlay" src={firmaSrc} alt="Firma"
+          style={{
+            position: "absolute",
+            left: `${firmaPosicion.left}%`,
+            top: `${firmaPosicion.top}%`,
+            width: `${firmaPosicion.width}%`,
+            height: `${firmaPosicion.height}%`,
+            objectFit: "contain",
+            zIndex: 20,
+          }} />
+      ) : null}
     </div>
   )
 }

@@ -92,7 +92,12 @@ export const ActasRepository = {
     const total = countResult[0]?.total || 0;
 
     const rows = await query(DB, `
-      SELECT a.*, ma.IdMaeEquipo, ma.IdReferente,
+      SELECT a.IdActa, a.IdMovEquipoAsignacion, a.TipoActa, a.CodigoActa, a.EstadoActa,
+             a.FechaGeneracion, a.FechaFirma, a.FechaExpiracion,
+             a.MotivoAnulacion, a.FechaAnulacion,
+             CASE WHEN a.PdfOriginalRuta IS NOT NULL THEN 1 ELSE 0 END AS TienePdfOriginal,
+             CASE WHEN a.PdfFirmadoRuta IS NOT NULL THEN 1 ELSE 0 END AS TienePdfFirmado,
+             ma.IdMaeEquipo, ma.IdReferente,
              t.Trabajador as TrabajadorNombre, t.DOI,
              e.CodEquipo, tp.DesTipodeEquipo
       FROM Tab_EQ_ActasAsignacion a
@@ -180,8 +185,7 @@ export const ActasRepository = {
   async getStatus(idMovEquipoAsignacion) {
     const rows = await query(DB, `
       SELECT IdActa, TipoActa, CodigoActa, EstadoActa,
-             FechaGeneracion, FechaFirma, FechaExpiracion,
-             PdfOriginalRuta, PdfFirmadoRuta
+             FechaGeneracion, FechaFirma, FechaExpiracion
       FROM Tab_EQ_ActasAsignacion
       WHERE IdMovEquipoAsignacion = @idMovEquipoAsignacion
       ORDER BY IdActa DESC

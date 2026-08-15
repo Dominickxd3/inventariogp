@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { ActasRepository } from '../repositories/actas.repository.js';
 import { AsignacionesRepository } from '../repositories/asignaciones.repository.js';
 import { EquiposRepository } from '../repositories/equipos.repository.js';
@@ -7,6 +8,7 @@ import { TrabajadoresRepository } from '../repositories/trabajadores.repository.
 import { generarToken, hashSHA256, hashFile } from '../utils/crypto.js';
 import { generarActaPdf, incrustarFirma } from '../documents/index.js';
 import { actasConfig } from '../config/actas.js';
+import { EventsService } from './events.service.js';
 
 function escapeJsonValue(v) {
   if (v === null || v === undefined) return null;
@@ -159,18 +161,93 @@ function generarFechaExpiracion() {
   return d;
 }
 
-function buildFilePath(tipoActa, subfolder, nombre) {
-  const now = new Date();
-  const year = String(now.getFullYear());
-  const month = String(now.getMonth() + 1).padStart(2, '0');
+function buildFilePath(tipoActa, subfolder, nombre, fechaBase) {
+  const base = fechaBase && !isNaN(new Date(fechaBase).getTime()) ? new Date(fechaBase) : new Date();
+  const year = String(base.getFullYear());
+  const month = String(base.getMonth() + 1).padStart(2, '0');
   const tipoDir = tipoActa === 'ENTREGA' ? 'entrega' : 'devolucion';
   const dir = path.join(actasConfig.storagePath, year, month, tipoDir, subfolder || '');
   fs.mkdirSync(dir, { recursive: true });
   return path.join(dir, nombre);
 }
 
+function fechaLocalCompacta() {
+  return new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString().slice(0, 10).replace(/-/g, '');
+}
+
+function sanitizarNombreArchivo(nombre) {
+  return String(nombre || '')
+    .toUpperCase()
+    .replace(/[\\/:*?"<>|]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function siguienteSecuencia(dir, prefijo) {
+  let max = 0;
+  try {
+    const nombres = fs.readdirSync(dir) || [];
+    const re = new RegExp(`^${prefijo} (\\d{2}) `);
+    for (const n of nombres) {
+      const m = n.match(re);
+      if (m) max = Math.max(max, parseInt(m[1], 10));
+    }
+  } catch {}
+  return String(max + 1).padStart(2, '0');
+}
+
+function nombrePdfFirmado(tipoActa, snapshot, dir) {
+  const fecha = fechaLocalCompacta();
+  const tipo = sanitizarNombreArchivo(snapshot?.equipo?.tipoEquipo || 'EQUIPO');
+  const colaborador = sanitizarNombreArchivo(snapshot?.trabajador?.nombre) || 'SIN NOMBRE';
+  const prefijoDoc = tipoActa === 'ENTREGA' ? 'CARGO DE ENTREGA DE EQUIPO' : 'CARGO DE DEVOLUCION DE EQUIPO';
+  const sec = siguienteSecuencia(dir, fecha);
+  return `${fecha} ${sec} ${prefijoDoc} ${tipo} - ${colaborador}.pdf`;
+}
+
+function normalizarTipoEquipo(tipo) {
+  return String(tipo || '').toUpperCase().trim();
+}
+
+function obtenerRutaExterna(tipoActa, tipoEquipo) {
+  const map = tipoActa === 'ENTREGA' ? actasConfig.firmaPdfEntregaRuta : actasConfig.firmaPdfDevolucionRuta;
+  const directa = map[normalizarTipoEquipo(tipoEquipo)];
+  return directa || map.default || '';
+}
+
+function destinoPdfFirmado(tipoActa, nombreBase, snapshot, fechaBase) {
+  const externa = obtenerRutaExterna(tipoActa, snapshot?.equipo?.tipoEquipo);
+  if (externa) {
+    fs.mkdirSync(externa, { recursive: true });
+    const nombre = nombrePdfFirmado(tipoActa, snapshot, externa);
+    return path.join(externa, nombre);
+  }
+  return buildFilePath(tipoActa, 'firmados', nombreBase, fechaBase);
+}
+
+function rutasPermitidas() {
+  const rutas = [actasConfig.storagePath];
+  const collect = (map) => {
+    if (!map) return;
+    if (typeof map === 'string') {
+      if (map) rutas.push(map);
+      return;
+    }
+    for (const v of Object.values(map)) if (v) rutas.push(v);
+  };
+  collect(actasConfig.firmaPdfEntregaRuta);
+  collect(actasConfig.firmaPdfDevolucionRuta);
+  return rutas.map(p => path.resolve(p));
+}
+
+function esRutaPermitida(ruta) {
+  const resuelta = path.resolve(ruta);
+  return rutasPermitidas().some(base => resuelta === base || resuelta.startsWith(base + path.sep));
+}
+
 export const ActasService = {
   async generarAutomatica({ idMovEquipoAsignacion, tipoActa, idUsuarioGenera, estadoFisicoDevolucion, observacionesDevolucion }) {
+    let pdfRuta = null;
     try {
       const asignacion = await AsignacionesRepository.getById(idMovEquipoAsignacion);
       if (!asignacion) throw new Error(`Asignación ${idMovEquipoAsignacion} no encontrada`);
@@ -180,6 +257,15 @@ export const ActasService = {
 
       const equipo = await EquiposRepository.getById(asignacion.IdMaeEquipo);
       if (!equipo) throw new Error(`Equipo ${asignacion.IdMaeEquipo} no encontrado`);
+
+      const tipoEquipo = await EquiposRepository.getTipoById(equipo.IdTipodeEquipo);
+      if (tipoEquipo && tipoEquipo.GeneraActa === false) {
+        return {
+          success: true,
+          skipped: true,
+          reason: `El tipo de equipo ${tipoEquipo.DesTipodeEquipo} se asigna internamente sin acta`,
+        };
+      }
 
       let caracteristicas = [];
       try {
@@ -225,8 +311,8 @@ export const ActasService = {
       }
 
       const pdfBytes = await generarActaPdf({ ...datosActa, snapshot });
-      const fileName = `${codigoActa}.pdf`;
-      const pdfRuta = buildFilePath(tipoActa, '', fileName);
+      const fileName = `${codigoActa}-${crypto.randomUUID()}.pdf`;
+      pdfRuta = buildFilePath(tipoActa, '', fileName, asignacion.FecRegistro || asignacion.FecAsignacion);
       fs.writeFileSync(pdfRuta, pdfBytes);
       const pdfHash = await hashFile(pdfRuta);
 
@@ -247,6 +333,8 @@ export const ActasService = {
 
       const urlFirma = `${actasConfig.publicUrl}/firmar-acta#token=${token}`;
 
+      EventsService.emit('acta.generada', { IdActa: idActa, CodigoActa: codigoActa, TipoActa: tipoActa, IdMovEquipoAsignacion: idMovEquipoAsignacion });
+
       return {
         success: true,
         acta: {
@@ -258,6 +346,9 @@ export const ActasService = {
         },
       };
     } catch (error) {
+      if (pdfRuta && fs.existsSync(pdfRuta)) {
+        try { fs.unlinkSync(pdfRuta); } catch {}
+      }
       console.error(`[Actas] Error al generar acta automática para asignación ${idMovEquipoAsignacion}:`, error.message);
       return {
         success: false,
@@ -294,6 +385,9 @@ export const ActasService = {
     }
     const ruta = acta.PdfFirmadoRuta || acta.PdfOriginalRuta;
     if (!ruta || !fs.existsSync(ruta)) return null;
+    if (!esRutaPermitida(ruta)) {
+      throw Object.assign(new Error('Ruta de archivo inválida'), { statusCode: 400 });
+    }
     return { ruta, nombre: `${acta.CodigoActa}.pdf` };
   },
 
@@ -329,6 +423,8 @@ export const ActasService = {
       throw Object.assign(new Error('No se pudo regenerar el enlace'), { statusCode: 409 });
     }
 
+    EventsService.emit('acta.enlace-regenerado', { IdActa: idActa, CodigoActa: acta.CodigoActa, TipoActa: acta.TipoActa });
+
     return {
       urlFirma: `${actasConfig.publicUrl}/firmar-acta#token=${token}`,
       FechaExpiracion: fechaExpiracion.toISOString(),
@@ -346,6 +442,8 @@ export const ActasService = {
     if (affected !== 1) {
       throw Object.assign(new Error('No se pudo anular el acta'), { statusCode: 409 });
     }
+
+    EventsService.emit('acta.anulada', { IdActa: idActa, CodigoActa: acta.CodigoActa, TipoActa: acta.TipoActa });
 
     return { message: 'Acta anulada correctamente' };
   },
@@ -402,7 +500,7 @@ export const ActasService = {
     };
   },
 
-  async firmar(token, ultimosCuatroDni, firmaBase64) {
+  async firmar(token, ultimosCuatroDni, firmaBase64, posicionFirma) {
     const tokenHash = hashSHA256(token);
     const acta = await ActasRepository.getByTokenHash(tokenHash);
     if (!acta) {
@@ -459,20 +557,31 @@ export const ActasService = {
       snapshot,
     };
 
-    const pdfFirmadoBytes = await incrustarFirma(datosActa, firmaBase64);
+    const pdfFirmadoBytes = await incrustarFirma(datosActa, firmaBase64, posicionFirma);
 
     const now = new Date();
     const fechaFirma = now.toISOString();
 
-    const firmaFileName = `firma-${acta.CodigoActa}-${Date.now()}.png`;
-    const firmaRuta = buildFilePath(acta.TipoActa, 'firmas', firmaFileName);
-    fs.writeFileSync(firmaRuta, firmaBuffer);
-    const firmaHash = await hashFile(firmaRuta);
+    const idUnico = crypto.randomUUID();
+    const fechaBase = acta.FechaGeneracion;
 
-    const pdfFileName = `${acta.CodigoActa}-FIRMADO.pdf`;
-    const pdfFirmadoRuta = buildFilePath(acta.TipoActa, 'firmados', pdfFileName);
-    fs.writeFileSync(pdfFirmadoRuta, pdfFirmadoBytes);
-    const pdfFirmadoHash = await hashFile(pdfFirmadoRuta);
+    const firmaFileName = `firma-${acta.CodigoActa}-${idUnico}.png`;
+    const firmaRuta = buildFilePath(acta.TipoActa, 'firmas', firmaFileName, fechaBase);
+    const pdfFileName = `${acta.CodigoActa}-${idUnico}-FIRMADO.pdf`;
+    const pdfFirmadoRuta = destinoPdfFirmado(acta.TipoActa, pdfFileName, snapshot, fechaBase);
+
+    let firmaHash = null;
+    let pdfFirmadoHash = null;
+    try {
+      fs.writeFileSync(firmaRuta, firmaBuffer);
+      firmaHash = await hashFile(firmaRuta);
+      fs.writeFileSync(pdfFirmadoRuta, pdfFirmadoBytes);
+      pdfFirmadoHash = await hashFile(pdfFirmadoRuta);
+    } catch (error) {
+      try { fs.unlinkSync(firmaRuta); } catch {}
+      try { fs.unlinkSync(pdfFirmadoRuta); } catch {}
+      throw Object.assign(new Error('Error al guardar el documento firmado'), { statusCode: 500 });
+    }
 
     const affected = await ActasRepository.updateSigned(acta.IdActa, {
       TokenHash: tokenHash,
@@ -488,6 +597,8 @@ export const ActasService = {
       try { fs.unlinkSync(pdfFirmadoRuta); } catch {}
       throw Object.assign(new Error('El documento ya fue firmado por otro usuario'), { statusCode: 409 });
     }
+
+    EventsService.emit('acta.firmada', { IdActa: acta.IdActa, CodigoActa: acta.CodigoActa, TipoActa: acta.TipoActa });
 
     return {
       message: 'Documento firmado correctamente',
@@ -524,6 +635,9 @@ export const ActasService = {
 
     if (!acta.PdfOriginalRuta || !fs.existsSync(acta.PdfOriginalRuta)) {
       throw Object.assign(new Error('No se encontró el archivo PDF'), { statusCode: 404 });
+    }
+    if (!esRutaPermitida(acta.PdfOriginalRuta)) {
+      throw Object.assign(new Error('Ruta de archivo inválida'), { statusCode: 400 });
     }
 
     return acta.PdfOriginalRuta;

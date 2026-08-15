@@ -17,7 +17,7 @@ router.post('/validar', loginLimiter, validate(actaValidarSchema), async (req, r
   }
 });
 
-router.post('/preview', async (req, res, next) => {
+router.post('/preview', loginLimiter, async (req, res, next) => {
   try {
     const { token, ultimosCuatroDni } = req.body;
     if (!token || !ultimosCuatroDni) {
@@ -34,7 +34,7 @@ router.post('/preview', async (req, res, next) => {
 
 router.post('/firmar', loginLimiter, validate(actaFirmarSchema), async (req, res, next) => {
   try {
-    const result = await ActasService.firmar(req.body.token, req.body.ultimosCuatroDni, req.body.firmaBase64);
+    const result = await ActasService.firmar(req.body.token, req.body.ultimosCuatroDni, req.body.firmaBase64, req.body.posicionFirma);
     res.json(result);
   } catch (e) {
     const status = e.statusCode || 500;

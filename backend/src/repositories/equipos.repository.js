@@ -12,7 +12,7 @@ export const EquiposRepository = {
     const params = {};
     if (filtros.estado) { where += ' AND e.Estado = @estado'; params.estado = filtros.estado; }
     if (filtros.idTipo) { where += ' AND e.IdTipodeEquipo = @idTipo'; params.idTipo = parseInt(filtros.idTipo); }
-    if (filtros.search) { where += " AND (e.CodEquipo LIKE @search OR e.CodBarra LIKE @search)"; params.search = `%${filtros.search}%`; }
+    if (filtros.search) { where += " AND (e.CodEquipo LIKE @search OR e.CodBarra LIKE @search OR EXISTS (SELECT 1 FROM Tab_EQ_CaracteristicasEquipo ce WHERE ce.IdMaeEquipo = e.IdMaeEquipo AND ce.Valor LIKE @search))"; params.search = `%${filtros.search}%`; }
 
     const countSql = `SELECT COUNT(*) as total FROM Tab_EQ_MaeEquipos e ${where}`;
     const [{ total }] = await query(DB, countSql, params);
@@ -228,6 +228,14 @@ export const EquiposRepository = {
       FROM Tab_EQ_CaracteristicasEquipo
       WHERE IdMaeEquipo = @id
     `, { id: idEquipo });
+  },
+
+  async getCaracteristicasByLote(idsCsv) {
+    return query(DB, `
+      SELECT c.IdMaeEquipo, c.Clave, c.Valor
+      FROM Tab_EQ_CaracteristicasEquipo c
+      WHERE c.IdMaeEquipo IN (${idsCsv})
+    `);
   },
 
   async deleteCaracteristicasPorEquipo(idEquipo) {

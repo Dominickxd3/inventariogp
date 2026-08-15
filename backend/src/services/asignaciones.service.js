@@ -6,10 +6,14 @@ import { IncidenciasRepository } from '../repositories/incidencias.repository.js
 import { ActasRepository } from '../repositories/actas.repository.js';
 import { ConfiguracionesService } from './configuraciones.service.js';
 import { ConfiguracionesRepository } from '../repositories/configuraciones.repository.js';
+import { normalizarClaveEquipo } from './equipos.service.js';
 import { withTransaction, createRequest, query } from '../config/db.js';
+import { EventsService } from './events.service.js';
 
 const DB = 'InventarioGP';
-const fec = () => new Date().toISOString().split('T')[0];
+const fec = () => new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+const escapeHtml = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
 // Helpers transaccionales seguros para mssql
 const trxRows = async (trx, sqlText, params = {}) => {
@@ -20,6 +24,18 @@ const trxRows = async (trx, sqlText, params = {}) => {
 const trxExec = async (trx, sqlText, params = {}) => {
   return createRequest(trx, params).query(sqlText);
 };
+
+// Los componentes instalados (vinculados VIGENTE en Tab_EQ_MovEquiposComponentes)
+// siguen el estado del equipo: ASIGNADO al asignar, y el estado final al cesar.
+async function marcarComponentesVinculados(trx, idEquipo, estado) {
+  await trxExec(trx, `
+    UPDATE c
+    SET c.Estado = @estado
+    FROM Tab_EQ_Componentes c
+    INNER JOIN Tab_EQ_MovEquiposComponentes mc ON c.IdComponente = mc.IdComponente
+    WHERE mc.IdMaeEquipo = @idEquipo AND mc.Estado = 'VIGENTE'
+  `, { idEquipo, estado });
+}
 
 
 
@@ -68,11 +84,31 @@ async function validarDevolucionPrevia(idEquipo) {
       `El equipo tiene una asignación previa sin acta de devolución registrada. Genera y registra la ACT-DEV antes de asignarlo nuevamente.`
     );
   }
+
+  if (actaDev.EstadoActa !== 'FIRMADA') {
+    throw new Error(
+      `El equipo tiene una asignación previa con acta de devolución (${actaDev.CodigoActa}) sin firmar. La ACT-DEV debe estar firmada antes de reasignar el equipo.`
+    );
+  }
 }
 
 export const AsignacionesService = {
   async list(filtros) {
-    return AsignacionesRepository.listAll(filtros);
+    const result = await AsignacionesRepository.listAll(filtros);
+    if (result.rows && result.rows.length) {
+      const ids = result.rows.map(r => r.IdMaeEquipo).join(',');
+      const caracs = await EquiposRepository.getCaracteristicasByLote(ids);
+      const map = {};
+      for (const c of caracs) {
+        if (!map[c.IdMaeEquipo]) map[c.IdMaeEquipo] = {};
+        map[c.IdMaeEquipo][normalizarClaveEquipo(c.Clave)] = c.Valor;
+      }
+      result.rows = result.rows.map(r => {
+        const m = map[r.IdMaeEquipo] || {};
+        return { ...r, Marca: m.Marca || null, Modelo: m.Modelo || null, Capacidad: m.Capacidad || null };
+      });
+    }
+    return result;
   },
 
   async getById(id) {
@@ -97,7 +133,7 @@ export const AsignacionesService = {
       ? await ConfiguracionesRepository.getTipoByCod('ASIGNACION')
       : null;
 
-    return withTransaction(DB, async (trx) => {
+    const idAsigFinal = await withTransaction(DB, async (trx) => {
       const rows = await trxRows(trx, `
         INSERT INTO Tab_EQ_MovEquiposAsignaciones (IdMaeEquipo, IdReferente, FecAsignacion, Obs, Estado)
         OUTPUT INSERTED.IdMovEquipoAsignacion
@@ -122,6 +158,8 @@ export const AsignacionesService = {
         }
       }
 
+      await marcarComponentesVinculados(trx, idEquipo, 'ASIGNADO');
+
       if (tipoCfgAsignacion) {
         await ConfiguracionesRepository.actualizarConfig(trx, idEquipo, config.hostname, config.usuarioWindows);
         await ConfiguracionesRepository.registrar(trx, {
@@ -139,6 +177,8 @@ export const AsignacionesService = {
 
       return idAsig;
     });
+    EventsService.emit('asignacion.created', { id: idAsigFinal, idEquipo, idTrabajador });
+    return idAsigFinal;
   },
 
   async getAccsByAsignacion(id) {
@@ -189,7 +229,7 @@ export const AsignacionesService = {
       estadoNuevo === 'DISPONIBLE' && estadoFisicoDev && estadoFisicoDev !== 'BUENO';
     const estadoEquipo = devolucionConNovedad ? 'MANTENIMIENTO' : estadoNuevo;
 
-    return withTransaction(DB, async (trx) => {
+    const cesarResult = await withTransaction(DB, async (trx) => {
       const dbAccs = await trxRows(trx, `
         SELECT IdMovAccesorio, IdComponente, Estado
         FROM Tab_EQ_MovAccesoriosTrabajador
@@ -256,9 +296,8 @@ export const AsignacionesService = {
           }
 
           if (accion === 'MANTENER') {
-            const err = new Error('La acción "Mantener asignado al trabajador" aún no tiene una regla empresarial aprobada. Usa "Devolver a disponible" o contacta al administrador.');
-            err.statusCode = 422;
-            throw err;
+            // El accesorio permanece VIGENTE con el trabajador (devolución parcial)
+            continue;
           }
         }
 
@@ -334,7 +373,13 @@ export const AsignacionesService = {
         INSERT INTO Tab_EQ_MovEstadosEquipos (IdMaeEquipo, EstadoAnterior, EstadoNuevo, IdUsuario, Obs)
         VALUES (@idEquipo, 'ASIGNADO', @estadoNuevo, @idUsuario, @obs)
       `, { idEquipo: asig.IdMaeEquipo, estadoNuevo: estadoEquipo, idUsuario: idUsuario || null, obs: obsCombinada || 'Asignación finalizada' });
+
+      // Los componentes instalados siguen el estado final del equipo
+      await marcarComponentesVinculados(trx, asig.IdMaeEquipo, estadoEquipo);
     });
+    EventsService.emit('asignacion.updated', { id, idEquipo: asig.IdMaeEquipo, estadoEquipo });
+    EventsService.emit('accesorio.cesado', { id });
+    return cesarResult;
   },
 
   async asignarMulti(data, idUsuario) {
@@ -362,7 +407,7 @@ export const AsignacionesService = {
       : null;
     const equipoUnico = config ? await EquiposRepository.getById(IdMaeEquipos[0]) : null;
 
-    return withTransaction(DB, async (trx) => {
+    const resultsMulti = await withTransaction(DB, async (trx) => {
       const results = [];
 
       for (const idEquipo of IdMaeEquipos) {
@@ -378,6 +423,8 @@ export const AsignacionesService = {
           INSERT INTO Tab_EQ_MovEstadosEquipos (IdMaeEquipo, EstadoAnterior, EstadoNuevo, IdUsuario, Obs)
           VALUES (@idEquipo, 'DISPONIBLE', 'ASIGNADO', @idUsuario, 'Asignación múltiple')
         `, { idEquipo, idUsuario: idUsuario || null });
+
+        await marcarComponentesVinculados(trx, idEquipo, 'ASIGNADO');
 
         if (tipoCfgAsignacion && config) {
           await ConfiguracionesRepository.actualizarConfig(trx, idEquipo, config.hostname, config.usuarioWindows);
@@ -399,6 +446,8 @@ export const AsignacionesService = {
 
       return results;
     });
+    EventsService.emit('asignacion.created', { idTrabajador: IdReferente, equipos: IdMaeEquipos, results: resultsMulti });
+    return resultsMulti;
   },
 
   async asignarConAccesorios(data) {
@@ -436,7 +485,7 @@ export const AsignacionesService = {
       }
     }
 
-    return withTransaction(DB, async (trx) => {
+    const resultadoAsig = await withTransaction(DB, async (trx) => {
       const rows = await trxRows(trx, `
         INSERT INTO Tab_EQ_MovEquiposAsignaciones (IdMaeEquipo, IdReferente, FecAsignacion, Obs, Estado)
         OUTPUT INSERTED.IdMovEquipoAsignacion
@@ -450,6 +499,8 @@ export const AsignacionesService = {
         INSERT INTO Tab_EQ_MovEstadosEquipos (IdMaeEquipo, EstadoAnterior, EstadoNuevo, IdUsuario, Obs)
         VALUES (@idEquipo, @estadoAnt, 'ASIGNADO', @idUsuario, 'Equipo asignado con accesorios')
       `, { idEquipo: IdMaeEquipo, estadoAnt: equipo.Estado, idUsuario: IdUsuario || null });
+
+      await marcarComponentesVinculados(trx, IdMaeEquipo, 'ASIGNADO');
 
       for (const acc of accsValidos) {
         await trxExec(trx, `
@@ -485,6 +536,11 @@ export const AsignacionesService = {
 
       return { idAsig, equipo: IdMaeEquipo, accesorios: accsValidos.length };
     });
+    EventsService.emit('asignacion.created', { id: resultadoAsig?.idAsig, idEquipo: IdMaeEquipo, idTrabajador: IdReferente });
+    if (accsValidos.length) {
+      EventsService.emit('accesorio.asignado', { idTrabajador: IdReferente, idsComponentes: accsValidos.map(a => a.IdComponente) });
+    }
+    return resultadoAsig;
   },
 
   async cesarActivasByTrabajador(idTrabajador, idUsuario) {
@@ -493,7 +549,7 @@ export const AsignacionesService = {
 
     const accs = await ComponentesRepository.listAccesoriosPorTrabajador(idTrabajador);
 
-    return withTransaction(DB, async (trx) => {
+    const resultadoCese = await withTransaction(DB, async (trx) => {
       for (const asig of activas) {
         await trxExec(trx, `UPDATE Tab_EQ_MovEquiposAsignaciones SET Estado = 'CESADO', FecCese = GETDATE() WHERE IdMovEquipoAsignacion = @id`, { id: asig.IdMovEquipoAsignacion });
         await trxExec(trx, `UPDATE Tab_EQ_MaeEquipos SET Estado = 'DISPONIBLE' WHERE IdMaeEquipo = @id`, { id: asig.IdMaeEquipo });
@@ -501,6 +557,8 @@ export const AsignacionesService = {
           INSERT INTO Tab_EQ_MovEstadosEquipos (IdMaeEquipo, EstadoAnterior, EstadoNuevo, IdUsuario, Obs)
           VALUES (@idEquipo, 'ASIGNADO', 'DISPONIBLE', @idUsuario, 'Asignación finalizada (desasignación masiva)')
         `, { idEquipo: asig.IdMaeEquipo, idUsuario: idUsuario || null });
+
+        await marcarComponentesVinculados(trx, asig.IdMaeEquipo, 'DISPONIBLE');
       }
 
       for (const acc of accs) {
@@ -510,6 +568,9 @@ export const AsignacionesService = {
 
       return { count: activas.length, accesoriosCesados: accs.length };
     });
+    EventsService.emit('asignacion.updated', { idTrabajador, count: activas.length });
+    if (accs.length) EventsService.emit('accesorio.cesado', { idTrabajador, count: accs.length });
+    return resultadoCese;
   },
 
   async getHistorialByEquipo(idEquipo) {
@@ -608,7 +669,14 @@ export const AsignacionesService = {
     const asig = await AsignacionesRepository.getById(id);
     if (!asig) return null;
 
+    const actas = await ActasRepository.getStatus(id);
+    const actaEntrega = actas.find(a => a.TipoActa === 'ENTREGA');
+    if (actaEntrega && actaEntrega.EstadoActa === 'ANULADA') {
+      throw Object.assign(new Error('El acta de entrega está anulada'), { statusCode: 422 });
+    }
+
     const accs = await this.getAccsByAsignacion(id);
+    const e = (v) => escapeHtml(v);
 
     const fec = new Date().toLocaleDateString('es-PE', { year: 'numeric', month: 'long', day: 'numeric' });
     const fecAsig = asig.FecAsignacion
@@ -617,11 +685,11 @@ export const AsignacionesService = {
 
     const accesoriosRowsHtml = accs.length
       ? accs.map(a => `        <tr>
-          <td>${a.CodComponente || ''}</td>
-          <td>${a.DesTipodeComponente || '—'}</td>
-          <td>${a.DesComponente || '—'}</td>
-          <td>${a.Marca || '—'}</td>
-          <td>${a.Modelo || '—'}</td>
+          <td>${e(a.CodComponente)}</td>
+          <td>${e(a.DesTipodeComponente) || '—'}</td>
+          <td>${e(a.DesComponente) || '—'}</td>
+          <td>${e(a.Marca) || '—'}</td>
+          <td>${e(a.Modelo) || '—'}</td>
         </tr>
       `).join('')
       : `        <tr>
@@ -631,7 +699,7 @@ export const AsignacionesService = {
 
     return `<!DOCTYPE html>
 <html lang="es">
-<head><meta charset="UTF-8"><title>Acta de Entrega - ${asig.CodEquipo}</title>
+<head><meta charset="UTF-8"><title>Acta de Entrega - ${e(asig.CodEquipo)}</title>
 <style>
   * { box-sizing: border-box; }
   body { font-family: 'Inter', Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; color: #1a1a1a; }
@@ -653,17 +721,17 @@ export const AsignacionesService = {
 
   <table>
     <tr><th colspan="2">Datos del Trabajador</th></tr>
-    <tr><td style="width:30%">Nombre</td><td>${asig.TrabajadorNombre || '—'}</td></tr>
-    <tr><td>DNI</td><td>${asig.DOI || '—'}</td></tr>
-    <tr><td>Área</td><td>${asig.Area || '—'}</td></tr>
-    <tr><td>Cargo</td><td>${asig.Ocupacion || '—'}</td></tr>
+    <tr><td style="width:30%">Nombre</td><td>${e(asig.TrabajadorNombre) || '—'}</td></tr>
+    <tr><td>DNI</td><td>${e(asig.DOI) || '—'}</td></tr>
+    <tr><td>Área</td><td>${e(asig.Area) || '—'}</td></tr>
+    <tr><td>Cargo</td><td>${e(asig.Ocupacion) || '—'}</td></tr>
   </table>
 
   <table>
     <tr><th colspan="2">Equipo Entregado</th></tr>
-    <tr><td style="width:30%">Código</td><td>${asig.CodEquipo}</td></tr>
-    <tr><td>Tipo</td><td>${asig.DesTipodeEquipo || '—'}</td></tr>
-    <tr><td>Código de barra / Serie</td><td>${asig.CodBarra || '—'}</td></tr>
+    <tr><td style="width:30%">Código</td><td>${e(asig.CodEquipo)}</td></tr>
+    <tr><td>Tipo</td><td>${e(asig.DesTipodeEquipo) || '—'}</td></tr>
+    <tr><td>Código de barra / Serie</td><td>${e(asig.CodBarra) || '—'}</td></tr>
   </table>
 
   <table>
@@ -677,7 +745,7 @@ export const AsignacionesService = {
     <tr><td style="width:30%">Fecha de asignación</td><td>${fecAsig}</td></tr>
   </table>
 
-  ${asig.Obs ? `<div class="obs"><strong>Observaciones:</strong><p>${asig.Obs}</p></div>` : ''}
+  ${asig.Obs ? `<div class="obs"><strong>Observaciones:</strong><p>${e(asig.Obs)}</p></div>` : ''}
 
   <div class="firmas">
     <div class="firma">
@@ -687,7 +755,7 @@ export const AsignacionesService = {
     </div>
     <div class="firma">
       <div><strong>RECIBIÓ</strong></div>
-      <div style="margin-top:4px;font-size:12px;color:#666;">${asig.TrabajadorNombre || 'Trabajador'}</div>
+      <div style="margin-top:4px;font-size:12px;color:#666;">${e(asig.TrabajadorNombre) || 'Trabajador'}</div>
       <div class="linea"></div>
     </div>
   </div>

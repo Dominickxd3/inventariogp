@@ -16,7 +16,7 @@ import {
 } from '#components/ui/dialog.jsx';
 import { Skeleton } from '#components/ui/skeleton.jsx';
 import AutocompleteInput from '../components/AutocompleteInput';
-import { Plus, QrCode, Eye, Archive, Monitor, CheckCircle, Clock, AlertTriangle, Search, Download, Copy, Check } from 'lucide-react';
+import { Plus, QrCode, Eye, Archive, Monitor, CheckCircle, Clock, AlertTriangle, Search, Download, Copy, Check, Trash2, Layers, Pencil } from 'lucide-react';
 import { formatDate } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -65,15 +65,49 @@ export default function Equipos() {
   const [caracteristicasVals, setCaracteristicasVals] = useState({});
   const [plantilla, setPlantilla] = useState(null);
   const [tipoSeleccionado, setTipoSeleccionado] = useState('');
+  const [compFabrica, setCompFabrica] = useState([]);
+  const [plantillaSel, setPlantillaSel] = useState('');
+  const [cantidadLote, setCantidadLote] = useState(1);
+  const [plantillaOpen, setPlantillaOpen] = useState(false);
+  const [plantillaEditando, setPlantillaEditando] = useState(null);
 
   const handleTipoChange = (v) => {
     setTipoSeleccionado(v);
     form.setValue('IdTipodeEquipo', v);
     setCaracteristicasVals({});
+    setCompFabrica([]);
+    setPlantillaSel('');
     if (!v) { setPlantilla(null); return; }
     api.equipos.plantillaByTipo(Number(v))
       .then(r => setPlantilla(r || []))
       .catch(() => setPlantilla(null));
+  };
+
+  const cargarPlantilla = async (id) => {
+    if (!id) return;
+    try {
+      const p = await api.equipos.plantillasComponentes.get(Number(id));
+      setCompFabrica((p.componentes || []).map((c) => ({
+        IdTipodeComponente: c.IdTipodeComponente,
+        Marca: c.Marca || '',
+        Modelo: c.Modelo || '',
+        Serie: '',
+        Capacidad: c.Capacidad || '',
+        DesComponente: '',
+      })));
+      setPlantillaSel(String(id));
+    } catch (e) {
+      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo cargar la plantilla' });
+    }
+  };
+
+  const esTipoPC = (id) => {
+    const nombre = (tiposAsignables?.find(t => String(t.IdTipodeEquipo) === String(id))?.DesTipodeEquipo || '').toUpperCase().trim();
+    return nombre === 'PC ESCRITORIO';
+  };
+
+  const updateCompFabrica = (idx, patch) => {
+    setCompFabrica((prev) => prev.map((c, i) => (i === idx ? { ...c, ...patch } : c)));
   };
 
   const { data: dashboard, isLoading: dashLoading } = useQuery({
@@ -94,6 +128,16 @@ export default function Equipos() {
   const { data: tiposAsignables } = useQuery({
     queryKey: ['equipos-tipos-asignables'],
     queryFn: api.equipos.tiposAsignables,
+  });
+
+  const { data: compTipos } = useQuery({
+    queryKey: ['componentes-tipos'],
+    queryFn: api.componentes.tipos.list,
+  });
+
+  const { data: plantillas } = useQuery({
+    queryKey: ['plantillas-componentes'],
+    queryFn: api.equipos.plantillasComponentes.list,
   });
 
   const bajaMutation = useMutation({
@@ -127,7 +171,19 @@ export default function Equipos() {
           throw new Error(`"${c.Etiqueta || c.Clave}" requiere al menos ${c.LongitudMin} caracteres`);
         }
       }
-      const resp = await api.equipos.rapido(data);
+      const resp = await api.equipos.rapido({
+        ...data,
+        componentes: compFabrica
+          .map((c) => ({
+            IdTipodeComponente: c.IdTipodeComponente,
+            DesComponente: c.DesComponente?.trim() || undefined,
+            Marca: c.Marca?.trim() || undefined,
+            Modelo: c.Modelo?.trim() || undefined,
+            Serie: c.Serie?.trim() || undefined,
+            Capacidad: c.Capacidad?.trim() || undefined,
+          }))
+          .filter((c) => c.IdTipodeComponente),
+      });
       const id = resp.equipo.IdMaeEquipo;
       if (id && cam.length > 0) {
         const vals = Object.entries(caracteristicasVals)
@@ -141,6 +197,7 @@ export default function Equipos() {
       queryClient.invalidateQueries({ queryKey: ['equipos'] });
       queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
       setCaracteristicasVals({});
+      setCompFabrica([]);
       Swal.fire({ icon: 'success', title: 'Equipo creado', timer: 1500, showConfirmButton: false });
 
       switch (despuesDeGuardar) {
@@ -149,6 +206,7 @@ export default function Equipos() {
           setTipoSeleccionado('');
           setPlantilla(null);
           setCaracteristicasVals({});
+          setCompFabrica([]);
           setTimeout(() => document.querySelector('[data-equipo-codbarra]')?.focus(), 150);
           break;
         case 'asignar_ahora':
@@ -161,6 +219,17 @@ export default function Equipos() {
       }
     },
     onError: (err) => Swal.fire({ icon: 'error', title: 'Error al crear', text: err.message }),
+  });
+
+  const loteMutation = useMutation({
+    mutationFn: api.equipos.rapidoLote,
+    onSuccess: (resp) => {
+      queryClient.invalidateQueries({ queryKey: ['equipos'] });
+      queryClient.invalidateQueries({ queryKey: ['equipos-dashboard'] });
+      const cods = (resp.creados || []).map((e) => e.CodEquipo);
+      Swal.fire({ icon: 'success', title: `${cods.length} PC(s) creadas`, html: `<div class="text-left text-sm">${cods.join('<br/>')}</div>`, confirmButtonText: 'Cerrar' });
+    },
+    onError: (err) => Swal.fire({ icon: 'error', title: 'Error', text: err.message }),
   });
 
   const equipos = pageData?.rows;
@@ -176,12 +245,16 @@ export default function Equipos() {
   return (
     <div className="space-y-6">
       <PageHeader title="Equipos" description="Gestión de equipos del inventario">
+        <Button variant="outline" onClick={() => { setPlantillaEditando(null); setPlantillaOpen(true); }}>
+          <Layers className="w-4 h-4" /> Plantillas
+        </Button>
         <Button onClick={() => {
           form.reset({ IdTipodeEquipo: '', CodBarra: '', Obs: '' });
           setDespuesDeGuardar('');
           setTipoSeleccionado('');
           setPlantilla(null);
           setCaracteristicasVals({});
+          setCompFabrica([]);
           setShowCreateOpen(true);
         }}>
           <Plus className="w-4 h-4" /> Nuevo Equipo
@@ -248,6 +321,16 @@ export default function Equipos() {
       <DataTable
         columns={[
           { key: 'CodEquipo', label: 'Código' },
+          {
+            key: 'nombreEquipo',
+            label: 'Equipo',
+            sortable: false,
+            render: (row) => {
+              const nombre = [row.Marca, row.Modelo].filter(Boolean).join(' - ');
+              const extra = [row.Ram, row.Capacidad].filter(Boolean).join(' / ');
+              return nombre ? `${nombre}${extra ? ` — ${extra}` : ''}` : '-';
+            },
+          },
           { key: 'DesTipodeEquipo', label: 'Tipo' },
           { key: 'CodBarra', label: 'Serie' },
           { key: 'Estado', label: 'Estado', render: (row) => <StatusBadge status={row.Estado} /> },
@@ -356,6 +439,77 @@ export default function Equipos() {
               </div>
             )}
 
+            {tipoSeleccionado && esTipoPC(tipoSeleccionado) && (
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-foreground border-b pb-1">Componentes de fábrica</p>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setCompFabrica((p) => [...p, { IdTipodeComponente: '', Marca: '', Modelo: '', Serie: '', Capacidad: '', DesComponente: '' }])}>
+                    <Plus className="w-4 h-4" /> Agregar pieza
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">Registra las piezas que trae la PC armada de fábrica. Se crearán en Componentes y se vincularán a esta PC (origen FABRICA). Opcional.</p>
+                {(plantillas || []).length > 0 && (
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-foreground">Usar plantilla (opcional)</label>
+                    <Select value={plantillaSel} onValueChange={(v) => cargarPlantilla(v)}>
+                      <SelectTrigger className="w-full"><SelectValue placeholder="Seleccionar plantilla para precargar piezas..." /></SelectTrigger>
+                      <SelectContent>
+                        {(plantillas || []).map((p) => (
+                          <SelectItem key={p.IdPlantillaComp} value={String(p.IdPlantillaComp)}>{p.Nombre} ({p.TotalComponentes} piezas)</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {plantillaSel && (
+                  <div className="border rounded-lg p-3 space-y-2 bg-muted/40">
+                    <p className="text-sm font-semibold text-foreground">Registrar por lote</p>
+                    <p className="text-xs text-muted-foreground">Crea varias PCs a la vez con esta plantilla. Cada PC tendrá su propia instancia de cada pieza (origen FABRICA).</p>
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm whitespace-nowrap">Cantidad de PCs:</label>
+                      <Input type="number" min={1} max={100} value={cantidadLote}
+                        onChange={(e) => setCantidadLote(parseInt(e.target.value, 10) || 1)}
+                        className="w-24" />
+                    </div>
+                    <Button type="button" onClick={() => loteMutation.mutate({ IdTipodeEquipo: Number(tipoSeleccionado), cantidad: cantidadLote, idPlantillaComp: Number(plantillaSel) })} disabled={loteMutation.isPending}>
+                      <Layers className="w-4 h-4" /> {loteMutation.isPending ? 'Creando...' : `Crear ${cantidadLote} PC(s)`}
+                    </Button>
+                  </div>
+                )}
+                {compFabrica.length > 0 && (
+                  <div className="space-y-2">
+                    {compFabrica.map((c, idx) => (
+                      <div key={idx} className="border rounded-lg p-3 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex-1 space-y-1.5">
+                            <label className="text-xs font-medium text-muted-foreground">Tipo de componente</label>
+                            <Select value={String(c.IdTipodeComponente || '')} onValueChange={(v) => updateCompFabrica(idx, { IdTipodeComponente: Number(v) })}>
+                              <SelectTrigger className="w-full"><SelectValue placeholder="Seleccionar tipo..." /></SelectTrigger>
+                              <SelectContent>
+                                {(compTipos || []).map((t) => (
+                                  <SelectItem key={t.IdTipodeComponente} value={String(t.IdTipodeComponente)}>{t.DesTipodeComponente}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <Button type="button" variant="ghost" size="icon" className="shrink-0" onClick={() => setCompFabrica((p) => p.filter((_, i) => i !== idx))}>
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Input placeholder="Marca (ej: Kingston)" value={c.Marca} onChange={(e) => updateCompFabrica(idx, { Marca: e.target.value })} />
+                          <Input placeholder="Modelo (ej: HyperX)" value={c.Modelo} onChange={(e) => updateCompFabrica(idx, { Modelo: e.target.value })} />
+                          <Input placeholder="Serie / S/N" value={c.Serie} onChange={(e) => updateCompFabrica(idx, { Serie: e.target.value })} />
+                          <Input placeholder="Capacidad (ej: 8GB)" value={c.Capacidad} onChange={(e) => updateCompFabrica(idx, { Capacidad: e.target.value })} />
+                        </div>
+                        <Input placeholder="Descripción (opcional)" value={c.DesComponente} onChange={(e) => updateCompFabrica(idx, { DesComponente: e.target.value })} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-foreground">Observaciones</label>
               <textarea {...form.register('Obs')}
@@ -399,6 +553,123 @@ export default function Equipos() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Gestor de plantillas de componentes */}
+      <Dialog open={plantillaOpen} onOpenChange={(v) => { setPlantillaOpen(v); if (!v) setPlantillaEditando(null); }}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{plantillaEditando ? 'Editar plantilla' : 'Plantillas de componentes'}</DialogTitle>
+            <DialogDescription>Configuración estándar de piezas para registrar PCs armadas por lote.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {!plantillaEditando && (
+              <div className="space-y-2">
+                {(plantillas || []).map((p) => (
+                  <div key={p.IdPlantillaComp} className="flex items-center justify-between border rounded-lg p-3">
+                    <div>
+                      <p className="text-sm font-medium">{p.Nombre}</p>
+                      <p className="text-xs text-muted-foreground">{p.TotalComponentes} pieza(s){p.Descripcion ? ` · ${p.Descripcion}` : ''}</p>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon-sm" onClick={async () => {
+                        const d = await api.equipos.plantillasComponentes.get(p.IdPlantillaComp);
+                        setPlantillaEditando({ ...d, componentes: (d.componentes || []).map((c) => ({ IdTipodeComponente: c.IdTipodeComponente, Marca: c.Marca || '', Modelo: c.Modelo || '', Capacidad: c.Capacidad || '' })) });
+                      }}>
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon-sm" onClick={() => {
+                        Swal.fire({
+                          title: '¿Eliminar plantilla?', text: p.Nombre, icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar',
+                        }).then(async (r) => {
+                          if (r.isConfirmed) {
+                            await api.equipos.plantillasComponentes.remove(p.IdPlantillaComp);
+                            queryClient.invalidateQueries({ queryKey: ['plantillas-componentes'] });
+                            Swal.fire({ icon: 'success', title: 'Plantilla eliminada', timer: 1500, showConfirmButton: false });
+                          }
+                        });
+                      }}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                {(plantillas || []).length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Aún no hay plantillas.</p>}
+                <Button type="button" onClick={() => setPlantillaEditando({ Nombre: '', Descripcion: '', componentes: [] })} className="w-full">
+                  <Plus className="w-4 h-4" /> Nueva plantilla
+                </Button>
+              </div>
+            )}
+
+            {plantillaEditando && (
+              <div className="space-y-3 border-t pt-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Nombre <span className="text-destructive">*</span></label>
+                    <Input value={plantillaEditando.Nombre} onChange={(e) => setPlantillaEditando({ ...plantillaEditando, Nombre: e.target.value })} placeholder="Ej: PC Estándar Oficina" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Descripción</label>
+                    <Input value={plantillaEditando.Descripcion || ''} onChange={(e) => setPlantillaEditando({ ...plantillaEditando, Descripcion: e.target.value })} placeholder="Opcional" />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">Piezas de la plantilla</p>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setPlantillaEditando((prev) => ({ ...prev, componentes: [...prev.componentes, { IdTipodeComponente: '', Marca: '', Modelo: '', Capacidad: '' }] }))}>
+                    <Plus className="w-4 h-4" /> Agregar pieza
+                  </Button>
+                </div>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {plantillaEditando.componentes.map((c, idx) => (
+                    <div key={idx} className="grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-2 items-center">
+                      <Select value={String(c.IdTipodeComponente || '')} onValueChange={(v) => setPlantillaEditando((prev) => {
+                        const arr = [...prev.componentes]; arr[idx] = { ...arr[idx], IdTipodeComponente: Number(v) }; return { ...prev, componentes: arr };
+                      })}>
+                        <SelectTrigger className="w-full"><SelectValue placeholder="Tipo" /></SelectTrigger>
+                        <SelectContent>
+                          {(compTipos || []).map((t) => (
+                            <SelectItem key={t.IdTipodeComponente} value={String(t.IdTipodeComponente)}>{t.DesTipodeComponente}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input placeholder="Marca" value={c.Marca} onChange={(e) => setPlantillaEditando((prev) => { const arr = [...prev.componentes]; arr[idx] = { ...arr[idx], Marca: e.target.value }; return { ...prev, componentes: arr }; })} />
+                      <Input placeholder="Modelo" value={c.Modelo} onChange={(e) => setPlantillaEditando((prev) => { const arr = [...prev.componentes]; arr[idx] = { ...arr[idx], Modelo: e.target.value }; return { ...prev, componentes: arr }; })} />
+                      <Input placeholder="Capacidad" value={c.Capacidad} onChange={(e) => setPlantillaEditando((prev) => { const arr = [...prev.componentes]; arr[idx] = { ...arr[idx], Capacidad: e.target.value }; return { ...prev, componentes: arr }; })} />
+                      <Button type="button" variant="ghost" size="icon" onClick={() => setPlantillaEditando((prev) => ({ ...prev, componentes: prev.componentes.filter((_, i) => i !== idx) }))}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
+                  ))}
+                  {plantillaEditando.componentes.length === 0 && <p className="text-sm text-muted-foreground text-center py-2">Sin piezas. Agrega al menos una.</p>}
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setPlantillaEditando(null)}>Cancelar</Button>
+                  <Button onClick={async () => {
+                    const payload = {
+                      Nombre: plantillaEditando.Nombre,
+                      Descripcion: plantillaEditando.Descripcion,
+                      componentes: plantillaEditando.componentes.filter((c) => c.IdTipodeComponente),
+                    };
+                    try {
+                      if (plantillaEditando.IdPlantillaComp) {
+                        await api.equipos.plantillasComponentes.update(plantillaEditando.IdPlantillaComp, payload);
+                      } else {
+                        await api.equipos.plantillasComponentes.create(payload);
+                      }
+                      queryClient.invalidateQueries({ queryKey: ['plantillas-componentes'] });
+                      setPlantillaEditando(null);
+                      Swal.fire({ icon: 'success', title: 'Plantilla guardada', timer: 1200, showConfirmButton: false });
+                    } catch (e) {
+                      Swal.fire({ icon: 'error', title: 'Error', text: e.message });
+                    }
+                  }}>
+                    Guardar plantilla
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 

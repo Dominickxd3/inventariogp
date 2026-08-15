@@ -129,11 +129,11 @@ export default function ActasList() {
       label: 'Acciones',
       render: (row) => (
         <div className="flex gap-1">
-          {row.EstadoActa !== 'ANULADA' && (row.PdfFirmadoRuta ? (
+          {row.EstadoActa !== 'ANULADA' && (row.TienePdfFirmado ? (
             <Button variant="ghost" size="icon-sm" onClick={() => handleVerPdf(row.IdActa)} title="Ver PDF">
               <FileText className="w-4 h-4" />
             </Button>
-          ) : row.PdfOriginalRuta ? (
+          ) : row.TienePdfOriginal ? (
             <Button variant="ghost" size="icon-sm" onClick={() => handleVerPdf(row.IdActa)} title="Ver PDF original">
               <FileText className="w-4 h-4" />
             </Button>

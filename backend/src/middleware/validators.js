@@ -15,6 +15,16 @@ export const equipoCreateSchema = z.object({
   CodBarra: z.string().optional(),
   Estado: z.string().optional(),
   Obs: z.string().optional(),
+  idPlantillaComp: z.number().int().positive().optional(),
+  componentes: z.array(z.object({
+    IdTipodeComponente: z.number().int().positive('Tipo de componente requerido'),
+    DesComponente: z.string().nullish(),
+    Marca: z.string().nullish(),
+    Modelo: z.string().nullish(),
+    Serie: z.string().nullish(),
+    Capacidad: z.string().nullish(),
+    Obs: z.string().nullish(),
+  })).optional(),
 }).partial({
   CodEquipo: true,
   NombreEquipo: true,
@@ -40,10 +50,26 @@ export const equipoCreateTipoSchema = z.object({
 
 export const equipoAgregarComponenteSchema = z.object({
   IdComponente: z.number().int().positive('Componente requerido'),
-  Obs: z.string().optional(),
-  OrigenVinculo: z.string().optional(),
-  Motivo: z.string().optional(),
-  IdIntervencion: z.number().int().positive().optional(),
+  Obs: z.string().nullish(),
+  OrigenVinculo: z.string().nullish(),
+  Motivo: z.string().nullish(),
+  IdIntervencion: z.number().int().positive().nullish(),
+});
+
+export const equipoLoteSchema = z.object({
+  IdTipodeEquipo: z.number().int().positive('Tipo de equipo requerido'),
+  cantidad: z.number().int().min(1).max(100, 'Máximo 100 equipos por lote'),
+  idPlantillaComp: z.number().int().positive('Plantilla requerida'),
+});
+
+export const plantillaComponentesSchema = z.object({  Nombre: z.string().min(1, 'Nombre requerido').max(120),
+  Descripcion: z.string().max(255).nullish(),
+  componentes: z.array(z.object({
+    IdTipodeComponente: z.number().int().positive('Tipo de componente requerido'),
+    Marca: z.string().nullish(),
+    Modelo: z.string().nullish(),
+    Capacidad: z.string().nullish(),
+  })).min(1, 'La plantilla debe tener al menos un componente'),
 });
 
 export const componenteCreateSchema = z.object({

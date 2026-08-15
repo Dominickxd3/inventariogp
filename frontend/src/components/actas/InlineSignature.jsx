@@ -3,7 +3,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 
 const MAX_HISTORY = 40
 
 const InlineSignature = forwardRef(function InlineSignature(
-  { value, onChange, onHistoryChange, width = 220, height = 64, className = '', highlight = false },
+  { value, onChange, onHistoryChange, width = 220, height = 64, className = '', highlight = false, hideHint = false },
   ref,
 ) {
   const canvasRef = useRef(null)
@@ -68,14 +68,14 @@ const InlineSignature = forwardRef(function InlineSignature(
     const canvas = canvasRef.current
     if (!canvas || strokesRef.current.length === 0) {
       skipValueSyncRef.current = true
-      onChange(null)
+      onChange(null, null)
       return
     }
 
     const allPoints = strokesRef.current.flat()
     if (allPoints.length === 0) {
       skipValueSyncRef.current = true
-      onChange(null)
+      onChange(null, null)
       return
     }
 
@@ -97,7 +97,7 @@ const InlineSignature = forwardRef(function InlineSignature(
 
     if (cropW <= 1 || cropH <= 1) {
       skipValueSyncRef.current = true
-      onChange(canvas.toDataURL('image/png'))
+      onChange(canvas.toDataURL('image/png'), { left: cropX, top: cropY, width: cropW, height: cropH })
       return
     }
 
@@ -112,7 +112,7 @@ const InlineSignature = forwardRef(function InlineSignature(
     )
 
     skipValueSyncRef.current = true
-    onChange(tmp.toDataURL('image/png'))
+    onChange(tmp.toDataURL('image/png'), { left: cropX, top: cropY, width: cropW, height: cropH })
   }, [onChange, width, height])
 
   const clear = useCallback(() => {
@@ -221,13 +221,15 @@ const InlineSignature = forwardRef(function InlineSignature(
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       />
-      <p
-        ref={hintRef}
-        aria-hidden
-        className="pointer-events-none absolute inset-0 flex items-center justify-center text-[9pt] text-neutral-400 select-none"
-      >
-        Firme aquí
-      </p>
+      {!hideHint && (
+        <p
+          ref={hintRef}
+          aria-hidden
+          className="pointer-events-none absolute inset-0 flex items-center justify-center text-[9pt] text-neutral-400 select-none"
+        >
+          Firme aquí
+        </p>
+      )}
     </div>
   )
 })
