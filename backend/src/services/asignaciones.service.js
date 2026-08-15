@@ -3,6 +3,7 @@ import { EquiposRepository } from '../repositories/equipos.repository.js';
 import { ComponentesRepository } from '../repositories/componentes.repository.js';
 import { TrabajadoresRepository } from '../repositories/trabajadores.repository.js';
 import { IncidenciasRepository } from '../repositories/incidencias.repository.js';
+import { ActasRepository } from '../repositories/actas.repository.js';
 import { ConfiguracionesService } from './configuraciones.service.js';
 import { ConfiguracionesRepository } from '../repositories/configuraciones.repository.js';
 import { withTransaction, createRequest, query } from '../config/db.js';
@@ -48,6 +49,27 @@ async function validarEquipoDisponible(idEquipo) {
   return equipo;
 }
 
+// R1: evita doble entrega. Si el equipo ya tuvo una asignación previa, exige
+// que exista un acta de devolución registrada (no anulada) antes de reasignarlo.
+async function validarDevolucionPrevia(idEquipo) {
+  const historial = await AsignacionesRepository.getHistorialByEquipo(idEquipo);
+  if (!historial.length) return;
+
+  const previa = historial[0];
+  if (previa.Estado === 'VIGENTE') {
+    throw new Error(
+      `El equipo ya está asignado. Registra la devolución (acta ACT-DEV) antes de generar una nueva entrega.`
+    );
+  }
+
+  const actaDev = await ActasRepository.getByAssignmentAndType(previa.IdMovEquipoAsignacion, 'DEVOLUCION');
+  if (!actaDev || actaDev.EstadoActa === 'ANULADA') {
+    throw new Error(
+      `El equipo tiene una asignación previa sin acta de devolución registrada. Genera y registra la ACT-DEV antes de asignarlo nuevamente.`
+    );
+  }
+}
+
 export const AsignacionesService = {
   async list(filtros) {
     return AsignacionesRepository.listAll(filtros);
@@ -66,6 +88,7 @@ export const AsignacionesService = {
 
     const equipo = await validarEquipoDisponible(idEquipo);
     await validarTrabajador(idTrabajador);
+    await validarDevolucionPrevia(idEquipo);
 
     const config = await ConfiguracionesService.resolver({
       idEquipo, hostname: data.Hostname, usuarioWindows: data.UsuarioWindows,
@@ -158,6 +181,13 @@ export const AsignacionesService = {
     const estadoNuevo = ESTADO_POR_MOTIVO[data.Motivo];
     const obsTexto = (data?.Obs || '').trim();
     const obsCombinada = [`Motivo: ${data.Motivo}`, obsTexto].filter(Boolean).join(' — ');
+
+    // R3: devolución con daño físico o faltante de accesorios → estado intermedio obligatorio
+    const estadoFisicoDev = (data.EstadoFisicoDevolucion || '').trim().toUpperCase() || null;
+    const obsDev = (data.ObservacionesDevolucion || '').trim() || null;
+    const devolucionConNovedad =
+      estadoNuevo === 'DISPONIBLE' && estadoFisicoDev && estadoFisicoDev !== 'BUENO';
+    const estadoEquipo = devolucionConNovedad ? 'MANTENIMIENTO' : estadoNuevo;
 
     return withTransaction(DB, async (trx) => {
       const dbAccs = await trxRows(trx, `
@@ -277,9 +307,12 @@ export const AsignacionesService = {
 
       const updResult = await trxExec(trx, `
         UPDATE Tab_EQ_MovEquiposAsignaciones
-        SET Estado = 'CESADO', FecCese = GETDATE(), Obs = @obs
+        SET Estado = 'CESADO', FecCese = GETDATE(), Obs = @obs,
+            MotivoCese = @motivoCese,
+            EstadoFisicoDevolucion = @estadoFisico,
+            ObservacionesDevolucion = @obsDev
         WHERE IdMovEquipoAsignacion = @id AND Estado = 'VIGENTE'
-      `, { id, obs: obsCombinada || null });
+      `, { id, obs: obsCombinada || null, motivoCese: data.Motivo, estadoFisico: estadoFisicoDev, obsDev });
 
       if (updResult.rowsAffected?.[0] !== 1) {
         const err = new Error('La asignación ya fue cesada o no está vigente');
@@ -290,7 +323,7 @@ export const AsignacionesService = {
       const eqResult = await trxExec(trx, `
         UPDATE Tab_EQ_MaeEquipos SET Estado = @estado
         WHERE IdMaeEquipo = @id AND Estado = 'ASIGNADO'
-      `, { estado: estadoNuevo, id: asig.IdMaeEquipo });
+      `, { estado: estadoEquipo, id: asig.IdMaeEquipo });
       if (eqResult.rowsAffected?.[0] !== 1) {
         const err = new Error('El equipo no está en estado ASIGNADO o no se pudo actualizar');
         err.statusCode = 409;
@@ -300,7 +333,7 @@ export const AsignacionesService = {
       await trxExec(trx, `
         INSERT INTO Tab_EQ_MovEstadosEquipos (IdMaeEquipo, EstadoAnterior, EstadoNuevo, IdUsuario, Obs)
         VALUES (@idEquipo, 'ASIGNADO', @estadoNuevo, @idUsuario, @obs)
-      `, { idEquipo: asig.IdMaeEquipo, estadoNuevo, idUsuario: idUsuario || null, obs: obsCombinada || 'Asignación finalizada' });
+      `, { idEquipo: asig.IdMaeEquipo, estadoNuevo: estadoEquipo, idUsuario: idUsuario || null, obs: obsCombinada || 'Asignación finalizada' });
     });
   },
 
@@ -314,6 +347,7 @@ export const AsignacionesService = {
     // Validar todos los equipos antes de la transacción
     for (const idEquipo of IdMaeEquipos) {
       await validarEquipoDisponible(idEquipo);
+      await validarDevolucionPrevia(idEquipo);
     }
 
     // La configuración TI (hostname/usuario) solo aplica en asignación de un equipo
@@ -372,6 +406,7 @@ export const AsignacionesService = {
 
     const equipo = await validarEquipoDisponible(IdMaeEquipo);
     const trabajador = await validarTrabajador(IdReferente);
+    await validarDevolucionPrevia(IdMaeEquipo);
 
     const config = await ConfiguracionesService.resolver({
       idEquipo: IdMaeEquipo, hostname: data.Hostname, usuarioWindows: data.UsuarioWindows,

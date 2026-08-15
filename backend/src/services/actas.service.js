@@ -57,7 +57,7 @@ function normalizarClave(clave) {
   return alias[limpia] || '';
 }
 
-function buildSnapshot({ asignacion, trabajador, equipo, caracteristicas, accesorios, tipoActa, plantilla }) {
+function buildSnapshot({ asignacion, trabajador, equipo, caracteristicas, accesorios, tipoActa, plantilla, estadoFisicoDevolucion, observacionesDevolucion }) {
   const eq = {
     id: equipo.IdMaeEquipo,
     codigo: equipo.CodEquipo || '',
@@ -141,6 +141,10 @@ function buildSnapshot({ asignacion, trabajador, equipo, caracteristicas, acceso
       modelo: escapeJsonValue(a.modelo),
     })),
     plantilla: plantilla || (tipoActa === 'ENTREGA' ? 'ENTREGA_LAPTOP_V1' : 'DEVOLUCION_LAPTOP_V1'),
+    ...(tipoActa === 'DEVOLUCION' ? {
+      estadoFisicoDevolucion: estadoFisicoDevolucion || null,
+      observacionesDevolucion: observacionesDevolucion || null,
+    } : {}),
   };
 }
 
@@ -166,7 +170,7 @@ function buildFilePath(tipoActa, subfolder, nombre) {
 }
 
 export const ActasService = {
-  async generarAutomatica({ idMovEquipoAsignacion, tipoActa, idUsuarioGenera }) {
+  async generarAutomatica({ idMovEquipoAsignacion, tipoActa, idUsuarioGenera, estadoFisicoDevolucion, observacionesDevolucion }) {
     try {
       const asignacion = await AsignacionesRepository.getById(idMovEquipoAsignacion);
       if (!asignacion) throw new Error(`Asignación ${idMovEquipoAsignacion} no encontrada`);
@@ -189,6 +193,7 @@ export const ActasService = {
 
       const snapshot = buildSnapshot({
         asignacion, trabajador, equipo, caracteristicas, accesorios, tipoActa,
+        estadoFisicoDevolucion, observacionesDevolucion,
       });
 
       const datosActa = {
@@ -284,6 +289,9 @@ export const ActasService = {
   async getPdf(id) {
     const acta = await ActasRepository.getById(id);
     if (!acta) return null;
+    if (acta.EstadoActa === 'ANULADA') {
+      throw Object.assign(new Error('El acta está anulada y no puede descargarse'), { statusCode: 422 });
+    }
     const ruta = acta.PdfFirmadoRuta || acta.PdfOriginalRuta;
     if (!ruta || !fs.existsSync(ruta)) return null;
     return { ruta, nombre: `${acta.CodigoActa}.pdf` };

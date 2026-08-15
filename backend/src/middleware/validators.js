@@ -86,6 +86,8 @@ export const asignacionCesarSchema = z.object({
     'PERDIDO', 'ROBADO', 'EXTRAVIADO',
   ]),
   Obs: z.string().trim().max(500).optional(),
+  EstadoFisicoDevolucion: z.string().trim().max(50).optional(),
+  ObservacionesDevolucion: z.string().trim().max(500).optional(),
   accesorios: z.array(z.object({
     idMovAccesorio: z.number().int().positive(),
     accion: z.enum(['DISPONIBLE', 'MANTENER', 'BAJA', 'PERDIDO']),

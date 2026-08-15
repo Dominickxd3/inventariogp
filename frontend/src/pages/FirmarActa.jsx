@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { api } from '../lib/api'
 import FirmarActaDocumento from '../components/actas/FirmarActaDocumento'
 
@@ -20,6 +20,7 @@ export default function FirmarActa() {
   const [tipoActa, setTipoActa] = useState(null)
   const [resultado, setResultado] = useState(null)
   const [enviandoFirma, setEnviandoFirma] = useState(false)
+  const firmaEnviadaRef = useRef(false)
 
   useEffect(() => {
     if (token) window.history.replaceState(null, '', window.location.pathname)
@@ -50,12 +51,15 @@ export default function FirmarActa() {
   }
 
   async function handleFirmar(firmaBase64) {
+    if (firmaEnviadaRef.current) return
+    firmaEnviadaRef.current = true
     setEnviandoFirma(true)
     try {
       const data = await api.public.firmarActa(token, ultimosCuatroDni, true, firmaBase64)
       setResultado(data)
       setPaso(PASO.EXITO)
     } catch (err) {
+      firmaEnviadaRef.current = false
       alert(err.message || 'No se pudo registrar la firma.')
     } finally {
       setEnviandoFirma(false)

@@ -124,6 +124,8 @@ router.post('/:id/cesar', roleMiddleware('ADMIN', 'TECNICO'), validate(asignacio
       idMovEquipoAsignacion: parseInt(req.params.id),
       tipoActa: 'DEVOLUCION',
       idUsuarioGenera: req.usuario.id,
+      estadoFisicoDevolucion: req.body?.EstadoFisicoDevolucion,
+      observacionesDevolucion: req.body?.ObservacionesDevolucion,
     });
 
     if (actaResult.success) {

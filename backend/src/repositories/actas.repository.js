@@ -188,4 +188,14 @@ export const ActasRepository = {
     `, { idMovEquipoAsignacion });
     return rows;
   },
+
+  async tieneFirmadaPorEquipo(idEquipo) {
+    const rows = await query(DB, `
+      SELECT TOP 1 1 AS encontrado
+      FROM Tab_EQ_ActasAsignacion a
+      JOIN Tab_EQ_MovEquiposAsignaciones m ON a.IdMovEquipoAsignacion = m.IdMovEquipoAsignacion
+      WHERE m.IdMaeEquipo = @idEquipo AND a.EstadoActa = 'FIRMADA'
+    `, { idEquipo });
+    return rows.length > 0;
+  },
 };

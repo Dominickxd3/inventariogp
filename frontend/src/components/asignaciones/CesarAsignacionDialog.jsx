@@ -30,6 +30,13 @@ const ACC_OPTIONS = [
   { value: 'PERDIDO', label: 'Marcar como perdido/dañado' },
 ]
 
+const ESTADOS_FISICOS = [
+  { value: 'BUENO', label: 'Buen estado' },
+  { value: 'DANADO', label: 'Daño físico' },
+  { value: 'FALTANTE', label: 'Faltante de accesorios' },
+  { value: 'OTRO', label: 'Otro / observaciones' },
+]
+
 function escapeHtml(str) {
   if (!str) return ''
   const d = document.createElement('div')
@@ -45,6 +52,7 @@ export default function CesarAsignacionDialog({
 }) {
   const [motivo, setMotivo] = useState('')
   const [obs, setObs] = useState('')
+  const [estadoFisico, setEstadoFisico] = useState('BUENO')
   const [accActions, setAccActions] = useState([])
   const [submitting, setSubmitting] = useState(false)
 
@@ -78,6 +86,7 @@ export default function CesarAsignacionDialog({
     if (!v) {
       setMotivo('')
       setObs('')
+      setEstadoFisico('BUENO')
       setAccActions([])
     }
     onOpenChange(v)
@@ -118,6 +127,8 @@ export default function CesarAsignacionDialog({
 
     const motivoElegido = MOTIVOS.find((m) => m.value === motivo)
     const estadoDestino = motivoElegido?.estado || 'DISPONIBLE'
+    const estadoFinal =
+      estadoDestino === 'DISPONIBLE' && estadoFisico !== 'BUENO' ? 'MANTENIMIENTO' : estadoDestino
 
     const hayAcc = accs?.length > 0
     const resumenAcc = hayAcc
@@ -136,7 +147,8 @@ export default function CesarAsignacionDialog({
       html: `<div style="text-align:left;font-size:13px;">
         <p><strong>Equipo:</strong> ${escapeHtml(cesarTarget.CodEquipo)}</p>
         <p><strong>Motivo:</strong> ${escapeHtml(motivoElegido?.label)}</p>
-        <p><strong>Estado final del equipo:</strong> ${escapeHtml(estadoDestino)}</p>
+        <p><strong>Estado físico:</strong> ${escapeHtml(ESTADOS_FISICOS.find((e) => e.value === estadoFisico)?.label || estadoFisico)}</p>
+        <p><strong>Estado final del equipo:</strong> ${escapeHtml(estadoFinal)}</p>
         ${hayAcc ? `<p style="margin-top:8px;"><strong>Accesorios:</strong></p><pre style="font-size:12px;line-height:1.5;">${escapeHtml(resumenAcc)}</pre>` : ''}
       </div>`,
       showCancelButton: true,
@@ -151,6 +163,8 @@ export default function CesarAsignacionDialog({
       await api.asignaciones.cesar(cesarTarget.IdMovEquipoAsignacion, accsToSend, {
         Motivo: motivo,
         Obs: obs.trim() || undefined,
+        EstadoFisicoDevolucion: estadoFisico,
+        ObservacionesDevolucion: (estadoFisico !== 'BUENO' && obs.trim()) ? obs.trim() : undefined,
       })
       Swal.fire({ icon: 'success', title: 'Asignaci\u00f3n finalizada', text: 'El cambio de estado se registr\u00f3 correctamente', timer: 2000, showConfirmButton: false })
       onSuccess?.()
@@ -164,6 +178,8 @@ export default function CesarAsignacionDialog({
 
   const motivoElegido = MOTIVOS.find((m) => m.value === motivo)
   const estadoDestino = motivoElegido?.estado || 'DISPONIBLE'
+  const estadoFinal =
+    estadoDestino === 'DISPONIBLE' && estadoFisico !== 'BUENO' ? 'MANTENIMIENTO' : estadoDestino
 
   const hasIncompleteActions = accs?.length > 0 && accActions.length !== accs.length
   const bloqueadoPorAccs = accsLoading || accsError
@@ -202,7 +218,28 @@ export default function CesarAsignacionDialog({
             </Select>
             {motivo && (
               <p className="text-xs text-muted-foreground mt-1">
-                El equipo pasar&aacute; a estado <strong>{estadoDestino}</strong>
+                El equipo pasar&aacute; a estado <strong>{estadoFinal}</strong>
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">
+              Estado f&iacute;sico de devoluci&oacute;n <span className="text-destructive">*</span>
+            </label>
+            <Select value={estadoFisico} onValueChange={setEstadoFisico}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Seleccionar estado f&iacute;sico..." />
+              </SelectTrigger>
+              <SelectContent>
+                {ESTADOS_FISICOS.map((ef) => (
+                  <SelectItem key={ef.value} value={ef.value}>{ef.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {estadoDestino === 'DISPONIBLE' && estadoFisico !== 'BUENO' && (
+              <p className="text-xs text-amber-600 mt-1">
+                El equipo pasar&aacute; a <strong>MANTENIMIENTO</strong> para revisi&oacute;n antes de quedar disponible.
               </p>
             )}
           </div>

@@ -129,7 +129,7 @@ export default function ActasList() {
       label: 'Acciones',
       render: (row) => (
         <div className="flex gap-1">
-          {row.PdfFirmadoRuta ? (
+          {row.EstadoActa !== 'ANULADA' && (row.PdfFirmadoRuta ? (
             <Button variant="ghost" size="icon-sm" onClick={() => handleVerPdf(row.IdActa)} title="Ver PDF">
               <FileText className="w-4 h-4" />
             </Button>
@@ -137,7 +137,7 @@ export default function ActasList() {
             <Button variant="ghost" size="icon-sm" onClick={() => handleVerPdf(row.IdActa)} title="Ver PDF original">
               <FileText className="w-4 h-4" />
             </Button>
-          ) : null}
+          ) : null)}
           {(row.EstadoActa === 'PENDIENTE_FIRMA' || row.EstadoActa === 'VENCIDA') && (
             <Button variant="ghost" size="icon-sm" onClick={() => handleRegenerarEnlace(row.IdActa)} title="Generar nuevo enlace">
               <Link className="w-4 h-4" />

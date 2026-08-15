@@ -1,5 +1,6 @@
 import { EquiposRepository } from '../repositories/equipos.repository.js';
 import { AsignacionesRepository } from '../repositories/asignaciones.repository.js';
+import { ActasRepository } from '../repositories/actas.repository.js';
 import { ComponentesRepository } from '../repositories/componentes.repository.js';
 import { IncidenciasRepository } from '../repositories/incidencias.repository.js';
 import { IntervencionesRepository } from '../repositories/intervenciones.repository.js';
@@ -30,6 +31,21 @@ function businessError(message, statusCode = 400) {
   const err = new Error(message);
   err.statusCode = statusCode;
   return err;
+}
+
+// R2: no se permite modificar datos de un equipo cuyo acta ya fue firmada.
+async function validarSinActaFirmada(idEquipo, data) {
+  const contieneDatosActa = Object.keys(data || {}).some(
+    (k) => k !== 'Obs' && data[k] !== undefined && data[k] !== null
+  );
+  if (!contieneDatosActa) return;
+  const tieneFirmada = await ActasRepository.tieneFirmadaPorEquipo(idEquipo);
+  if (tieneFirmada) {
+    throw businessError(
+      'El equipo tiene un acta firmada vigente. Anula el acta y genera una nueva antes de modificar sus datos.',
+      422
+    );
+  }
 }
 
 function validarNoBaja(equipo) {
@@ -99,6 +115,7 @@ export const EquiposService = {
     const equipo = await EquiposRepository.getById(id);
     if (!equipo) throw businessError('Equipo no encontrado', 404);
     validarNoBaja(equipo);
+    await validarSinActaFirmada(id, data);
 
     if (data.CodBarra?.trim() && data.CodBarra.trim() !== (equipo.CodBarra || '')) {
       const existenteBarra = await EquiposRepository.getByCodigo(data.CodBarra.trim());
@@ -257,6 +274,7 @@ export const EquiposService = {
     const equipo = await EquiposRepository.getById(id);
     if (!equipo) throw businessError('Equipo no encontrado', 404);
     validarNoBaja(equipo);
+    await validarSinActaFirmada(id, data);
 
     const tipo = await EquiposRepository.getTipoById(equipo.IdTipodeEquipo);
     if (!ConfiguracionesService.esTipoConfigurable(tipo)) {
