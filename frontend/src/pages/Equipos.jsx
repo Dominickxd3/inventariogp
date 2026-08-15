@@ -365,7 +365,7 @@ export default function Equipos() {
 
       {/* Create Dialog */}
       <Dialog open={showCreateOpen} onOpenChange={setShowCreateOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
           <DialogHeader className="pb-1">
             <DialogTitle>Nuevo Equipo</DialogTitle>
             <DialogDescription>El código interno se genera automáticamente</DialogDescription>
@@ -484,7 +484,7 @@ export default function Equipos() {
                           <div className="flex-1 space-y-1.5">
                             <label className="text-xs font-medium text-muted-foreground">Tipo de componente</label>
                             <Select value={String(c.IdTipodeComponente || '')} onValueChange={(v) => updateCompFabrica(idx, { IdTipodeComponente: Number(v) })}>
-                              <SelectTrigger className="w-full"><SelectValue placeholder="Seleccionar tipo..." /></SelectTrigger>
+                              <SelectTrigger className="w-full"><SelectValue placeholder="Seleccionar tipo...">{(compTipos || []).find((t) => String(t.IdTipodeComponente) === String(c.IdTipodeComponente))?.DesTipodeComponente}</SelectValue></SelectTrigger>
                               <SelectContent>
                                 {(compTipos || []).map((t) => (
                                   <SelectItem key={t.IdTipodeComponente} value={String(t.IdTipodeComponente)}>{t.DesTipodeComponente}</SelectItem>
@@ -496,7 +496,7 @@ export default function Equipos() {
                             <Trash2 className="w-4 h-4 text-destructive" />
                           </Button>
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           <Input placeholder="Marca (ej: Kingston)" value={c.Marca} onChange={(e) => updateCompFabrica(idx, { Marca: e.target.value })} />
                           <Input placeholder="Modelo (ej: HyperX)" value={c.Modelo} onChange={(e) => updateCompFabrica(idx, { Modelo: e.target.value })} />
                           <Input placeholder="Serie / S/N" value={c.Serie} onChange={(e) => updateCompFabrica(idx, { Serie: e.target.value })} />
@@ -558,7 +558,7 @@ export default function Equipos() {
 
       {/* Gestor de plantillas de componentes */}
       <Dialog open={plantillaOpen} onOpenChange={(v) => { setPlantillaOpen(v); if (!v) setPlantillaEditando(null); }}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-2xl" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
           <DialogHeader>
             <DialogTitle>{plantillaEditando ? 'Editar plantilla' : 'Plantillas de componentes'}</DialogTitle>
             <DialogDescription>Configuración estándar de piezas para registrar PCs armadas por lote.</DialogDescription>
@@ -622,11 +622,11 @@ export default function Equipos() {
                 </div>
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {plantillaEditando.componentes.map((c, idx) => (
-                    <div key={idx} className="grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-2 items-center">
+                    <div key={idx} className="grid grid-cols-1 gap-2 items-center sm:grid-cols-[1fr_1fr_1fr_1fr_auto]">
                       <Select value={String(c.IdTipodeComponente || '')} onValueChange={(v) => setPlantillaEditando((prev) => {
                         const arr = [...prev.componentes]; arr[idx] = { ...arr[idx], IdTipodeComponente: Number(v) }; return { ...prev, componentes: arr };
                       })}>
-                        <SelectTrigger className="w-full"><SelectValue placeholder="Tipo" /></SelectTrigger>
+                        <SelectTrigger className="w-full"><SelectValue placeholder="Tipo">{(compTipos || []).find((t) => String(t.IdTipodeComponente) === String(c.IdTipodeComponente))?.DesTipodeComponente}</SelectValue></SelectTrigger>
                         <SelectContent>
                           {(compTipos || []).map((t) => (
                             <SelectItem key={t.IdTipodeComponente} value={String(t.IdTipodeComponente)}>{t.DesTipodeComponente}</SelectItem>

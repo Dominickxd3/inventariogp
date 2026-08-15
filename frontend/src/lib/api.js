@@ -212,4 +212,14 @@ export const api = {
       request(`/componentes/${id}/caracteristicas`, { method: 'PUT', body: JSON.stringify({ caracteristicas }) }),
     searchCatalogo: (nombre, q) => request(`/componentes/catalogos/${nombre}/search?q=${encodeURIComponent(q)}`),
   },
+  catalogos: {
+    list: () => request('/catalogos'),
+    create: (data) => request('/catalogos', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id, data) => request(`/catalogos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    toggle: (id, activo) => request(`/catalogos/${id}`, { method: 'PATCH', body: JSON.stringify({ Activo: activo }) }),
+    valores: (id, params) => request(`/catalogos/${id}/valores?${new URLSearchParams(params)}`),
+    createValor: (id, nombre) => request(`/catalogos/${id}/valores`, { method: 'POST', body: JSON.stringify({ NombreValor: nombre }) }),
+    updateValor: (id, vid, nombre) => request(`/catalogos/${id}/valores/${vid}`, { method: 'PUT', body: JSON.stringify({ NombreValor: nombre }) }),
+    toggleValor: (id, vid, activo) => request(`/catalogos/${id}/valores/${vid}`, { method: 'PATCH', body: JSON.stringify({ Activo: activo }) }),
+  },
 };

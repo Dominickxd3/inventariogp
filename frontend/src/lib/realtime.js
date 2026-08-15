@@ -39,6 +39,10 @@ const CONFIGURACION_KEYS = [
   ['timeline-equipo'],
 ];
 
+const CATALOGO_KEYS = [
+  ['catalogos'], ['catalogo-valores'],
+];
+
 export const EVENTO_QUERY_KEYS = {
   'equipo.created': EQUIPO_KEYS,
   'equipo.updated': EQUIPO_KEYS,
@@ -59,6 +63,8 @@ export const EVENTO_QUERY_KEYS = {
   'acta.enlace-regenerado': ACTA_KEYS,
   'incidencia.created': INCIDENCIA_KEYS,
   'incidencia.updated': INCIDENCIA_KEYS,
+  'catalogo.updated': CATALOGO_KEYS,
+  'catalogo.valores.updated': CATALOGO_KEYS,
 };
 
 export function invalidarPorEvento(queryClient, tipo) {
